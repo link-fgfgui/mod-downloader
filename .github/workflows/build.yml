@@ -1,0 +1,106 @@
+name: Wails Build & Release
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - 'v*' # 当推送以 v 开头的标签（如 v1.0.0）时触发
+  pull_request:
+    branches:
+      - master
+
+# 显式声明权限，允许工作流创建和写入 Release 产物
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: windows-latest
+            platform: windows
+          - os: macos-latest
+            platform: darwin
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+          cache: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json # 如果使用 yarn/pnpm 请根据实际情况调整或删除此行
+
+      - name: Install Linux Dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev build-essential pkg-config || \
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev build-essential pkg-config
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Build Wails App
+        shell: bash
+        run: |
+          # setup-go 会自动把 go/bin 加入 PATH，直接运行 wails 即可
+          wails build -clean
+
+      # macOS 编译出的产物是一个 .app 文件夹，必须压缩成 zip 才能正常上传和分发
+      - name: Package macOS App
+        if: matrix.platform == 'darwin'
+        shell: bash
+        run: |
+          cd build/bin
+          zip -r macos-app.zip *.app
+          rm -rf *.app
+
+      # 无论何种触发条件，构建完成后都将产物上传到 Actions 存储中
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wails-artifact-${{ matrix.platform }}
+          path: build/bin/*
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/') # 仅在推 Tag 时才执行此 Job
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      # 整理下载下来的矩阵产物，将其扁平化移动到一个统一的目录中
+      - name: Flatten Artifacts Structure
+        run: |
+          mkdir ./dist
+          find ./artifacts -type f -exec cp {} ./dist/ \;
+          echo "=== 待发布文件列表 ==="
+          ls -l ./dist
+
+      - name: Create and Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
