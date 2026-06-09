@@ -5,6 +5,6 @@ import { createVuetify } from "vuetify";
 export default createVuetify({
   // Configure themes, i18n, etc. here
   theme: {
-    defaultTheme: "light",
+    defaultTheme: "dark",
   },
 });

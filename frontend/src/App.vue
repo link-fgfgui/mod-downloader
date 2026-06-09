@@ -26,18 +26,16 @@
 <script setup lang="ts">
 import SideBar from "./components/SideBar/SideBar.vue";
 import { onMounted, onUnmounted, ref } from "vue";
-import { GetDownloadQueueState } from "../wailsjs/go/main/App";
+import { useTheme } from "vuetify";
+import { GetDownloadQueueState, GetPreferences } from "../wailsjs/go/main/App";
 import { EventsOn } from "../wailsjs/runtime/runtime";
 
-// const drawer = ref(true);
-
-import { useI18n } from "vue-i18n";
-const { locale } = useI18n();
-function toggleLanguage() {
-    locale.value = locale.value === "zh" ? "en" : "zh";
-}
-
 const downloadQueueUpdatedEvent = "download-queue-updated";
+const themeDark = "dark";
+const themeLight = "light";
+const themeSystem = "system";
+
+const vuetifyTheme = useTheme();
 const downloadQueue = ref({
     active: false,
     pending: 0,
@@ -45,8 +43,38 @@ const downloadQueue = ref({
 });
 
 let stopListeningDownloadQueueUpdated: (() => void) | null = null;
+let systemThemeQuery: MediaQueryList | null = null;
+let stopListeningSystemTheme: (() => void) | null = null;
+
+const applyVuetifyTheme = (theme: string) => {
+    stopListeningSystemTheme?.();
+    stopListeningSystemTheme = null;
+    systemThemeQuery = null;
+
+    const normalizedTheme = theme?.trim().toLowerCase();
+    if (normalizedTheme === themeLight) {
+        vuetifyTheme.global.name.value = "light";
+        return;
+    }
+    if (normalizedTheme !== themeSystem) {
+        vuetifyTheme.global.name.value = "dark";
+        return;
+    }
+
+    systemThemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const applySystemTheme = () => {
+        vuetifyTheme.global.name.value = systemThemeQuery?.matches ? "dark" : "light";
+    };
+    applySystemTheme();
+    systemThemeQuery.addEventListener("change", applySystemTheme);
+    stopListeningSystemTheme = () => {
+        systemThemeQuery?.removeEventListener("change", applySystemTheme);
+    };
+};
 
 onMounted(async () => {
+    const preferences = await GetPreferences();
+    applyVuetifyTheme(preferences?.theme ?? themeDark);
     downloadQueue.value = await GetDownloadQueueState();
     stopListeningDownloadQueueUpdated = EventsOn(downloadQueueUpdatedEvent, (state) => {
         downloadQueue.value = state || { active: false, pending: 0, running: 0 };
@@ -55,6 +83,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
     stopListeningDownloadQueueUpdated?.();
+    stopListeningSystemTheme?.();
 });
 </script>
 

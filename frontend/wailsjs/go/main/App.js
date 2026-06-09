@@ -26,6 +26,10 @@ export function GetPinnedModVersion(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['GetPinnedModVersion'](arg1, arg2, arg3, arg4);
 }
 
+export function GetPreferences() {
+  return window['go']['main']['App']['GetPreferences']();
+}
+
 export function GetSelectedVersion() {
   return window['go']['main']['App']['GetSelectedVersion']();
 }

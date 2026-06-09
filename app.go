@@ -34,6 +34,10 @@ type App struct {
 	config *configs.Config
 }
 
+type AppPreferences struct {
+	Theme string `json:"theme"`
+}
+
 // NewApp creates a new App application struct
 func NewApp() *App {
 	return &App{}
@@ -118,6 +122,13 @@ func (a *App) PinModVersion(req appstructs.ModVersionPinRequest) database.Pinned
 
 func (a *App) GetMinecraftReleaseVersions() []string {
 	return minecraft.GetMinecraftReleaseVersions()
+}
+
+func (a *App) GetPreferences() AppPreferences {
+	if a.config == nil {
+		return AppPreferences{Theme: configs.ThemeDark.String()}
+	}
+	return AppPreferences{Theme: a.config.Prefers.Theme.Normalized().String()}
 }
 
 func (a *App) QueueModDownload(req appstructs.ModDownloadRequest) appstructs.ModDownloadResult {

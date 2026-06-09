@@ -25,6 +25,23 @@ export namespace database {
 
 }
 
+export namespace main {
+	
+	export class AppPreferences {
+	    theme: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AppPreferences(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.theme = source["theme"];
+	    }
+	}
+
+}
+
 export namespace structs {
 	
 	export class DownloadQueueState {

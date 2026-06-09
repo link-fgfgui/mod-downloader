@@ -37,7 +37,7 @@ func Load() (*Config, error) {
 	if err := cleanenv.ReadConfig(path, &cfg); err != nil {
 		if os.IsNotExist(err) {
 			logging.Info("config file not found, loading from environment", "path", path)
-			if err := cleanenv.ReadEnv(&cfg); err != nil {
+			if err := readEnv(&cfg); err != nil {
 				logging.Error("load config from environment failed", "error", err)
 				return nil, fmt.Errorf("read env: %w", err)
 			}
@@ -50,6 +50,10 @@ func Load() (*Config, error) {
 
 	logging.Info("config loaded from file", "path", path, "hasCurseforgeKey", cfg.Keys.CurseforgeApiKey != "", "hasModrinthKey", cfg.Keys.ModrinthApiKey != "", "minecraftDir", cfg.Prefers.MinecraftDir)
 	return &cfg, nil
+}
+
+func readEnv(cfg *Config) error {
+	return cleanenv.ReadEnv(cfg)
 }
 
 // Save writes the configuration to mod-downloader.toml in pwd.
