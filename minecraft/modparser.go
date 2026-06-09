@@ -123,6 +123,7 @@ func parseModsToml(r *zip.Reader, path string) ([]structs.ModInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+	properties := jarManifestProperties(r)
 
 	var meta struct {
 		Mods []struct {
@@ -144,12 +145,78 @@ func parseModsToml(r *zip.Reader, path string) ([]structs.ModInfo, error) {
 		}
 		infos = append(infos, structs.ModInfo{
 			ID:          id,
-			Name:        m.DisplayName,
-			Version:     m.Version,
-			Description: m.Description,
+			Name:        resolveMetadataValue(m.DisplayName, properties),
+			Version:     resolveMetadataValue(m.Version, properties),
+			Description: resolveMetadataValue(m.Description, properties),
 		})
 	}
 	return infos, nil
+}
+
+func jarManifestProperties(r *zip.Reader) map[string]string {
+	data, err := readZipFile(r, "META-INF/MANIFEST.MF")
+	if err != nil {
+		return nil
+	}
+
+	attrs := parseManifestMainAttributes(data)
+	if len(attrs) == 0 {
+		return nil
+	}
+
+	props := make(map[string]string, len(attrs)+1)
+	if version := strings.TrimSpace(attrs["Implementation-Version"]); version != "" {
+		props["file.jarVersion"] = version
+	}
+	for key, value := range attrs {
+		if strings.TrimSpace(value) == "" {
+			continue
+		}
+		props["file."+key] = strings.TrimSpace(value)
+	}
+	return props
+}
+
+func parseManifestMainAttributes(data []byte) map[string]string {
+	attrs := make(map[string]string)
+	var currentKey string
+	for _, rawLine := range strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n") {
+		line := strings.TrimRight(rawLine, "\r")
+		if line == "" {
+			break
+		}
+		if strings.HasPrefix(line, " ") && currentKey != "" {
+			attrs[currentKey] += line[1:]
+			continue
+		}
+		key, value, ok := strings.Cut(line, ":")
+		if !ok {
+			currentKey = ""
+			continue
+		}
+		currentKey = strings.TrimSpace(key)
+		if currentKey == "" {
+			continue
+		}
+		attrs[currentKey] = strings.TrimSpace(value)
+	}
+	return attrs
+}
+
+func resolveMetadataValue(value string, properties map[string]string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+
+	resolved := value
+	for key, replacement := range properties {
+		resolved = strings.ReplaceAll(resolved, "${"+key+"}", replacement)
+	}
+	if strings.Contains(resolved, "${") {
+		return ""
+	}
+	return resolved
 }
 
 // --- registry ---

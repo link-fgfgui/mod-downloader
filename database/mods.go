@@ -21,7 +21,7 @@ const (
 	kindVersionScope   = "version-scope"
 	kindPinnedMod      = "pinned-mod"
 	kindJarMetadata    = "jar-metadata"
-	jarMetadataVersion = "recursive-jar-mod-id-v4"
+	jarMetadataVersion = "recursive-jar-mod-id-v5"
 )
 
 // --- record types ---

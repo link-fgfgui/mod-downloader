@@ -107,6 +107,50 @@ modId="forgeonly"
 	}
 }
 
+func TestParseNeoForgeJarVersionFromManifest(t *testing.T) {
+	jar := testJar(t, map[string][]byte{
+		"META-INF/neoforge.mods.toml": []byte(`
+license="MIT"
+
+[[mods]]
+modId="jade"
+displayName="Jade"
+version="${file.jarVersion}"
+description="Minecraft mod shows what you are looking at."
+`),
+		"META-INF/MANIFEST.MF": []byte("Manifest-Version: 1.0\r\nImplementation-Title: Jade\r\nImplementation-Version: 15.10.5+neoforge\r\n\r\n"),
+	})
+
+	got := ParseModZipReader(testZipReader(t, jar), "Jade-1.21.1-NeoForge-15.10.5.jar", "neoforge")
+	if len(got) != 1 {
+		t.Fatalf("ParseModZipReader() returned %d mods, want 1: %#v", len(got), got)
+	}
+	if got[0].Version != "15.10.5+neoforge" {
+		t.Fatalf("version = %q, want %q", got[0].Version, "15.10.5+neoforge")
+	}
+}
+
+func TestParseModsTomlDropsUnresolvedPlaceholders(t *testing.T) {
+	jar := testJar(t, map[string][]byte{
+		"META-INF/mods.toml": []byte(`
+license="MIT"
+
+[[mods]]
+modId="example"
+displayName="${missing.name}"
+version="${missing.version}"
+`),
+	})
+
+	got := ParseModZipReader(testZipReader(t, jar), "example.jar", "forge")
+	if len(got) != 1 {
+		t.Fatalf("ParseModZipReader() returned %d mods, want 1: %#v", len(got), got)
+	}
+	if got[0].Name != "" || got[0].Version != "" {
+		t.Fatalf("metadata placeholders were not dropped: %#v", got[0])
+	}
+}
+
 func modIDs(mods []structs.ModInfo) []string {
 	ids := make([]string, 0, len(mods))
 	for _, mod := range mods {
