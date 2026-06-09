@@ -1,0 +1,10 @@
+build/bin
+node_modules
+frontend/dist
+*.md
+mod-downloader.toml
+mods.db
+mods.db-shm
+mods.db-wal
+exampleJars/
+dev.sh

@@ -1,0 +1,31 @@
+{
+  "lsp": {
+    "vtsls": {
+      "settings": {
+        "vtsls": {
+          "tsserver": {
+            "globalPlugins": [
+              {
+                "name": "@vue/typescript-plugin",
+                "location": "/home/link/.local/share/zed/extensions/work/vue/node_modules/@vue/language-server",
+                "languages": ["vue.js"],
+                "configNamespace": "typescript",
+                "enableForWorkspaceTypeScriptVersions": true
+              }
+            ]
+          }
+        }
+      }
+    },
+    "vue-language-server": {
+      "initialization_options": {
+        "typescript": {
+          "tsdk": "frontend/node_modules/typescript/lib"
+        },
+        "vue": {
+          "hybridMode": true
+        }
+      }
+    }
+  }
+}
