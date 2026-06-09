@@ -34,3 +34,27 @@ func TestLocalModPathsInInstanceByModIDSupportsMultipleIDsPerSHA1(t *testing.T) 
 		}
 	}
 }
+
+func TestHasLocalModPathsInInstance(t *testing.T) {
+	ClearLocalMods()
+	defer ClearLocalMods()
+
+	if HasLocalModPathsInInstance("test-instance") {
+		t.Fatal("HasLocalModPathsInInstance returned true for empty cache")
+	}
+
+	UpsertLocalMod(structs.ModInfo{
+		ID:       "testmod",
+		FileName: "test",
+		Path:     "versions/test/mods/test.jar",
+		SHA1:     "sha1",
+		Enabled:  true,
+	}, "test-instance", "1.20.1", "forge")
+
+	if !HasLocalModPathsInInstance("test-instance") {
+		t.Fatal("HasLocalModPathsInInstance returned false after upsert")
+	}
+	if HasLocalModPathsInInstance("other-instance") {
+		t.Fatal("HasLocalModPathsInInstance returned true for another instance")
+	}
+}

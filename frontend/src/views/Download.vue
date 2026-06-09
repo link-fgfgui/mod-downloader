@@ -172,6 +172,7 @@ const runSearch = async ({ append = false } = {}) => {
 
     const requestID = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     activeSearchRequestID.value = requestID;
+    activeDownloadStateRequestID = "";
     activeSearchAppend.value = append;
     const offset = append ? nextSearchOffset.value : 0;
     if (append) {
@@ -179,6 +180,7 @@ const runSearch = async ({ append = false } = {}) => {
         isLoadingMore.value = true;
     } else {
         searchResults.value = [];
+        downloadStates.value = [];
         appendBaseResults.value = [];
         nextSearchOffset.value = 0;
         hasMoreResults.value = true;
@@ -218,6 +220,9 @@ const loadMoreSearchResults = async () => {
 };
 
 const refreshDownloadStates = async () => {
+    if (isSearching.value || isLoadingMore.value) {
+        return;
+    }
     const requestID = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     activeDownloadStateRequestID = requestID;
     const results = searchResults.value || [];
@@ -394,6 +399,9 @@ onMounted(() => {
         } else {
             isSearching.value = loading;
         }
+        if (!loading) {
+            void refreshDownloadStates();
+        }
     });
 
     // 初始化：拉一次当前选中实例，使下拉框与实际选中实例一致
@@ -416,7 +424,8 @@ onUnmounted(() => {
     stopListeningDownloadFailed?.();
 });
 
-watch([searchResults, selectedVersion, selectedModLoader], () => {
+watch([selectedVersion, selectedModLoader], () => {
+    downloadStates.value = [];
     refreshDownloadStates();
 }, { deep: false });
 </script>

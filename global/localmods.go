@@ -111,6 +111,39 @@ func GetLocalModFilePathsByVersionLoader(mcVersion, modLoader string) []LocalMod
 	return paths
 }
 
+func HasLocalModPathsInInstance(instanceID string) bool {
+	instanceID = strings.TrimSpace(instanceID)
+	if instanceID == "" {
+		return false
+	}
+
+	localModsMu.RLock()
+	defer localModsMu.RUnlock()
+	for _, path := range localModFilePaths {
+		if path.InstanceID == instanceID {
+			return true
+		}
+	}
+	return false
+}
+
+func LocalModPathsInInstance(instanceID string) []LocalModFilePath {
+	instanceID = strings.TrimSpace(instanceID)
+	if instanceID == "" {
+		return nil
+	}
+
+	localModsMu.RLock()
+	defer localModsMu.RUnlock()
+	out := make([]LocalModFilePath, 0)
+	for _, path := range localModFilePaths {
+		if path.InstanceID == instanceID {
+			out = append(out, path)
+		}
+	}
+	return out
+}
+
 // LocalModPathsInInstanceByModID 返回某实例内、所属 jar 的 ModID 匹配 modID 的本地文件路径记录。
 // 每条记录带有 FileSHA1(用于按 sha1 判定状态）与 Path（用于替换时删除磁盘文件）。
 func LocalModPathsInInstanceByModID(instanceID, modID string) []LocalModFilePath {

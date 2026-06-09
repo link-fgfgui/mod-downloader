@@ -7,8 +7,8 @@ require (
 	github.com/BurntSushi/toml v1.5.0
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/ilyakaznacheev/cleanenv v1.5.0
-	github.com/mattn/go-sqlite3 v1.14.45
 	github.com/sjet47/go-curseforge v0.6.0
+	github.com/tidwall/buntdb v1.3.2
 	github.com/wailsapp/wails/v2 v2.12.0
 )
 
@@ -47,6 +47,13 @@ require (
 	github.com/samber/lo v1.49.1 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/spf13/cast v1.7.0 // indirect
+	github.com/tidwall/btree v1.4.2 // indirect
+	github.com/tidwall/gjson v1.14.3 // indirect
+	github.com/tidwall/grect v0.1.4 // indirect
+	github.com/tidwall/match v1.1.1 // indirect
+	github.com/tidwall/pretty v1.2.0 // indirect
+	github.com/tidwall/rtred v0.1.2 // indirect
+	github.com/tidwall/tinyqueue v0.1.1 // indirect
 	github.com/tkrajina/go-reflector v0.5.8 // indirect
 	github.com/urfave/cli/v2 v2.27.7 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect

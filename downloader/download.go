@@ -131,12 +131,20 @@ func GetDownloadStates(req appstructs.DownloadStatesRequest) []appstructs.ModDow
 	req.ModLoader = strings.ToLower(strings.TrimSpace(req.ModLoader))
 
 	states := make([]appstructs.ModDownloadButtonState, len(req.Results))
+	selected := global.GetSelectedVersion()
+	instanceID := versionInstanceID(selected)
+	if instanceID == "" || !global.HasLocalModPathsInInstance(instanceID) {
+		for i := range req.Results {
+			states[i] = defaultDownloadButtonState(req.Results[i])
+		}
+		return states
+	}
+
 	var wg sync.WaitGroup
 	for i := range req.Results {
 		result := req.Results[i]
-		key := providers.ProjectReferenceFromSearchResult(result)
-		states[i] = appstructs.ModDownloadButtonState{Key: key, Status: btnStatusNew, Icon: "mdi-download", Color: "primary"}
-		if key == "" {
+		states[i] = defaultDownloadButtonState(result)
+		if states[i].Key == "" {
 			continue
 		}
 
@@ -144,7 +152,7 @@ func GetDownloadStates(req appstructs.DownloadStatesRequest) []appstructs.ModDow
 		go func(idx int) {
 			defer wg.Done()
 			status := localModButtonStatus(appstructs.ModDownloadRequest{
-				ProjectID:        key,
+				ProjectID:        states[idx].Key,
 				Result:           result,
 				MinecraftVersion: req.MinecraftVersion,
 				ModLoader:        req.ModLoader,
@@ -154,6 +162,10 @@ func GetDownloadStates(req appstructs.DownloadStatesRequest) []appstructs.ModDow
 	}
 	wg.Wait()
 	return states
+}
+
+func defaultDownloadButtonState(result appstructs.SearchModResult) appstructs.ModDownloadButtonState {
+	return appstructs.ModDownloadButtonState{Key: providers.ProjectReferenceFromSearchResult(result), Status: btnStatusNew, Icon: "mdi-download", Color: "primary"}
 }
 
 // applyButtonStatus 把状态映射成按钮的禁用/图标/颜色。
@@ -178,6 +190,62 @@ func applyButtonStatus(state *appstructs.ModDownloadButtonState, status string) 
 
 // localModButtonStatus 判定某搜索结果在当前选中实例下的按钮状态。
 func localModButtonStatus(req appstructs.ModDownloadRequest) string {
+	req.ProjectID = strings.TrimSpace(req.ProjectID)
+	if req.ProjectID == "" {
+		req.ProjectID = providers.ProjectReferenceFromSearchResult(req.Result)
+	}
+
+	req, instanceID, _, ok := applySelectedInstance(req)
+	if !ok || req.ProjectID == "" || req.MinecraftVersion == "" || req.ModLoader == "" {
+		return btnStatusNew
+	}
+
+	versions := downloadVersionsForRequest(req)
+	if len(versions) == 0 {
+		return btnStatusNew
+	}
+	version := versions[0]
+
+	localPaths := global.LocalModPathsInInstance(instanceID)
+	if len(localPaths) == 0 {
+		return btnStatusNew
+	}
+
+	latestSHA1 := strings.ToLower(strings.TrimSpace(version.SHA1))
+	if latestSHA1 != "" {
+		for _, p := range localPaths {
+			if strings.ToLower(strings.TrimSpace(p.FileSHA1)) == latestSHA1 {
+				return btnStatusInstalled
+			}
+		}
+	}
+
+	projectSHA1s := projectVersionSHA1Set(versions)
+	hasProjectFile := false
+	for _, p := range localPaths {
+		if projectSHA1s[strings.ToLower(strings.TrimSpace(p.FileSHA1))] {
+			hasProjectFile = true
+			break
+		}
+	}
+	if hasProjectFile {
+		return btnStatusUpdate
+	}
+
+	if mods, ok := database.GetJarMetadata(version.SHA1); ok {
+		for _, p := range localModPathsForMods(mods, instanceID) {
+			if strings.ToLower(strings.TrimSpace(p.FileSHA1)) != latestSHA1 {
+				return btnStatusConflict
+			}
+		}
+	}
+
+	return btnStatusNew
+}
+
+// localModButtonStatusPrecise may parse the remote jar to discover mod ids.
+// Use it for install-time dependency decisions, not for search-list button state.
+func localModButtonStatusPrecise(req appstructs.ModDownloadRequest) string {
 	req.ProjectID = strings.TrimSpace(req.ProjectID)
 	if req.ProjectID == "" {
 		req.ProjectID = providers.ProjectReferenceFromSearchResult(req.Result)
@@ -220,6 +288,16 @@ func localModButtonStatus(req appstructs.ModDownloadRequest) string {
 	return btnStatusConflict
 }
 
+func projectVersionSHA1Set(versions []appstructs.ProjectVersionResult) map[string]bool {
+	out := make(map[string]bool, len(versions))
+	for _, version := range versions {
+		if sha1 := strings.ToLower(strings.TrimSpace(version.SHA1)); sha1 != "" {
+			out[sha1] = true
+		}
+	}
+	return out
+}
+
 // localModPathsForMods 汇总实例内与给定 mod 集合任一 modId 匹配的本地文件记录（按路径去重）。
 func localModPathsForMods(mods []mcstructs.ModInfo, instanceID string) []global.LocalModFilePath {
 	out := make([]global.LocalModFilePath, 0)
@@ -237,6 +315,14 @@ func localModPathsForMods(mods []mcstructs.ModInfo, instanceID string) []global.
 }
 
 func downloadVersionForRequest(req appstructs.ModDownloadRequest) (appstructs.ProjectVersionResult, bool) {
+	versions := downloadVersionsForRequest(req)
+	if len(versions) == 0 {
+		return appstructs.ProjectVersionResult{}, false
+	}
+	return versions[0], true
+}
+
+func downloadVersionsForRequest(req appstructs.ModDownloadRequest) []appstructs.ProjectVersionResult {
 	platform := strings.ToLower(strings.TrimSpace(req.Result.Platform))
 	projectID := strings.TrimSpace(req.ProjectID)
 	if platform == "" {
@@ -248,15 +334,12 @@ func downloadVersionForRequest(req appstructs.ModDownloadRequest) (appstructs.Pr
 
 	if pin, ok := database.GetPinnedMod(platform, projectID, req.MinecraftVersion, req.ModLoader); ok {
 		if version, found := findProjectVersionByID(providers.ListMatchingProjectVersions(req.Result, req.MinecraftVersion, req.ModLoader), pin.VersionID); found {
-			return version, true
+			return []appstructs.ProjectVersionResult{version}
 		}
 	}
 
 	versions := providers.ListMatchingProjectVersions(req.Result, req.MinecraftVersion, req.ModLoader)
-	if len(versions) == 0 {
-		return appstructs.ProjectVersionResult{}, false
-	}
-	return versions[0], true
+	return versions
 }
 
 func findProjectVersionByID(versions []appstructs.ProjectVersionResult, versionID string) (appstructs.ProjectVersionResult, bool) {
@@ -300,7 +383,7 @@ func queueMissingRequiredDependencies(ctx context.Context, req appstructs.ModDow
 			continue
 		}
 
-		if localModButtonStatus(depReq) != btnStatusNew {
+		if localModButtonStatusPrecise(depReq) != btnStatusNew {
 			continue
 		}
 		result := queueModDownload(ctx, depReq, visited)
