@@ -1,6 +1,6 @@
 # mod-downloader
 
-A desktop Minecraft mod downloader and local mod manager built with Go, Wails, Vue, and Vuetify.
+A desktop Minecraft mod downloader and local mod manager built with Go, Wails, Vue, Pinia, and Vuetify.
 
 `mod-downloader` helps you search Modrinth and CurseForge, filter releases by Minecraft version and mod loader, install matching jars into a selected Minecraft instance, and inspect the mods already present in that instance. It focuses on downloading and managing mod files; it is not a launcher.
 
@@ -50,6 +50,8 @@ Environment variables:
 - `PREFERS_MINECRAFT_DIR`
 - `PREFERS_THEME`
 
+`theme` supports `dark`, `light`, or `system`. The Modrinth key field is currently reserved for future use; Modrinth requests are made with the app user agent, while CurseForge requires `curseforge_api_key` or `KEYS_CF_API_KEY` to enable that source.
+
 The app also lets you choose the `.minecraft` directory from the UI.
 
 ## Development
@@ -63,8 +65,7 @@ Requirements:
 Install frontend dependencies:
 
 ```bash
-cd frontend
-npm install
+npm ci --prefix frontend
 ```
 
 Run in development mode from the repository root:
@@ -88,8 +89,7 @@ go test ./...
 Build the frontend only:
 
 ```bash
-cd frontend
-npm run build
+npm run build --prefix frontend
 ```
 
 ## Data Files
