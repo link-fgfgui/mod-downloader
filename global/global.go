@@ -89,12 +89,13 @@ func setVersionsLocked(dir string, v []structs.VersionInfo) {
 	if len(v) == 0 {
 		selectedVersionKey = ""
 		selectedVersionDir = ""
-	} else if selectedVersionDir != dir || selectedVersionKey == "" {
-		selectedVersionKey = versionKey(v[0])
+	} else if selectedVersionDir != dir {
+		selectedVersionKey = ""
 		selectedVersionDir = dir
-	} else if _, ok := versionMap[selectedVersionKey]; !ok {
-		selectedVersionKey = versionKey(v[0])
-		selectedVersionDir = dir
+	} else if selectedVersionKey != "" {
+		if _, ok := versionMap[selectedVersionKey]; !ok {
+			selectedVersionKey = ""
+		}
 	}
 	logging.Info("global versions cache set", "minecraftDir", dir, "versionCount", len(v), "keyCount", len(versionMap))
 }
@@ -138,7 +139,7 @@ func GetSelectedVersion() structs.VersionInfo {
 		return version
 	}
 	logging.Debug("global selected version read", "hit", false, "key", selectedVersionKey, "minecraftDir", mcDir)
-	return structs.VersionInfo{ID: selectedVersionKey, Name: selectedVersionKey, ModLoader: "vanilla"}
+	return structs.VersionInfo{}
 }
 
 func SetSelectedVersion(version structs.VersionInfo) {

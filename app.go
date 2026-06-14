@@ -139,6 +139,10 @@ func (a *App) GetDownloadQueueState() appstructs.DownloadQueueState {
 	return downloader.GetDownloadQueueState()
 }
 
+func (a *App) CancelDownload(id string) bool {
+	return downloader.CancelDownload(a.ctx, id)
+}
+
 func (a *App) GetDownloadStates(req appstructs.DownloadStatesRequest) []appstructs.ModDownloadButtonState {
 	return downloader.GetDownloadStates(req)
 }
@@ -261,6 +265,10 @@ func loadVersionsFromDisk(mcDir string) []structs.VersionInfo {
 		if !ok {
 			continue
 		}
+		if !validMinecraftInstance(info) {
+			logging.Warn("skip invalid minecraft version", "versionID", versionID, "minecraftVersion", info.MinecraftVersion, "modLoader", info.ModLoader)
+			continue
+		}
 		infos = append(infos, info)
 	}
 
@@ -311,29 +319,25 @@ func scanVersionMods(version structs.VersionInfo, mcDir string) structs.VersionI
 func (a *App) SelectVersion(versionKey string) structs.VersionInfo {
 	versionKey = strings.TrimSpace(versionKey)
 	if versionKey == "" {
-		return structs.VersionInfo{}
+		panic("select version failed: empty version key")
 	}
 
 	mcDir := global.GetMinecraftDir()
-	versions, ok := global.GetVersionsForDir(mcDir)
-	if !ok {
-		versions = loadVersionsFromDisk(mcDir)
+	if _, ok := global.GetVersionsForDir(mcDir); !ok {
+		loadVersionsFromDisk(mcDir)
 	}
 
 	if version, ok := global.GetVersionByKey(versionKey); ok {
-		versions = scanAllVersionMods(versions, mcDir)
-		if scanned, ok := findVersionByKey(versions, versionKey); ok {
-			version = scanned
+		if !validMinecraftInstance(version) {
+			panic("select version failed: invalid minecraft version or mod loader")
 		}
+		version = refreshVersionMods(version, mcDir)
 		global.SetSelectedVersion(version)
 		runtime.EventsEmit(a.ctx, selectedVersionChangedEvent, version)
 		return version
 	}
 
-	version := structs.VersionInfo{ID: versionKey, Name: versionKey, ModLoader: "vanilla"}
-	global.SetSelectedVersion(version)
-	runtime.EventsEmit(a.ctx, selectedVersionChangedEvent, version)
-	return version
+	panic("select version failed: version not found")
 }
 
 func findVersionByKey(versions []structs.VersionInfo, key string) (structs.VersionInfo, bool) {
@@ -343,4 +347,13 @@ func findVersionByKey(versions []structs.VersionInfo, key string) (structs.Versi
 		}
 	}
 	return structs.VersionInfo{}, false
+}
+
+func validMinecraftInstance(version structs.VersionInfo) bool {
+	switch strings.ToLower(strings.TrimSpace(version.ModLoader)) {
+	case "fabric", "forge", "neoforge":
+		return strings.TrimSpace(version.MinecraftVersion) != ""
+	default:
+		return false
+	}
 }

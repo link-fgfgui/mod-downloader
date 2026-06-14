@@ -73,9 +73,22 @@ type ModDownloadResult struct {
 }
 
 type DownloadQueueState struct {
-	Active  bool `json:"active"`
-	Pending int  `json:"pending"`
-	Running int  `json:"running"`
+	Active  bool                `json:"active"`
+	Pending int                 `json:"pending"`
+	Running int                 `json:"running"`
+	Items   []DownloadQueueItem `json:"items,omitempty"`
+}
+
+type DownloadQueueItem struct {
+	ID               string `json:"id"`
+	Status           string `json:"status"`
+	Title            string `json:"title"`
+	FileName         string `json:"fileName"`
+	VersionID        string `json:"versionId"`
+	Platform         string `json:"platform"`
+	MinecraftVersion string `json:"minecraftVersion"`
+	ModLoader        string `json:"modLoader"`
+	Cancelable       bool   `json:"cancelable"`
 }
 
 type DownloadFailedEvent struct {

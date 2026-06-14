@@ -4,6 +4,8 @@ import {structs} from '../models';
 import {database} from '../models';
 import {main} from '../models';
 
+export function CancelDownload(arg1:string):Promise<boolean>;
+
 export function ChooseMinecraftDir():Promise<string>;
 
 export function GetDownloadQueueState():Promise<structs.DownloadQueueState>;

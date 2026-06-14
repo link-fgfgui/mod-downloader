@@ -67,43 +67,116 @@ func SimplifyPathWithEnv(dirPath2 string) string {
 }
 
 func CheckManifest(jsonPath string) (structs.VersionInfo, bool) {
-	data, err := os.ReadFile(jsonPath)
+	raw, err := os.ReadFile(jsonPath)
 	if err != nil {
 		return structs.VersionInfo{}, false
 	}
 
 	var mv structs.MinecraftVersion
-	if err := json.Unmarshal(data, &mv); err != nil {
+	if err := json.Unmarshal(raw, &mv); err != nil {
 		return structs.VersionInfo{}, false
 	}
 
-	minecraftVersion := ""
-	modLoader := ""
-	for _, p := range mv.Patches {
-		if p.ID == "game" && p.Version != "" {
-			minecraftVersion = p.Version
-		} else if p.ID != "" {
-			modLoader = p.ID
-		}
-	}
-	if minecraftVersion == "" || modLoader == "" {
-		return structs.VersionInfo{}, false
-	}
-
-	// instanceID is the version folder name (== json filename), unique per instance.
-	// It must NOT be the Minecraft version: multiple instances can share one MC
-	// version (e.g. a Fabric and a NeoForge pack both on 1.21.1), and using the MC
-	// version as ID collides them in the version lookup map.
 	instanceID := strings.TrimSuffix(filepath.Base(jsonPath), filepath.Ext(jsonPath))
-	name := mv.Name
+	if id := strings.TrimSpace(mv.ID); id != "" {
+		instanceID = id
+	}
+
+	name := strings.TrimSpace(mv.Name)
 	if name == "" {
 		name = instanceID
 	}
 
+	minecraftVersion, modLoader := manifestMinecraftVersionAndLoader(mv, raw)
+	if minecraftVersion == "" {
+		if detected, ok := detectMinecraftVersionForManifest(jsonPath, mv); ok {
+			minecraftVersion = detected
+		}
+	}
+	if modLoader == "" {
+		modLoader = "vanilla"
+	}
+	if strings.TrimSpace(instanceID) == "" || strings.TrimSpace(minecraftVersion) == "" {
+		return structs.VersionInfo{}, false
+	}
+
+	// ID is the version folder name / manifest id, unique per instance.
+	// It must NOT be the Minecraft version: multiple instances can share one MC
+	// version (e.g. a Fabric and a NeoForge pack both on 1.21.1), and using the MC
+	// version as ID collides them in the version lookup map.
 	return structs.VersionInfo{
 		Name:             name,
 		ID:               instanceID,
 		MinecraftVersion: minecraftVersion,
 		ModLoader:        modLoader,
 	}, true
+}
+
+func manifestMinecraftVersionAndLoader(mv structs.MinecraftVersion, raw []byte) (string, string) {
+	minecraftVersion := strings.TrimSpace(mv.InheritsFrom)
+	modLoader := ""
+
+	for _, p := range mv.Patches {
+		id := strings.TrimSpace(p.ID)
+		version := strings.TrimSpace(p.Version)
+		if id == "" {
+			continue
+		}
+		if id == "game" {
+			if version != "" {
+				minecraftVersion = version
+			}
+			continue
+		}
+		modLoader = id
+	}
+
+	if modLoader == "" {
+		modLoader = detectModLoaderFromRawJSON(raw)
+	}
+
+	return minecraftVersion, strings.ToLower(modLoader)
+}
+
+// detectModLoaderFromRawJSON infers the mod loader by scanning the raw manifest
+// JSON for known Maven coordinates, avoiding the need to parse mainClass or
+// libraries into structured fields.
+func detectModLoaderFromRawJSON(raw []byte) string {
+	s := string(raw)
+	if strings.Contains(s, "net.fabricmc:fabric-loader") {
+		return "fabric"
+	}
+	if strings.Contains(s, "net.neoforged.fancymodloader:loader") {
+		return "neoforge"
+	}
+	if strings.Contains(s, "net.minecraftforge:fmlloader") {
+		return "forge"
+	}
+	return ""
+}
+
+func detectMinecraftVersionForManifest(jsonPath string, mv structs.MinecraftVersion) (string, bool) {
+	for _, jarPath := range manifestJarPaths(jsonPath, mv) {
+		if detected, ok := DetectMinecraftVersionFromJar(jarPath); ok {
+			return detected, true
+		}
+	}
+	return "", false
+}
+
+func manifestJarPaths(jsonPath string, mv structs.MinecraftVersion) []string {
+	jarID := strings.TrimSpace(mv.Jar)
+	if jarID == "" {
+		jarID = strings.TrimSuffix(filepath.Base(jsonPath), filepath.Ext(jsonPath))
+	}
+
+	versionDir := filepath.Dir(jsonPath)
+	paths := []string{filepath.Join(versionDir, jarID+".jar")}
+
+	instanceID := strings.TrimSuffix(filepath.Base(jsonPath), filepath.Ext(jsonPath))
+	if jarID != "" && jarID != instanceID {
+		versionsDir := filepath.Dir(versionDir)
+		paths = append(paths, filepath.Join(versionsDir, jarID, jarID+".jar"))
+	}
+	return paths
 }

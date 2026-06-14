@@ -43,12 +43,41 @@ export namespace main {
 }
 
 export namespace structs {
+
+	export class DownloadQueueItem {
+	    id: string;
+	    status: string;
+	    title: string;
+	    fileName: string;
+	    versionId: string;
+	    platform: string;
+	    minecraftVersion: string;
+	    modLoader: string;
+	    cancelable: boolean;
+
+	    static createFrom(source: any = {}) {
+	        return new DownloadQueueItem(source);
+	    }
 	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.status = source["status"];
+	        this.title = source["title"];
+	        this.fileName = source["fileName"];
+	        this.versionId = source["versionId"];
+	        this.platform = source["platform"];
+	        this.minecraftVersion = source["minecraftVersion"];
+	        this.modLoader = source["modLoader"];
+	        this.cancelable = source["cancelable"];
+	    }
+	}
 	export class DownloadQueueState {
 	    active: boolean;
 	    pending: number;
 	    running: number;
-	
+	    items?: DownloadQueueItem[];
+
 	    static createFrom(source: any = {}) {
 	        return new DownloadQueueState(source);
 	    }
@@ -58,7 +87,26 @@ export namespace structs {
 	        this.active = source["active"];
 	        this.pending = source["pending"];
 	        this.running = source["running"];
+	        this.items = this.convertValues(source["items"], DownloadQueueItem);
 	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class SearchModResult {
 	    id: string;
@@ -375,4 +423,3 @@ export namespace structs {
 	}
 
 }
-

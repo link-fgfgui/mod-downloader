@@ -7,9 +7,11 @@ type Patch struct {
 
 // MinecraftVersion maps the top-level structure of .minecraft/versions/<id>/<id>.json
 type MinecraftVersion struct {
-	Name    string  `json:"name"`
-	ID      string  `json:"id"`
-	Patches []Patch `json:"patches,omitempty"`
+	Name         string  `json:"name"`
+	ID           string  `json:"id"`
+	InheritsFrom string  `json:"inheritsFrom"`
+	Jar          string  `json:"jar"`
+	Patches      []Patch `json:"patches,omitempty"`
 }
 
 // VersionInfo is a simplified structure returned to the frontend

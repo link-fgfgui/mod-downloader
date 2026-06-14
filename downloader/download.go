@@ -3,6 +3,7 @@ package downloader
 import (
 	"archive/zip"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -33,18 +34,22 @@ const (
 )
 
 type downloadJob struct {
+	ID               string
 	Version          appstructs.ProjectVersionResult
 	Result           appstructs.SearchModResult
 	TargetDir        string
 	InstanceID       string
 	MinecraftVersion string
 	ModLoader        string
+	cancel           context.CancelFunc
 }
 
 var downloadQueue = struct {
 	sync.Mutex
+	nextID  int64
 	pending []downloadJob
 	running bool
+	current *downloadJob
 }{}
 
 func QueueModDownload(ctx context.Context, req appstructs.ModDownloadRequest) appstructs.ModDownloadResult {
@@ -124,6 +129,37 @@ func applySelectedInstance(req appstructs.ModDownloadRequest) (appstructs.ModDow
 
 func GetDownloadQueueState() appstructs.DownloadQueueState {
 	return currentDownloadQueueState()
+}
+
+func CancelDownload(ctx context.Context, id string) bool {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return false
+	}
+
+	downloadQueue.Lock()
+	for i, job := range downloadQueue.pending {
+		if job.ID != id {
+			continue
+		}
+		downloadQueue.pending = append(downloadQueue.pending[:i], downloadQueue.pending[i+1:]...)
+		downloadQueue.Unlock()
+		emitDownloadQueueState(ctx)
+		return true
+	}
+
+	var cancel context.CancelFunc
+	if downloadQueue.current != nil && downloadQueue.current.ID == id {
+		cancel = downloadQueue.current.cancel
+	}
+	downloadQueue.Unlock()
+
+	if cancel == nil {
+		return false
+	}
+	cancel()
+	emitDownloadQueueState(ctx)
+	return true
 }
 
 func GetDownloadStates(req appstructs.DownloadStatesRequest) []appstructs.ModDownloadButtonState {
@@ -447,8 +483,19 @@ func projectVersionJobKey(version appstructs.ProjectVersionResult) string {
 	return platform + ":" + projectID + ":" + versionID
 }
 
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
+}
+
 func enqueueDownload(ctx context.Context, job downloadJob) {
 	downloadQueue.Lock()
+	downloadQueue.nextID++
+	job.ID = fmt.Sprintf("download-%d", downloadQueue.nextID)
 	downloadQueue.pending = append(downloadQueue.pending, job)
 	shouldStart := !downloadQueue.running
 	if shouldStart {
@@ -463,6 +510,10 @@ func enqueueDownload(ctx context.Context, job downloadJob) {
 }
 
 func runDownloadQueue(ctx context.Context) {
+	parentCtx := ctx
+	if parentCtx == nil {
+		parentCtx = context.Background()
+	}
 	for {
 		downloadQueue.Lock()
 		if len(downloadQueue.pending) == 0 {
@@ -473,17 +524,32 @@ func runDownloadQueue(ctx context.Context) {
 		}
 		job := downloadQueue.pending[0]
 		downloadQueue.pending = downloadQueue.pending[1:]
+		jobCtx, cancel := context.WithCancel(parentCtx)
+		job.cancel = cancel
+		runningJob := job
+		downloadQueue.current = &runningJob
 		downloadQueue.Unlock()
 		emitDownloadQueueState(ctx)
 
-		if err := downloadModJob(job); err != nil {
-			logging.Error("download mod failed", "fileName", job.Version.FileName, "versionID", job.Version.ID, "targetDir", job.TargetDir, "error", err)
-			emitDownloadFailed(ctx, job, err)
+		if err := downloadModJob(jobCtx, job); err != nil {
+			if errors.Is(err, context.Canceled) {
+				logging.Info("download mod canceled", "fileName", job.Version.FileName, "versionID", job.Version.ID, "targetDir", job.TargetDir)
+			} else {
+				logging.Error("download mod failed", "fileName", job.Version.FileName, "versionID", job.Version.ID, "targetDir", job.TargetDir, "error", err)
+				emitDownloadFailed(ctx, job, err)
+			}
 		}
+		cancel()
+		downloadQueue.Lock()
+		if downloadQueue.current != nil && downloadQueue.current.ID == job.ID {
+			downloadQueue.current = nil
+		}
+		downloadQueue.Unlock()
+		emitDownloadQueueState(ctx)
 	}
 }
 
-func downloadModJob(job downloadJob) error {
+func downloadModJob(ctx context.Context, job downloadJob) error {
 	if err := os.MkdirAll(job.TargetDir, 0o755); err != nil {
 		return err
 	}
@@ -493,10 +559,10 @@ func downloadModJob(job downloadJob) error {
 			return nil
 		}
 		archiveSupersededModJars(existing)
-		return downloadModToTarget(job, mods)
+		return downloadModToTarget(ctx, job, mods)
 	}
 
-	return downloadModWithLocalParse(job)
+	return downloadModWithLocalParse(ctx, job)
 }
 
 // alreadyInstalled 判断现有同 modId 文件里是否已有与目标版本完全相同的 jar（同 sha1）。
@@ -603,7 +669,7 @@ func parseRemoteModJar(downloadURL string, modLoader string) ([]mcstructs.ModInf
 	return mods, nil
 }
 
-func downloadModToTarget(job downloadJob, mods []mcstructs.ModInfo) error {
+func downloadModToTarget(ctx context.Context, job downloadJob, mods []mcstructs.ModInfo) error {
 	client := grab.NewClient()
 	req, err := grab.NewRequest(job.TargetDir, job.Version.DownloadURL)
 	if err != nil {
@@ -612,6 +678,11 @@ func downloadModToTarget(job downloadJob, mods []mcstructs.ModInfo) error {
 	if job.Version.FileName != "" {
 		req.Filename = filepath.Join(job.TargetDir, job.Version.FileName)
 	}
+	if downloadTargetExists(req.Filename) {
+		logging.Info("download skipped because target file already exists", "path", req.Filename, "versionID", job.Version.ID)
+		return nil
+	}
+	req = req.WithContext(ctx)
 
 	resp := client.Do(req)
 	if err := resp.Err(); err != nil {
@@ -623,7 +694,7 @@ func downloadModToTarget(job downloadJob, mods []mcstructs.ModInfo) error {
 	return nil
 }
 
-func downloadModWithLocalParse(job downloadJob) error {
+func downloadModWithLocalParse(ctx context.Context, job downloadJob) error {
 	tempDir := filepath.Join(filepath.Dir(job.TargetDir), ".mod-downloader-tmp")
 	if err := os.MkdirAll(tempDir, 0o755); err != nil {
 		return err
@@ -637,6 +708,7 @@ func downloadModWithLocalParse(job downloadJob) error {
 	if job.Version.FileName != "" {
 		req.Filename = filepath.Join(tempDir, job.Version.FileName)
 	}
+	req = req.WithContext(ctx)
 
 	resp := client.Do(req)
 	if err := resp.Err(); err != nil {
@@ -660,11 +732,28 @@ func downloadModWithLocalParse(job downloadJob) error {
 	archiveSupersededModJars(existing)
 
 	finalPath := filepath.Join(job.TargetDir, filepath.Base(resp.Filename))
+	if downloadTargetExists(finalPath) {
+		logging.Info("download skipped because target file already exists", "path", finalPath, "versionID", job.Version.ID)
+		_ = os.Remove(resp.Filename)
+		return nil
+	}
 	if err := os.Rename(resp.Filename, finalPath); err != nil {
 		return err
 	}
 	upsertDownloadedMod(finalPath, mods, job)
 	return nil
+}
+
+func downloadTargetExists(path string) bool {
+	if strings.TrimSpace(path) == "" {
+		return false
+	}
+	if _, err := os.Stat(path); err == nil {
+		return true
+	} else if err != nil && !os.IsNotExist(err) {
+		logging.Warn("download target stat failed", "path", path, "error", err)
+	}
+	return false
 }
 
 func upsertDownloadedMod(path string, mods []mcstructs.ModInfo, job downloadJob) {
@@ -691,13 +780,39 @@ func currentDownloadQueueState() appstructs.DownloadQueueState {
 	downloadQueue.Lock()
 	defer downloadQueue.Unlock()
 	running := 0
-	if downloadQueue.running {
+	if downloadQueue.current != nil {
 		running = 1
 	}
+	items := make([]appstructs.DownloadQueueItem, 0, running+len(downloadQueue.pending))
+	if downloadQueue.current != nil {
+		items = append(items, downloadQueueItemFromJob(*downloadQueue.current, "running", true))
+	}
+	for _, job := range downloadQueue.pending {
+		items = append(items, downloadQueueItemFromJob(job, "pending", true))
+	}
 	return appstructs.DownloadQueueState{
-		Active:  downloadQueue.running || len(downloadQueue.pending) > 0,
+		Active:  running > 0 || len(downloadQueue.pending) > 0,
 		Pending: len(downloadQueue.pending),
 		Running: running,
+		Items:   items,
+	}
+}
+
+func downloadQueueItemFromJob(job downloadJob, status string, cancelable bool) appstructs.DownloadQueueItem {
+	title := strings.TrimSpace(job.Result.Title)
+	if title == "" {
+		title = firstNonEmpty(job.Version.Name, job.Version.FileName, job.Version.Version, job.Version.ID)
+	}
+	return appstructs.DownloadQueueItem{
+		ID:               job.ID,
+		Status:           status,
+		Title:            title,
+		FileName:         job.Version.FileName,
+		VersionID:        job.Version.ID,
+		Platform:         job.Version.Platform,
+		MinecraftVersion: job.MinecraftVersion,
+		ModLoader:        job.ModLoader,
+		Cancelable:       cancelable,
 	}
 }
 
