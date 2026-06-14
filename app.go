@@ -212,6 +212,7 @@ func (a *App) ValidateMinecraftDir() bool {
 func (a *App) GetVersions() []structs.VersionInfo {
 	mcDir := global.GetMinecraftDir()
 	if versions, ok := global.GetVersionsForDir(mcDir); ok {
+		ensureSelectedVersion(versions)
 		return versions
 	}
 	return loadVersionsFromDisk(mcDir)
@@ -273,7 +274,19 @@ func loadVersionsFromDisk(mcDir string) []structs.VersionInfo {
 	}
 
 	global.SetVersionsForDir(mcDir, infos)
+	ensureSelectedVersion(infos)
 	return infos
+}
+
+func ensureSelectedVersion(versions []structs.VersionInfo) {
+	if len(versions) == 0 {
+		return
+	}
+	selected := global.GetSelectedVersion()
+	if selected.ID != "" || selected.Name != "" {
+		return
+	}
+	global.SetSelectedVersion(versions[0])
 }
 
 func scanAllVersionMods(versions []structs.VersionInfo, mcDir string) []structs.VersionInfo {

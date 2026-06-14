@@ -43,7 +43,7 @@ export namespace main {
 }
 
 export namespace structs {
-
+	
 	export class DownloadQueueItem {
 	    id: string;
 	    status: string;
@@ -54,7 +54,7 @@ export namespace structs {
 	    minecraftVersion: string;
 	    modLoader: string;
 	    cancelable: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new DownloadQueueItem(source);
 	    }
@@ -77,7 +77,7 @@ export namespace structs {
 	    pending: number;
 	    running: number;
 	    items?: DownloadQueueItem[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new DownloadQueueState(source);
 	    }
@@ -89,7 +89,7 @@ export namespace structs {
 	        this.running = source["running"];
 	        this.items = this.convertValues(source["items"], DownloadQueueItem);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -423,3 +423,4 @@ export namespace structs {
 	}
 
 }
+

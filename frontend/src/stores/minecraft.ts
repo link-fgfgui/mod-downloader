@@ -51,6 +51,7 @@ export const useMinecraftStore = defineStore("minecraft", {
                 const versions = (force ? await RefreshVersions() : await GetVersions()) || [];
                 this.versions = versions;
                 this.releaseVersions = await GetMinecraftReleaseVersions();
+                this.selectedVersion = await GetSelectedVersion();
             } finally {
                 this.isRefreshing = false;
             }
