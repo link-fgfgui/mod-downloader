@@ -287,7 +287,7 @@ func scanAllVersionMods(versions []structs.VersionInfo, mcDir string) []structs.
 }
 
 func refreshVersionMods(version structs.VersionInfo, mcDir string) structs.VersionInfo {
-	global.ClearLocalModsByInstance(version.Name)
+	global.ClearLocalModsByInstance(versionInstanceDir(version))
 	refreshed := scanVersionMods(version, mcDir)
 	if versions, ok := global.GetVersionsForDir(mcDir); ok {
 		next := make([]structs.VersionInfo, len(versions))
@@ -303,16 +303,13 @@ func refreshVersionMods(version structs.VersionInfo, mcDir string) structs.Versi
 }
 
 func scanVersionMods(version structs.VersionInfo, mcDir string) structs.VersionInfo {
-	versionDirName := version.Name
-	if versionDirName == "" {
-		versionDirName = version.ID
-	}
+	versionDirName := versionInstanceDir(version)
 	if strings.TrimSpace(mcDir) == "" || strings.TrimSpace(versionDirName) == "" {
 		version.Mods = nil
 		return version
 	}
 	versionDir := filepath.Join(mcDir, "versions", versionDirName)
-	version.Mods = minecraft.ScanVersionMods(versionDir, version.Name, version.MinecraftVersion, version.ModLoader, mcDir)
+	version.Mods = minecraft.ScanVersionMods(versionDir, versionDirName, version.MinecraftVersion, version.ModLoader, mcDir)
 	return version
 }
 
@@ -347,6 +344,13 @@ func findVersionByKey(versions []structs.VersionInfo, key string) (structs.Versi
 		}
 	}
 	return structs.VersionInfo{}, false
+}
+
+func versionInstanceDir(version structs.VersionInfo) string {
+	if strings.TrimSpace(version.ID) != "" {
+		return strings.TrimSpace(version.ID)
+	}
+	return strings.TrimSpace(version.Name)
 }
 
 func validMinecraftInstance(version structs.VersionInfo) bool {

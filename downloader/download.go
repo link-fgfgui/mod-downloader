@@ -401,10 +401,10 @@ func selectedVersionModsDir(selected mcstructs.VersionInfo) string {
 }
 
 func versionInstanceID(version mcstructs.VersionInfo) string {
-	if strings.TrimSpace(version.Name) != "" {
-		return strings.TrimSpace(version.Name)
+	if strings.TrimSpace(version.ID) != "" {
+		return strings.TrimSpace(version.ID)
 	}
-	return strings.TrimSpace(version.ID)
+	return strings.TrimSpace(version.Name)
 }
 
 func queueMissingRequiredDependencies(ctx context.Context, req appstructs.ModDownloadRequest, version appstructs.ProjectVersionResult, instanceID string, visited map[string]bool) {
@@ -558,8 +558,7 @@ func downloadModJob(ctx context.Context, job downloadJob) error {
 		if alreadyInstalled(existing, job.Version.SHA1) {
 			return nil
 		}
-		archiveSupersededModJars(existing)
-		return downloadModToTarget(ctx, job, mods)
+		return downloadModToTarget(ctx, job, mods, existing)
 	}
 
 	return downloadModWithLocalParse(ctx, job)
@@ -669,18 +668,19 @@ func parseRemoteModJar(downloadURL string, modLoader string) ([]mcstructs.ModInf
 	return mods, nil
 }
 
-func downloadModToTarget(ctx context.Context, job downloadJob, mods []mcstructs.ModInfo) error {
+func downloadModToTarget(ctx context.Context, job downloadJob, mods []mcstructs.ModInfo, existing []global.LocalModFilePath) error {
+	tempDir := filepath.Join(filepath.Dir(job.TargetDir), ".mod-downloader-tmp")
+	if err := os.MkdirAll(tempDir, 0o755); err != nil {
+		return err
+	}
+
 	client := grab.NewClient()
-	req, err := grab.NewRequest(job.TargetDir, job.Version.DownloadURL)
+	req, err := grab.NewRequest(tempDir, job.Version.DownloadURL)
 	if err != nil {
 		return err
 	}
 	if job.Version.FileName != "" {
-		req.Filename = filepath.Join(job.TargetDir, job.Version.FileName)
-	}
-	if downloadTargetExists(req.Filename) {
-		logging.Info("download skipped because target file already exists", "path", req.Filename, "versionID", job.Version.ID)
-		return nil
+		req.Filename = filepath.Join(tempDir, job.Version.FileName)
 	}
 	req = req.WithContext(ctx)
 
@@ -688,9 +688,26 @@ func downloadModToTarget(ctx context.Context, job downloadJob, mods []mcstructs.
 	if err := resp.Err(); err != nil {
 		return err
 	}
-	if resp.Filename != "" {
-		upsertDownloadedMod(resp.Filename, mods, job)
+	if resp.Filename == "" {
+		return nil
 	}
+
+	finalPath := filepath.Join(job.TargetDir, filepath.Base(resp.Filename))
+	if downloadTargetExists(finalPath) && !pathInLocalModPaths(finalPath, existing) {
+		logging.Info("download skipped because target file already exists", "path", finalPath, "versionID", job.Version.ID)
+		_ = os.Remove(resp.Filename)
+		return nil
+	}
+	archiveSupersededModJars(existing)
+	if downloadTargetExists(finalPath) {
+		logging.Info("download skipped because target file already exists after archiving superseded jars", "path", finalPath, "versionID", job.Version.ID)
+		_ = os.Remove(resp.Filename)
+		return nil
+	}
+	if err := os.Rename(resp.Filename, finalPath); err != nil {
+		return err
+	}
+	upsertDownloadedMod(finalPath, mods, job)
 	return nil
 }
 
@@ -752,6 +769,21 @@ func downloadTargetExists(path string) bool {
 		return true
 	} else if err != nil && !os.IsNotExist(err) {
 		logging.Warn("download target stat failed", "path", path, "error", err)
+	}
+	return false
+}
+
+func pathInLocalModPaths(path string, paths []global.LocalModFilePath) bool {
+	path = filepath.Clean(path)
+	mcDir := global.GetMinecraftDir()
+	for _, p := range paths {
+		existing := p.Path
+		if mcDir != "" && !filepath.IsAbs(existing) {
+			existing = filepath.Join(mcDir, existing)
+		}
+		if filepath.Clean(existing) == path {
+			return true
+		}
 	}
 	return false
 }

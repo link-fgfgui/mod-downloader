@@ -37,3 +37,29 @@ func TestGetSelectedVersionReturnsEmptyWhenSelectedKeyMissing(t *testing.T) {
 		t.Fatalf("GetSelectedVersion() = %#v, want empty", got)
 	}
 }
+
+func TestSelectedVersionKeyPrefersIDOverDisplayName(t *testing.T) {
+	dir := t.TempDir()
+	SetMinecraftDir(dir)
+	SetVersionsForDir(dir, []structs.VersionInfo{{
+		ID:               "instance-folder",
+		Name:             "Display Name",
+		MinecraftVersion: "1.21.1",
+		ModLoader:        "fabric",
+	}})
+	SetSelectedVersion(structs.VersionInfo{
+		ID:               "instance-folder",
+		Name:             "Display Name",
+		MinecraftVersion: "1.21.1",
+		ModLoader:        "fabric",
+	})
+	t.Cleanup(func() {
+		SetMinecraftDir("")
+		InvalidateVersions()
+	})
+
+	got := GetSelectedVersion()
+	if got.ID != "instance-folder" || got.Name != "Display Name" {
+		t.Fatalf("GetSelectedVersion() = %#v, want selected by ID", got)
+	}
+}

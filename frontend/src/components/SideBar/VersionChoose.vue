@@ -4,14 +4,13 @@
         <div v-show="isExpanded">
             <div class="d-flex align-center" style="gap: 8px">
                 <v-select
-                    v-model="selectedVersion"
+                    v-model="selectedVersionName"
                     :items="versionList"
                     label="Version"
                     density="compact"
                     hide-details
                     variant="outlined"
                     class="flex-grow-1"
-                    @update:model-value="selectVersion"
                 ></v-select>
                 <v-btn
                     icon="mdi-refresh"
@@ -37,78 +36,57 @@
         <span
             v-show="!isExpanded"
             style="font-size: 32px; writing-mode: vertical-rl"
-            >{{ selectedVersion }}</span
         >
+            {{ selectedVersionName }}
+        </span>
     </div>
 </template>
-<script setup>
-import { onMounted, ref } from "vue";
+<script setup lang="ts">
+import { computed } from "vue";
+import { storeToRefs } from "pinia";
 
-import {
-    ChooseMinecraftDir,
-    GetMinecraftDir,
-    GetVersions,
-    RefreshSelectedVersionMods,
-    RefreshVersions,
-    SelectVersion,
-} from "../../../wailsjs/go/main/App";
-// Bottom area data
-const selectedVersion = ref("");
-const versionList = ref([]);
-const isRefreshing = ref(false);
-const downloadFolder = ref("");
+import { useMinecraftStore } from "../../stores/minecraft";
+
 const props = defineProps({
     isExpanded: {
         type: Boolean,
         default: false,
     },
 });
-const refreshVersions = async (force = false) => {
-    isRefreshing.value = true;
-    try {
-        const versions =
-            (force ? await RefreshVersions() : await GetVersions()) || [];
-        versionList.value = versions
-            .map(
-                (version) =>
-                    version.name || version.Name || version.id || version.ID,
-            )
-            .filter(Boolean);
-        if (!selectedVersion.value && versionList.value.length > 0) {
-            selectedVersion.value = versionList.value[0];
-            await selectVersion(selectedVersion.value);
-        }
-    } finally {
-        isRefreshing.value = false;
-    }
-};
+
+void props;
+
+const minecraftStore = useMinecraftStore();
+const { minecraftDir: downloadFolder, isRefreshing } = storeToRefs(minecraftStore);
+
+const versionList = computed(() =>
+    minecraftStore.versions
+        .map((version) => typeof version === "string" ? version : version.name || version.id)
+        .filter(Boolean),
+);
+
+const selectedVersionName = computed({
+    get: () => {
+        const selected = minecraftStore.selectedVersion;
+        return selected?.name || selected?.id || "";
+    },
+    set: (version: string) => {
+        void selectVersion(version);
+    },
+});
 
 const refreshSelectedMods = async () => {
-    isRefreshing.value = true;
-    try {
-        await RefreshSelectedVersionMods();
-    } finally {
-        isRefreshing.value = false;
-    }
+    await minecraftStore.refreshSelectedMods();
 };
 
-const selectVersion = async (version) => {
+const selectVersion = async (version: string) => {
     if (version) {
-        await SelectVersion(version);
+        await minecraftStore.selectVersion(version);
     }
 };
 
 const selectFolder = async () => {
-    const result = await ChooseMinecraftDir();
-    if (result) {
-        downloadFolder.value = result;
-        await refreshVersions(true);
-    }
+    await minecraftStore.chooseMinecraftDir();
 };
-
-onMounted(async () => {
-    downloadFolder.value = await GetMinecraftDir();
-    await refreshVersions();
-});
 </script>
 <style scoped></style>

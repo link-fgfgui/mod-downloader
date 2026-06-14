@@ -50,33 +50,22 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed } from "vue";
+import { storeToRefs } from "pinia";
 
-import { GetSelectedVersion, RefreshSelectedVersionMods } from "../../wailsjs/go/main/App";
-import { EventsOn } from "../../wailsjs/runtime/runtime";
+import { useMinecraftStore } from "../stores/minecraft";
 
-const selectedVersionChangedEvent = "selected-version-changed";
+const minecraftStore = useMinecraftStore();
+const { isRefreshing } = storeToRefs(minecraftStore);
 
-const selectedVersion = ref(null);
-const isRefreshing = ref(false);
-let stopListeningSelectedVersionChanged = null;
-
-const valueOf = (source, lowerKey, upperKey) => source?.[lowerKey] || source?.[upperKey] || "";
-
-const mods = computed(() => selectedVersion.value?.mods || selectedVersion.value?.Mods || []);
+const mods = computed(() => minecraftStore.mods);
 
 const hasSelectedInstance = computed(() => {
-    return Boolean(valueOf(selectedVersion.value, "name", "Name") || valueOf(selectedVersion.value, "id", "ID"));
+    return minecraftStore.hasSelectedInstance;
 });
 
 const selectedInstanceLabel = computed(() => {
-    const name = valueOf(selectedVersion.value, "name", "Name") || valueOf(selectedVersion.value, "id", "ID");
-    const minecraftVersion = valueOf(selectedVersion.value, "minecraftVersion", "MinecraftVersion");
-    const modLoader = valueOf(selectedVersion.value, "modLoader", "ModLoader");
-    if (!name) {
-        return "";
-    }
-    return [name, minecraftVersion, modLoader].filter(Boolean).join(" / ");
+    return minecraftStore.selectedInstanceLabel;
 });
 
 const modRowKey = (mod) => {
@@ -84,28 +73,8 @@ const modRowKey = (mod) => {
 };
 
 const refreshMods = async () => {
-    isRefreshing.value = true;
-    try {
-        selectedVersion.value = await RefreshSelectedVersionMods();
-    } finally {
-        isRefreshing.value = false;
-    }
+    await minecraftStore.refreshSelectedMods();
 };
-
-onMounted(async () => {
-    stopListeningSelectedVersionChanged = EventsOn(selectedVersionChangedEvent, (version) => {
-        selectedVersion.value = version;
-    });
-
-    selectedVersion.value = await GetSelectedVersion();
-    if (hasSelectedInstance.value) {
-        await refreshMods();
-    }
-});
-
-onUnmounted(() => {
-    stopListeningSelectedVersionChanged?.();
-});
 </script>
 
 <style scoped>

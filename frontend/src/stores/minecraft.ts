@@ -1,0 +1,95 @@
+import { defineStore } from "pinia";
+
+import {
+    ChooseMinecraftDir,
+    GetMinecraftDir,
+    GetMinecraftReleaseVersions,
+    GetSelectedVersion,
+    GetVersions,
+    RefreshSelectedVersionMods,
+    RefreshVersions,
+    SelectVersion,
+} from "../../wailsjs/go/main/App";
+import { EventsOn } from "../../wailsjs/runtime/runtime";
+import type { structs } from "../../wailsjs/go/models";
+
+const minecraftDirChangedEvent = "minecraft-dir-changed";
+const selectedVersionChangedEvent = "selected-version-changed";
+
+type VersionInfoSnapshot = Partial<structs.VersionInfo> & Record<string, any>;
+
+const valueOf = (source: VersionInfoSnapshot | null, lowerKey: string, upperKey: string) =>
+    source?.[lowerKey] || source?.[upperKey] || "";
+
+export const useMinecraftStore = defineStore("minecraft", {
+    state: () => ({
+        selectedVersion: null as VersionInfoSnapshot | null,
+        versions: [] as Array<string | VersionInfoSnapshot>,
+        releaseVersions: [] as string[],
+        minecraftDir: "",
+        isRefreshing: false,
+        stopListeningMinecraftDirChanged: null as (() => void) | null,
+        stopListeningSelectedVersionChanged: null as (() => void) | null,
+    }),
+    getters: {
+        hasSelectedInstance: (state) => Boolean(valueOf(state.selectedVersion, "name", "Name") || valueOf(state.selectedVersion, "id", "ID")),
+        selectedInstanceLabel: (state) => {
+            const name = valueOf(state.selectedVersion, "name", "Name") || valueOf(state.selectedVersion, "id", "ID");
+            const minecraftVersion = valueOf(state.selectedVersion, "minecraftVersion", "MinecraftVersion");
+            const modLoader = valueOf(state.selectedVersion, "modLoader", "ModLoader");
+            return name ? [name, minecraftVersion, modLoader].filter(Boolean).join(" / ") : "";
+        },
+        mods: (state) => state.selectedVersion?.mods || state.selectedVersion?.Mods || [],
+    },
+    actions: {
+        async refreshMinecraftDir() {
+            this.minecraftDir = await GetMinecraftDir();
+        },
+        async refreshVersions(force = false) {
+            this.isRefreshing = true;
+            try {
+                const versions = (force ? await RefreshVersions() : await GetVersions()) || [];
+                this.versions = versions;
+                this.releaseVersions = await GetMinecraftReleaseVersions();
+            } finally {
+                this.isRefreshing = false;
+            }
+        },
+        async refreshSelectedMods() {
+            this.selectedVersion = await RefreshSelectedVersionMods();
+        },
+        async selectVersion(version: string) {
+            this.selectedVersion = await SelectVersion(version);
+        },
+        async chooseMinecraftDir() {
+            const result = await ChooseMinecraftDir();
+            if (result) {
+                this.minecraftDir = result;
+                await this.refreshVersions(true);
+            }
+            return result;
+        },
+        applySelectedVersion(version: VersionInfoSnapshot | null) {
+            this.selectedVersion = version;
+        },
+        async start() {
+            if (this.stopListeningMinecraftDirChanged || this.stopListeningSelectedVersionChanged) {
+                return;
+            }
+            this.stopListeningMinecraftDirChanged = EventsOn(minecraftDirChangedEvent, async () => {
+                await this.refreshMinecraftDir();
+                await this.refreshVersions();
+            });
+            this.stopListeningSelectedVersionChanged = EventsOn(selectedVersionChangedEvent, this.applySelectedVersion);
+            await this.refreshMinecraftDir();
+            await this.refreshVersions();
+            this.selectedVersion = await GetSelectedVersion();
+        },
+        stop() {
+            this.stopListeningMinecraftDirChanged?.();
+            this.stopListeningSelectedVersionChanged?.();
+            this.stopListeningMinecraftDirChanged = null;
+            this.stopListeningSelectedVersionChanged = null;
+        },
+    },
+});

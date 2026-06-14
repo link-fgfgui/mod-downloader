@@ -12,9 +12,9 @@
                 </router-view>
             </v-container>
         </v-main>
-        <div v-if="downloadQueue.active" class="download-fab">
-            <v-badge :model-value="downloadQueue.pending + downloadQueue.running > 1"
-                :content="downloadQueue.pending + downloadQueue.running" color="error" floating>
+        <div v-if="downloadQueueStore.queue.active" class="download-fab">
+            <v-badge :model-value="downloadQueueStore.queue.pending + downloadQueueStore.queue.running > 1"
+                :content="downloadQueueStore.queue.pending + downloadQueueStore.queue.running" color="error" floating>
                 <v-btn color="primary" icon size="large" aria-label="Download status">
                     <v-icon icon="mdi-download"></v-icon>
                 </v-btn>
@@ -25,24 +25,20 @@
 
 <script setup lang="ts">
 import SideBar from "./components/SideBar/SideBar.vue";
-import { onMounted, onUnmounted, ref } from "vue";
+import { onMounted, onUnmounted } from "vue";
 import { useTheme } from "vuetify";
-import { GetDownloadQueueState, GetPreferences } from "../wailsjs/go/main/App";
-import { EventsOn } from "../wailsjs/runtime/runtime";
+import { GetPreferences } from "../wailsjs/go/main/App";
+import { useDownloadQueueStore } from "./stores/downloadQueue";
+import { useMinecraftStore } from "./stores/minecraft";
 
-const downloadQueueUpdatedEvent = "download-queue-updated";
 const themeDark = "dark";
 const themeLight = "light";
 const themeSystem = "system";
 
 const vuetifyTheme = useTheme();
-const downloadQueue = ref({
-    active: false,
-    pending: 0,
-    running: 0,
-});
+const downloadQueueStore = useDownloadQueueStore();
+const minecraftStore = useMinecraftStore();
 
-let stopListeningDownloadQueueUpdated: (() => void) | null = null;
 let systemThemeQuery: MediaQueryList | null = null;
 let stopListeningSystemTheme: (() => void) | null = null;
 
@@ -75,14 +71,13 @@ const applyVuetifyTheme = (theme: string) => {
 onMounted(async () => {
     const preferences = await GetPreferences();
     applyVuetifyTheme(preferences?.theme ?? themeDark);
-    downloadQueue.value = await GetDownloadQueueState();
-    stopListeningDownloadQueueUpdated = EventsOn(downloadQueueUpdatedEvent, (state) => {
-        downloadQueue.value = state || { active: false, pending: 0, running: 0 };
-    });
+    void downloadQueueStore.start();
+    void minecraftStore.start();
 });
 
 onUnmounted(() => {
-    stopListeningDownloadQueueUpdated?.();
+    downloadQueueStore.stop();
+    minecraftStore.stop();
     stopListeningSystemTheme?.();
 });
 </script>

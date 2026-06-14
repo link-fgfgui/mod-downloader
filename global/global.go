@@ -101,10 +101,10 @@ func setVersionsLocked(dir string, v []structs.VersionInfo) {
 }
 
 func versionKey(version structs.VersionInfo) string {
-	if version.Name != "" {
-		return version.Name
+	if version.ID != "" {
+		return version.ID
 	}
-	return version.ID
+	return version.Name
 }
 
 // InvalidateVersions clears the cached version list and lookup map.

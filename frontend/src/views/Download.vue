@@ -68,7 +68,7 @@
         </v-overlay>
 
         <v-snackbar v-model="snackbar.show" :color="snackbar.color" location="bottom" timeout="3000">
-            {{ snackbar.text }}
+            {{ $t(snackbar.key, snackbar.params) }}
         </v-snackbar>
 
         <v-dialog v-model="confirmDialog.show" max-width="420">
@@ -89,344 +89,78 @@
     </v-container>
 </template>
 
-<script setup>
-import { onMounted, onUnmounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+<script setup lang="ts">
+import { onActivated, onDeactivated, watch } from "vue";
+import { storeToRefs } from "pinia";
 
 import SearchResultList from "../components/SearchResultList.vue";
-import {
-    GetMinecraftReleaseVersions,
-    GetDownloadStates,
-    GetPinnedModVersion,
-    GetSelectedVersion,
-    ListMatchingProjectVersions,
-    PinModVersion,
-    QueueModDownload,
-    SearchMods,
-    ValidateMinecraftDir,
-} from "../../wailsjs/go/main/App";
-import { EventsOn } from "../../wailsjs/runtime/runtime";
+import { ValidateMinecraftDir } from "../../wailsjs/go/main/App";
+import { useDownloadSearchStore } from "../stores/downloadSearch";
+import { useMinecraftStore } from "../stores/minecraft";
+import type { structs } from "../../wailsjs/go/models";
 
-const { t } = useI18n();
+const downloadStore = useDownloadSearchStore();
+const minecraftStore = useMinecraftStore();
 
-const minecraftDirChangedEvent = "minecraft-dir-changed";
-const selectedVersionChangedEvent = "selected-version-changed";
-const searchModsUpdatedEvent = "search-mods-updated";
-const downloadQueueUpdatedEvent = "download-queue-updated";
-const downloadFailedEvent = "download-failed";
+const {
+    searchText,
+    selectedVersion,
+    selectedModLoader,
+    showDirOverlay,
+    isSearching,
+    isLoadingMore,
+    hasMoreResults,
+    showVersionsOverlay,
+    isLoadingVersions,
+    versionList,
+    modLoaderList,
+    searchResults,
+    selectedMod,
+    matchingVersions,
+    pinningVersionID,
+    downloadStates,
+    downloadingKeys,
+    snackbar,
+    confirmDialog,
+} = storeToRefs(downloadStore);
 
-// Go QueueModDownload 跳过原因 → i18n key 映射
-const downloadErrorKeys = {
-    "invalid request": "invalidRequest",
-    "no matching version": "noMatchingVersion",
-    "missing download url": "missingDownloadUrl",
-    "no selected version": "noSelectedVersion",
-};
-
-const searchText = ref("");
-const selectedVersion = ref("");
-const selectedModLoader = ref("Fabric");
-const showDirOverlay = ref(false);
-const isSearching = ref(false);
-const isLoadingMore = ref(false);
-const hasMoreResults = ref(true);
-const showVersionsOverlay = ref(false);
-const isLoadingVersions = ref(false);
-
-const versionList = ref([]);
-const modLoaderList = ["Fabric", "Forge", "NeoForge"];
-const searchResults = ref([]);
-const activeSearchRequestID = ref("");
-const searchPageSize = 10;
-const nextSearchOffset = ref(0);
-const activeSearchAppend = ref(false);
-const appendBaseResults = ref([]);
-const selectedMod = ref(null);
-const matchingVersions = ref([]);
-const pinnedVersion = ref(null);
-const pinningVersionID = ref("");
-const downloadStates = ref([]);
-const downloadingKeys = ref({});
-let activeDownloadStateRequestID = "";
-
-const snackbar = ref({ show: false, text: "", color: "success" });
-const showSnackbar = (text, color = "success") => {
-    snackbar.value = { show: true, text, color };
-};
+const searchMods = () => downloadStore.runSearch();
+const loadMoreSearchResults = () => downloadStore.loadMoreSearchResults();
+const installMod = (payload: { result?: structs.SearchModResult; key?: string; status?: string; confirm?: boolean }) => downloadStore.installMod(payload);
+const confirmInstall = () => downloadStore.confirmInstall();
+const openVersionsOverlay = (result: structs.SearchModResult) => downloadStore.openVersionsOverlay(result);
+const pinVersion = (version: structs.ProjectVersionResult) => downloadStore.pinVersion(version);
+const isPinnedVersion = (version: structs.ProjectVersionResult) => downloadStore.isPinnedVersion(version);
+const isPinningAnotherVersion = (version: structs.ProjectVersionResult) => downloadStore.isPinningAnotherVersion(version);
+const versionFileName = (version: structs.ProjectVersionResult) => downloadStore.versionFileName(version);
 
 const checkMinecraftDir = async () => {
     showDirOverlay.value = !(await ValidateMinecraftDir());
 };
 
-const loadVersions = async () => {
-    versionList.value = await GetMinecraftReleaseVersions();
-    if (!selectedVersion.value && versionList.value.length > 0) {
-        selectedVersion.value = versionList.value[0];
-    }
+const syncDownloadPageState = async () => {
+    await downloadStore.start();
+    await checkMinecraftDir();
+    downloadStore.setVersionList(minecraftStore.releaseVersions);
+    downloadStore.applySelectedInstance(minecraftStore.selectedVersion);
 };
 
-const runSearch = async ({ append = false } = {}) => {
-    if (append && (isSearching.value || isLoadingMore.value || !hasMoreResults.value)) {
-        return;
-    }
+onActivated(syncDownloadPageState);
 
-    const requestID = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    activeSearchRequestID.value = requestID;
-    activeDownloadStateRequestID = "";
-    activeSearchAppend.value = append;
-    const offset = append ? nextSearchOffset.value : 0;
-    if (append) {
-        appendBaseResults.value = [...searchResults.value];
-        isLoadingMore.value = true;
-    } else {
-        searchResults.value = [];
-        downloadStates.value = [];
-        appendBaseResults.value = [];
-        nextSearchOffset.value = 0;
-        hasMoreResults.value = true;
-        isSearching.value = true;
-    }
-
-    try {
-        await SearchMods({
-            requestId: requestID,
-            query: searchText.value,
-            version: selectedVersion.value,
-            modLoader: selectedModLoader.value,
-            offset,
-            limit: searchPageSize,
-        });
-        // 结果只由 search-mods-updated 事件写入；此处仅在请求仍有效时推进分页 offset。
-        if (activeSearchRequestID.value === requestID) {
-            nextSearchOffset.value = offset + searchPageSize;
-        }
-    } finally {
-        if (activeSearchRequestID.value === requestID) {
-            if (append) {
-                isLoadingMore.value = false;
-            } else {
-                isSearching.value = false;
-            }
-        }
-    }
-};
-
-const searchMods = async () => {
-    await runSearch();
-};
-
-const loadMoreSearchResults = async () => {
-    await runSearch({ append: true });
-};
-
-const refreshDownloadStates = async () => {
-    if (isSearching.value || isLoadingMore.value) {
-        return;
-    }
-    const requestID = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    activeDownloadStateRequestID = requestID;
-    const results = searchResults.value || [];
-
-    const states = await GetDownloadStates({
-        results,
-        minecraftVersion: selectedVersion.value,
-        modLoader: selectedModLoader.value,
-    });
-    if (activeDownloadStateRequestID !== requestID) {
-        return;
-    }
-    downloadStates.value = states || [];
-};
-
-// 需要二次确认的状态（黄色按钮：替换旧 jar 属不可逆操作）。
-const confirmStatuses = new Set(["update", "conflict"]);
-const confirmDialog = ref({ show: false, status: "", result: null, key: "" });
-
-// installMod 由按钮触发。confirm=true 表示来自左键且属黄色状态 → 先弹确认框；
-// confirm=false（右键直达 / 普通下载）→ 直接执行。
-const installMod = (payload) => {
-    const { result, key, status, confirm } = payload || {};
-    if (!key || downloadingKeys.value[key]) {
-        return;
-    }
-    if (confirm && confirmStatuses.has(status)) {
-        confirmDialog.value = { show: true, status, result, key };
-        return;
-    }
-    void doInstall({ result, key });
-};
-
-const confirmInstall = () => {
-    const { result, key } = confirmDialog.value;
-    confirmDialog.value = { show: false, status: "", result: null, key: "" };
-    void doInstall({ result, key });
-};
-
-const doInstall = async ({ result, key }) => {
-    if (!key || downloadingKeys.value[key]) {
-        return;
-    }
-
-    downloadingKeys.value = { ...downloadingKeys.value, [key]: true };
-    try {
-        const res = await QueueModDownload({
-            projectId: key,
-            result,
-            minecraftVersion: selectedVersion.value,
-            modLoader: selectedModLoader.value,
-        });
-        if (res?.skipped) {
-            const errorKey = downloadErrorKeys[res.reason];
-            showSnackbar(errorKey ? t(`download.errors.${errorKey}`) : t("download.errors.generic"), "error");
-        } else {
-            showSnackbar(t("download.queued"), "success");
-            await refreshDownloadStates();
-        }
-    } finally {
-        const next = { ...downloadingKeys.value };
-        delete next[key];
-        downloadingKeys.value = next;
-    }
-};
-
-const modIDFromResult = (result) => {
-    const id = result?.id || "";
-    return id.includes(":") ? id.split(":").slice(1).join(":") : id;
-};
-
-const openVersionsOverlay = async (result) => {
-    selectedMod.value = result;
-    matchingVersions.value = [];
-    pinnedVersion.value = null;
-    pinningVersionID.value = "";
-    showVersionsOverlay.value = true;
-    isLoadingVersions.value = true;
-
-    try {
-        const [versions, pin] = await Promise.all([
-            ListMatchingProjectVersions(result, selectedVersion.value, selectedModLoader.value),
-            GetPinnedModVersion(result.platform, modIDFromResult(result), selectedVersion.value, selectedModLoader.value),
-        ]);
-        matchingVersions.value = versions || [];
-        pinnedVersion.value = pin?.versionId ? pin : null;
-    } finally {
-        isLoadingVersions.value = false;
-    }
-};
-
-const pinVersion = async (version) => {
-    if (!selectedMod.value || pinningVersionID.value) {
-        return;
-    }
-
-    pinningVersionID.value = version.id;
-    try {
-        const pin = await PinModVersion({
-            platform: selectedMod.value.platform,
-            modId: modIDFromResult(selectedMod.value),
-            versionId: version.id,
-            minecraftVersion: selectedVersion.value,
-            modLoader: selectedModLoader.value,
-        });
-        pinnedVersion.value = pin?.versionId ? pin : null;
-    } finally {
-        pinningVersionID.value = "";
-    }
-};
-
-const isPinnedVersion = (version) => pinnedVersion.value?.versionId === version.id;
-
-const isPinningAnotherVersion = (version) => Boolean(pinningVersionID.value && pinningVersionID.value !== version.id);
-
-const versionFileName = (version) => version.fileName || version.name || version.version || version.id;
-
-const applySelectedVersion = (version) => {
-    // 只认显式的 Minecraft 版本字段；实例显示名(name)绝不能进版本选择器,
-    // 否则会变成无效的 MC 版本导致搜索为空。未知实例(无 minecraftVersion)则保持当前选择不变。
-    const minecraftVersion = version?.minecraftVersion || version?.MinecraftVersion;
-    if (minecraftVersion) {
-        if (!versionList.value.includes(minecraftVersion)) {
-            versionList.value = [minecraftVersion, ...versionList.value];
-        }
-        selectedVersion.value = minecraftVersion;
-    }
-
-    const modLoader = version?.modLoader || version?.ModLoader;
-    if (modLoader) {
-        const normalizedModLoader = modLoader.toLowerCase();
-        const matchingModLoader = modLoaderList.find((item) => item.toLowerCase() === normalizedModLoader);
-        if (matchingModLoader) {
-            selectedModLoader.value = matchingModLoader;
-        }
-    }
-};
-
-let stopListeningMinecraftDirChanged = null;
-let stopListeningSelectedVersionChanged = null;
-let stopListeningSearchModsUpdated = null;
-let stopListeningDownloadQueueUpdated = null;
-let stopListeningDownloadFailed = null;
-
-onMounted(() => {
-    // 先同步注册监听，避免在 await 期间错过事件
-    stopListeningMinecraftDirChanged = EventsOn(minecraftDirChangedEvent, () => {
-        checkMinecraftDir();
-        loadVersions();
-    });
-    stopListeningSelectedVersionChanged = EventsOn(selectedVersionChangedEvent, applySelectedVersion);
-    stopListeningDownloadQueueUpdated = EventsOn(downloadQueueUpdatedEvent, () => {
-        refreshDownloadStates();
-    });
-    stopListeningDownloadFailed = EventsOn(downloadFailedEvent, (event) => {
-        const fileName = event?.fileName || event?.FileName || t("download.errors.unknownFile");
-        const reason = event?.reason || event?.Reason || t("download.errors.generic");
-        showSnackbar(t("download.errors.failedWithReason", { fileName, reason }), "error");
-        refreshDownloadStates();
-    });
-    stopListeningSearchModsUpdated = EventsOn(searchModsUpdatedEvent, (update) => {
-        const requestID = update?.requestId || update?.RequestID;
-        if (requestID !== activeSearchRequestID.value) {
-            return;
-        }
-
-        const nextResults = update.results || update.Results || [];
-        const append = Boolean(update.append ?? update.Append ?? activeSearchAppend.value);
-        searchResults.value = append ? [...appendBaseResults.value, ...nextResults] : nextResults;
-        hasMoreResults.value = nextResults.length >= searchPageSize;
-        const loading = Boolean(update.loading ?? update.Loading);
-        if (append) {
-            isLoadingMore.value = loading;
-        } else {
-            isSearching.value = loading;
-        }
-        if (!loading) {
-            void refreshDownloadStates();
-        }
-    });
-
-    // 初始化：拉一次当前选中实例，使下拉框与实际选中实例一致
-    // （否则从别的页面切回时会错过 selected-version-changed 事件）。
-    void (async () => {
-        checkMinecraftDir();
-        await loadVersions();
-        const selected = await GetSelectedVersion();
-        if (selected && (selected.minecraftVersion || selected.modLoader)) {
-            applySelectedVersion(selected);
-        }
-    })();
+onDeactivated(() => {
+    downloadStore.stop();
 });
 
-onUnmounted(() => {
-    stopListeningMinecraftDirChanged?.();
-    stopListeningSelectedVersionChanged?.();
-    stopListeningSearchModsUpdated?.();
-    stopListeningDownloadQueueUpdated?.();
-    stopListeningDownloadFailed?.();
+watch(() => minecraftStore.releaseVersions, (versions) => {
+    downloadStore.setVersionList(versions);
+});
+
+watch(() => minecraftStore.selectedVersion, (version) => {
+    downloadStore.applySelectedInstance(version);
 });
 
 watch([selectedVersion, selectedModLoader], () => {
-    downloadStates.value = [];
-    refreshDownloadStates();
+    downloadStore.clearDownloadStates();
 }, { deep: false });
 </script>
 

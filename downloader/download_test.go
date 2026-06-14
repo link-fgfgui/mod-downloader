@@ -1,6 +1,7 @@
 package downloader
 
 import (
+	"path/filepath"
 	"testing"
 
 	"mod-downloader/global"
@@ -50,5 +51,38 @@ func TestProjectVersionSHA1Set(t *testing.T) {
 
 	if !set["abc"] || !set["def"] || len(set) != 2 {
 		t.Fatalf("sha1 set = %#v", set)
+	}
+}
+
+func TestSelectedVersionModsDirUsesInstanceIDNotDisplayName(t *testing.T) {
+	mcDir := t.TempDir()
+	global.SetMinecraftDir(mcDir)
+	t.Cleanup(func() {
+		global.SetMinecraftDir("")
+	})
+
+	got := selectedVersionModsDir(mcstructs.VersionInfo{
+		ID:   "instance-folder",
+		Name: "Display Name",
+	})
+	want := filepath.Join(mcDir, "versions", "instance-folder", "mods")
+	if got != want {
+		t.Fatalf("selectedVersionModsDir() = %q, want %q", got, want)
+	}
+}
+
+func TestPathInLocalModPathsMatchesRelativePaths(t *testing.T) {
+	mcDir := t.TempDir()
+	global.SetMinecraftDir(mcDir)
+	t.Cleanup(func() {
+		global.SetMinecraftDir("")
+	})
+
+	path := filepath.Join(mcDir, "versions", "instance", "mods", "mod.jar")
+	paths := []global.LocalModFilePath{{
+		Path: filepath.Join("versions", "instance", "mods", "mod.jar"),
+	}}
+	if !pathInLocalModPaths(path, paths) {
+		t.Fatalf("pathInLocalModPaths(%q) = false, want true", path)
 	}
 }
