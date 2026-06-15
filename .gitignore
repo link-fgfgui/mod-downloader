@@ -10,4 +10,4 @@ mods.db-shm
 mods.db-wal
 exampleJars/
 dev.sh
-mods.buntdb
+mods.gob.zst

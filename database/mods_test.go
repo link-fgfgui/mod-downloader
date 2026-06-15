@@ -6,11 +6,9 @@ import (
 	"testing"
 
 	structs "mod-downloader/structs/minecraft"
-
-	"github.com/tidwall/buntdb"
 )
 
-func openTestDB(t *testing.T) {
+func openTestDB(t *testing.T) string {
 	t.Helper()
 	oldwd, err := os.Getwd()
 	if err != nil {
@@ -29,20 +27,23 @@ func openTestDB(t *testing.T) {
 	if err := Open(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(tmp, databaseFileName)); err != nil {
+	path := filepath.Join(tmp, databaseFileName)
+	return path
+}
+
+func reopenTestDB(t *testing.T, path string) {
+	t.Helper()
+	Close()
+	if err := Open(); err != nil {
 		t.Fatal(err)
 	}
-	var config buntdb.Config
-	if err := db.ReadConfig(&config); err != nil {
+	if _, err := os.Stat(path); err != nil {
 		t.Fatal(err)
-	}
-	if config.SyncPolicy != buntdb.Never {
-		t.Fatalf("sync policy = %v, want %v", config.SyncPolicy, buntdb.Never)
 	}
 }
 
-func TestBuntDBPlatformVersionsAndDependencies(t *testing.T) {
-	openTestDB(t)
+func TestCachePlatformVersionsAndDependencies(t *testing.T) {
+	path := openTestDB(t)
 
 	if err := UpsertModPlatform(ModPlatform{
 		Platform:  "Modrinth",
@@ -72,6 +73,12 @@ func TestBuntDBPlatformVersionsAndDependencies(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("cache file before close error = %v, want not exist", err)
+	}
+
+	reopenTestDB(t, path)
+
 	if p, ok := GetModPlatformBySlug("Modrinth", "sodium-slug"); !ok || p.ProjectID != "sodium" {
 		t.Fatalf("slug lookup = %#v, %v", p, ok)
 	}
@@ -99,8 +106,8 @@ func TestBuntDBPlatformVersionsAndDependencies(t *testing.T) {
 	}
 }
 
-func TestBuntDBPinnedModsAndJarMetadata(t *testing.T) {
-	openTestDB(t)
+func TestCachePinnedModsAndJarMetadata(t *testing.T) {
+	path := openTestDB(t)
 
 	if err := UpsertPinnedMod(PinnedMod{
 		Platform:         "Modrinth",
@@ -111,13 +118,16 @@ func TestBuntDBPinnedModsAndJarMetadata(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	if err := SetJarMetadata("sha1", []structs.ModInfo{{ID: "jei"}, {ID: "jei"}, {ID: "tmrv"}}); err != nil {
+		t.Fatal(err)
+	}
+
+	reopenTestDB(t, path)
+
 	if pin, ok := GetPinnedMod("modrinth", "sodium", "1.21.1", "neoforge"); !ok || pin.VersionID != "v1" {
 		t.Fatalf("pin = %#v, %v", pin, ok)
 	}
 
-	if err := SetJarMetadata("sha1", []structs.ModInfo{{ID: "jei"}, {ID: "jei"}, {ID: "tmrv"}}); err != nil {
-		t.Fatal(err)
-	}
 	mods, ok := GetJarMetadata("sha1")
 	if !ok || len(mods) != 2 || mods[0].ID != "jei" || mods[1].ID != "tmrv" {
 		t.Fatalf("jar metadata = %#v, %v", mods, ok)

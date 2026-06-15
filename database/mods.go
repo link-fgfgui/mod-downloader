@@ -1,28 +1,14 @@
 package database
 
 import (
-	"encoding/base64"
-	"encoding/json"
-	"errors"
+	"sort"
 	"strings"
 
 	"mod-downloader/logging"
 	structs "mod-downloader/structs/minecraft"
-
-	"github.com/tidwall/buntdb"
 )
 
-const (
-	kindMetadata       = "meta"
-	kindModPlatform    = "mod-platform"
-	kindAssociation    = "association"
-	kindVersion        = "version"
-	kindVersionByID    = "version-id"
-	kindVersionScope   = "version-scope"
-	kindPinnedMod      = "pinned-mod"
-	kindJarMetadata    = "jar-metadata"
-	jarMetadataVersion = "recursive-jar-mod-id-v5"
-)
+const jarMetadataVersion = "recursive-jar-mod-id-v5"
 
 // --- record types ---
 
@@ -110,88 +96,26 @@ func normalizePinnedMod(p PinnedMod) PinnedMod {
 	return p
 }
 
-func keyPart(value string) string {
-	return base64.RawURLEncoding.EncodeToString([]byte(value))
+func makePlatformKey(platform, projectID string) platformKey {
+	return platformKey{Platform: strings.TrimSpace(platform), ProjectID: strings.TrimSpace(projectID)}
 }
 
-func dbKey(kind string, parts ...string) string {
-	var b strings.Builder
-	b.WriteString(kind)
-	for _, part := range parts {
-		b.WriteByte(':')
-		b.WriteString(keyPart(part))
-	}
-	return b.String()
+func makeVersionKey(platform, projectID, versionID string) versionKey {
+	return versionKey{Platform: strings.TrimSpace(platform), ProjectID: strings.TrimSpace(projectID), VersionID: strings.TrimSpace(versionID)}
 }
 
-func dbPrefix(kind string, parts ...string) string {
-	return dbKey(kind, parts...) + ":"
+func makePinnedModKey(platform, modID, mcVersion, modLoader string) pinnedModKey {
+	platform, modID, mcVersion, modLoader = normalizePinnedModKey(platform, modID, mcVersion, modLoader)
+	return pinnedModKey{Platform: platform, ModID: modID, MinecraftVersion: mcVersion, ModLoader: modLoader}
 }
 
-func dbPattern(kind string, parts ...string) string {
-	return dbPrefix(kind, parts...) + "*"
-}
-
-func getJSON(tx *buntdb.Tx, key string, out any) (bool, error) {
-	value, err := tx.Get(key)
-	if err != nil {
-		if errors.Is(err, buntdb.ErrNotFound) {
-			return false, nil
-		}
-		return false, err
+func makeVersionScopeKey(platform, projectID string, scope ModPlatformVersionScope) versionScopeKey {
+	return versionScopeKey{
+		Platform:         strings.TrimSpace(platform),
+		ProjectID:        strings.TrimSpace(projectID),
+		MinecraftVersion: scope.MinecraftVersion,
+		ModLoader:        scope.ModLoader,
 	}
-	if err := json.Unmarshal([]byte(value), out); err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
-func setJSON(tx *buntdb.Tx, key string, value any) error {
-	data, err := json.Marshal(value)
-	if err != nil {
-		return err
-	}
-	_, _, err = tx.Set(key, string(data), nil)
-	return err
-}
-
-func deleteKey(tx *buntdb.Tx, key string) error {
-	if _, err := tx.Delete(key); err != nil && !errors.Is(err, buntdb.ErrNotFound) {
-		return err
-	}
-	return nil
-}
-
-func deletePattern(tx *buntdb.Tx, pattern string) error {
-	keys := make([]string, 0)
-	if err := tx.AscendKeys(pattern, func(key, value string) bool {
-		keys = append(keys, key)
-		return true
-	}); err != nil {
-		return err
-	}
-	for _, key := range keys {
-		if err := deleteKey(tx, key); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func resetJarMetadataCacheWhenNeeded(tx *buntdb.Tx) error {
-	metaKey := dbKey(kindMetadata, "jar_metadata_version")
-	version, err := tx.Get(metaKey)
-	if err == nil && version == jarMetadataVersion {
-		return nil
-	}
-	if err != nil && !errors.Is(err, buntdb.ErrNotFound) {
-		return err
-	}
-	if err := deletePattern(tx, dbPattern(kindJarMetadata)); err != nil {
-		return err
-	}
-	_, _, err = tx.Set(metaKey, jarMetadataVersion, nil)
-	return err
 }
 
 // --- mod platforms ---
@@ -207,18 +131,16 @@ func UpsertModPlatform(p ModPlatform) error {
 		return nil
 	}
 
-	err = d.Update(func(tx *buntdb.Tx) error {
-		key := dbKey(kindModPlatform, p.Platform, p.ProjectID)
-		var existing ModPlatform
-		if ok, err := getJSON(tx, key, &existing); err != nil {
-			return err
-		} else if ok {
+	err = d.update(func(state *cacheState) error {
+		key := makePlatformKey(p.Platform, p.ProjectID)
+		if existing, ok := state.ModPlatforms[key]; ok {
 			if strings.TrimSpace(p.Slug) == "" {
 				p.Slug = existing.Slug
 			}
 			p.UpdatedAt = existing.UpdatedAt
 		}
-		return setJSON(tx, key, p)
+		state.ModPlatforms[key] = p
+		return nil
 	})
 	if err != nil {
 		logging.Error("upsert mod platform failed", "platform", p.Platform, "projectID", p.ProjectID, "slug", p.Slug, "error", err)
@@ -233,32 +155,22 @@ func GetModPlatform(platform, projectID string) (ModPlatform, bool) {
 	if err != nil {
 		return ModPlatform{}, false
 	}
-	platform = strings.TrimSpace(platform)
-	projectID = strings.TrimSpace(projectID)
-	if platform == "" || projectID == "" {
+	key := makePlatformKey(platform, projectID)
+	if key.Platform == "" || key.ProjectID == "" {
 		return ModPlatform{}, false
 	}
 
 	var p ModPlatform
-	err = d.View(func(tx *buntdb.Tx) error {
-		ok, err := getJSON(tx, dbKey(kindModPlatform, platform, projectID), &p)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			return buntdb.ErrNotFound
-		}
+	found := false
+	err = d.view(func(state *cacheState) error {
+		p, found = state.ModPlatforms[key]
 		return nil
 	})
-	if err != nil {
-		if !errors.Is(err, buntdb.ErrNotFound) {
-			logging.Error("get mod platform failed", "platform", platform, "projectID", projectID, "error", err)
-		} else {
-			logging.Debug("mod platform cache miss", "platform", platform, "projectID", projectID)
-		}
+	if err != nil || !found {
+		logging.Debug("mod platform cache miss", "platform", key.Platform, "projectID", key.ProjectID)
 		return ModPlatform{}, false
 	}
-	logging.Debug("mod platform cache hit", "platform", platform, "projectID", projectID, "updatedAt", p.UpdatedAt)
+	logging.Debug("mod platform cache hit", "platform", key.Platform, "projectID", key.ProjectID, "updatedAt", p.UpdatedAt)
 	return p, true
 }
 
@@ -274,39 +186,19 @@ func GetModPlatformBySlug(platform, slug string) (ModPlatform, bool) {
 	}
 
 	var p ModPlatform
-	err = d.View(func(tx *buntdb.Tx) error {
-		found := false
-		var scanErr error
-		err := tx.AscendKeys(dbPattern(kindModPlatform, platform), func(key, value string) bool {
-			var candidate ModPlatform
-			if err := json.Unmarshal([]byte(value), &candidate); err != nil {
-				scanErr = err
-				return false
-			}
-			if candidate.Slug == slug {
+	found := false
+	err = d.view(func(state *cacheState) error {
+		for key, candidate := range state.ModPlatforms {
+			if key.Platform == platform && candidate.Slug == slug {
 				p = candidate
 				found = true
-				return false
+				break
 			}
-			return true
-		})
-		if err != nil {
-			return err
-		}
-		if scanErr != nil {
-			return scanErr
-		}
-		if !found {
-			return buntdb.ErrNotFound
 		}
 		return nil
 	})
-	if err != nil {
-		if !errors.Is(err, buntdb.ErrNotFound) {
-			logging.Error("get mod platform by slug failed", "platform", platform, "slug", slug, "error", err)
-		} else {
-			logging.Debug("mod platform slug cache miss", "platform", platform, "slug", slug)
-		}
+	if err != nil || !found {
+		logging.Debug("mod platform slug cache miss", "platform", platform, "slug", slug)
 		return ModPlatform{}, false
 	}
 	logging.Debug("mod platform slug cache hit", "platform", platform, "slug", slug, "projectID", p.ProjectID, "updatedAt", p.UpdatedAt)
@@ -318,28 +210,24 @@ func TouchModPlatform(platform, projectID string, updatedAt int64) error {
 	if err != nil {
 		return err
 	}
-	platform = strings.TrimSpace(platform)
-	projectID = strings.TrimSpace(projectID)
-	if platform == "" || projectID == "" {
+	key := makePlatformKey(platform, projectID)
+	if key.Platform == "" || key.ProjectID == "" {
 		return nil
 	}
 
-	err = d.Update(func(tx *buntdb.Tx) error {
-		key := dbKey(kindModPlatform, platform, projectID)
-		p := ModPlatform{Platform: platform, ProjectID: projectID}
-		if _, err := getJSON(tx, key, &p); err != nil {
-			return err
-		}
-		p.Platform = platform
-		p.ProjectID = projectID
+	err = d.update(func(state *cacheState) error {
+		p := state.ModPlatforms[key]
+		p.Platform = key.Platform
+		p.ProjectID = key.ProjectID
 		p.UpdatedAt = updatedAt
-		return setJSON(tx, key, p)
+		state.ModPlatforms[key] = p
+		return nil
 	})
 	if err != nil {
-		logging.Error("touch mod platform failed", "platform", platform, "projectID", projectID, "updatedAt", updatedAt, "error", err)
+		logging.Error("touch mod platform failed", "platform", key.Platform, "projectID", key.ProjectID, "updatedAt", updatedAt, "error", err)
 		return err
 	}
-	logging.Debug("mod platform touched", "platform", platform, "projectID", projectID, "updatedAt", updatedAt)
+	logging.Debug("mod platform touched", "platform", key.Platform, "projectID", key.ProjectID, "updatedAt", updatedAt)
 	return nil
 }
 
@@ -356,8 +244,9 @@ func UpsertPlatformAssociation(a PlatformAssociation) error {
 		a.ID = NewID()
 	}
 
-	err = d.Update(func(tx *buntdb.Tx) error {
-		return setJSON(tx, dbKey(kindAssociation, a.ID), a)
+	err = d.update(func(state *cacheState) error {
+		state.PlatformAssociations[a.ID] = a
+		return nil
 	})
 	if err != nil {
 		logging.Error("upsert platform association failed", "id", a.ID, "curseforgeProjectID", a.CurseForgeProjectID, "modrinthProjectID", a.ModrinthProjectID, "error", err)
@@ -378,41 +267,26 @@ func UpsertPlatformAssociationByProjects(curseForgeProjectID, modrinthProjectID 
 		return nil
 	}
 
-	err = d.Update(func(tx *buntdb.Tx) error {
+	err = d.update(func(state *cacheState) error {
 		ids := make([]string, 0, 2)
-		var scanErr error
-		if err := tx.AscendKeys(dbPattern(kindAssociation), func(key, value string) bool {
-			var a PlatformAssociation
-			if err := json.Unmarshal([]byte(value), &a); err != nil {
-				scanErr = err
-				return false
-			}
+		for _, a := range state.PlatformAssociations {
 			if a.CurseForgeProjectID == curseForgeProjectID || a.ModrinthProjectID == modrinthProjectID {
 				ids = append(ids, a.ID)
 			}
-			return true
-		}); err != nil {
-			return err
 		}
-		if scanErr != nil {
-			return scanErr
-		}
-
 		id := NewID()
 		if len(ids) > 0 {
 			id = ids[0]
 			for _, duplicateID := range ids[1:] {
-				if err := deleteKey(tx, dbKey(kindAssociation, duplicateID)); err != nil {
-					logging.Error("delete duplicate platform association failed", "id", duplicateID, "error", err)
-					return err
-				}
+				delete(state.PlatformAssociations, duplicateID)
 			}
 		}
-		return setJSON(tx, dbKey(kindAssociation, id), PlatformAssociation{
+		state.PlatformAssociations[id] = PlatformAssociation{
 			ID:                  id,
 			CurseForgeProjectID: curseForgeProjectID,
 			ModrinthProjectID:   modrinthProjectID,
-		})
+		}
+		return nil
 	})
 	if err != nil {
 		logging.Error("upsert platform association by projects failed", "curseforgeProjectID", curseForgeProjectID, "modrinthProjectID", modrinthProjectID, "error", err)
@@ -442,38 +316,19 @@ func getAssociationBy(match func(PlatformAssociation) bool, logKey string, logVa
 		return PlatformAssociation{}, false
 	}
 	var out PlatformAssociation
-	err = d.View(func(tx *buntdb.Tx) error {
-		found := false
-		var scanErr error
-		if err := tx.AscendKeys(dbPattern(kindAssociation), func(key, value string) bool {
-			var a PlatformAssociation
-			if err := json.Unmarshal([]byte(value), &a); err != nil {
-				scanErr = err
-				return false
-			}
+	found := false
+	err = d.view(func(state *cacheState) error {
+		for _, a := range state.PlatformAssociations {
 			if match(a) {
 				out = a
 				found = true
-				return false
+				break
 			}
-			return true
-		}); err != nil {
-			return err
-		}
-		if scanErr != nil {
-			return scanErr
-		}
-		if !found {
-			return buntdb.ErrNotFound
 		}
 		return nil
 	})
-	if err != nil {
-		if !errors.Is(err, buntdb.ErrNotFound) {
-			logging.Error("get platform association failed", logKey, logValue, "error", err)
-		} else {
-			logging.Debug("platform association miss", logKey, logValue)
-		}
+	if err != nil || !found {
+		logging.Debug("platform association miss", logKey, logValue)
 		return PlatformAssociation{}, false
 	}
 	logging.Debug("platform association hit", logKey, logValue, "id", out.ID)
@@ -492,45 +347,29 @@ func GetLatestProjectBySHA1(platform, sha1 string) (ModPlatformVersion, bool) {
 	}
 
 	var best ModPlatformVersion
-	err = d.View(func(tx *buntdb.Tx) error {
+	found := false
+	err = d.view(func(state *cacheState) error {
 		latestByProject := make(map[string]ModPlatformVersion)
-		var scanErr error
-		if err := tx.AscendKeys(dbPattern(kindVersion, platform), func(key, value string) bool {
-			var v ModPlatformVersion
-			if err := json.Unmarshal([]byte(value), &v); err != nil {
-				scanErr = err
-				return false
+		for key, v := range state.PlatformVersions {
+			if key.Platform != platform {
+				continue
 			}
 			if current, ok := latestByProject[v.ProjectID]; !ok || newerProjectVersion(v, current) {
 				latestByProject[v.ProjectID] = v
 			}
-			return true
-		}); err != nil {
-			return err
 		}
-		if scanErr != nil {
-			return scanErr
-		}
-
-		found := false
 		for _, v := range latestByProject {
 			if strings.ToLower(strings.TrimSpace(v.SHA1)) != sha1 {
 				continue
 			}
 			if !found || v.PublishedAt > best.PublishedAt || (v.PublishedAt == best.PublishedAt && v.ProjectID < best.ProjectID) {
-				best = v
+				best = copyVersion(v)
 				found = true
 			}
 		}
-		if !found {
-			return buntdb.ErrNotFound
-		}
 		return nil
 	})
-	if err != nil {
-		if !errors.Is(err, buntdb.ErrNotFound) {
-			logging.Error("get latest project by sha1 failed", "platform", platform, "sha1", sha1, "error", err)
-		}
+	if err != nil || !found {
 		return ModPlatformVersion{}, false
 	}
 	return best, true
@@ -557,15 +396,10 @@ func SetPlatformVersions(platform, projectID string, versions []ModPlatformVersi
 	}
 
 	logging.Debug("set platform versions started", "platform", platform, "projectID", projectID, "versionCount", len(versions))
-	err = d.Update(func(tx *buntdb.Tx) error {
-		if err := deleteProjectVersionsTx(tx, platform, projectID); err != nil {
-			return err
-		}
+	err = d.update(func(state *cacheState) error {
+		deleteProjectVersions(state, platform, projectID)
 		for _, v := range versions {
-			if err := savePlatformVersionTx(tx, platform, projectID, v); err != nil {
-				logging.Error("insert platform version failed", "platform", platform, "projectID", projectID, "versionID", v.VersionID, "error", err)
-				return err
-			}
+			savePlatformVersion(state, platform, projectID, v)
 		}
 		return nil
 	})
@@ -590,33 +424,24 @@ func SetPlatformVersionSnapshot(platform, projectID string, versions []ModPlatfo
 	scopes = normalizePlatformVersionScopes(scopes)
 
 	logging.Debug("set platform version snapshot started", "platform", platform, "projectID", projectID, "versionCount", len(versions), "updatedAt", updatedAt, "scopeCount", len(scopes))
-	err = d.Update(func(tx *buntdb.Tx) error {
-		if err := touchSnapshotPlatformTx(tx, platform, projectID, updatedAt, len(scopes) == 0); err != nil {
-			return err
-		}
+	err = d.update(func(state *cacheState) error {
+		touchSnapshotPlatform(state, platform, projectID, updatedAt, len(scopes) == 0)
 		if len(scopes) == 0 {
-			if err := deleteProjectVersionsTx(tx, platform, projectID); err != nil {
-				return err
-			}
-		} else if err := deletePlatformVersionSnapshotScopesTx(tx, platform, projectID, scopes); err != nil {
-			return err
+			deleteProjectVersions(state, platform, projectID)
+		} else {
+			deletePlatformVersionSnapshotScopes(state, platform, projectID, scopes)
 		}
 		for _, v := range versions {
-			if err := savePlatformVersionTx(tx, platform, projectID, v); err != nil {
-				logging.Error("insert snapshot platform version failed", "platform", platform, "projectID", projectID, "versionID", v.VersionID, "error", err)
-				return err
-			}
+			savePlatformVersion(state, platform, projectID, v)
 		}
 		for _, scope := range scopes {
-			rec := storedVersionScope{
+			key := makeVersionScopeKey(platform, projectID, scope)
+			state.PlatformVersionScopes[key] = storedVersionScope{
 				Platform:         platform,
 				ProjectID:        projectID,
 				MinecraftVersion: scope.MinecraftVersion,
 				ModLoader:        scope.ModLoader,
 				UpdatedAt:        updatedAt,
-			}
-			if err := setJSON(tx, dbKey(kindVersionScope, platform, projectID, scope.MinecraftVersion, scope.ModLoader), rec); err != nil {
-				return err
 			}
 		}
 		return nil
@@ -629,18 +454,15 @@ func SetPlatformVersionSnapshot(platform, projectID string, versions []ModPlatfo
 	return nil
 }
 
-func touchSnapshotPlatformTx(tx *buntdb.Tx, platform, projectID string, updatedAt int64, updateProjectTimestamp bool) error {
-	key := dbKey(kindModPlatform, platform, projectID)
-	p := ModPlatform{Platform: platform, ProjectID: projectID}
-	if _, err := getJSON(tx, key, &p); err != nil {
-		return err
-	}
+func touchSnapshotPlatform(state *cacheState, platform, projectID string, updatedAt int64, updateProjectTimestamp bool) {
+	key := makePlatformKey(platform, projectID)
+	p := state.ModPlatforms[key]
 	p.Platform = platform
 	p.ProjectID = projectID
 	if updateProjectTimestamp {
 		p.UpdatedAt = updatedAt
 	}
-	return setJSON(tx, key, p)
+	state.ModPlatforms[key] = p
 }
 
 func normalizePlatformVersionScopes(scopes []ModPlatformVersionScope) []ModPlatformVersionScope {
@@ -662,53 +484,27 @@ func normalizePlatformVersionScopes(scopes []ModPlatformVersionScope) []ModPlatf
 	return out
 }
 
-func deleteProjectVersionsTx(tx *buntdb.Tx, platform, projectID string) error {
-	return deleteMatchingVersionsTx(tx, dbPattern(kindVersion, platform, projectID), func(ModPlatformVersion) bool {
-		return true
+func deleteProjectVersions(state *cacheState, platform, projectID string) {
+	deleteMatchingVersions(state, func(key versionKey, v ModPlatformVersion) bool {
+		return key.Platform == platform && key.ProjectID == projectID
 	})
 }
 
-func deletePlatformVersionSnapshotScopesTx(tx *buntdb.Tx, platform, projectID string, scopes []ModPlatformVersionScope) error {
-	return deleteMatchingVersionsTx(tx, dbPattern(kindVersion, platform, projectID), func(v ModPlatformVersion) bool {
-		return platformVersionMatchesAnyScope(v.GameVersions, v.Loaders, scopes)
+func deletePlatformVersionSnapshotScopes(state *cacheState, platform, projectID string, scopes []ModPlatformVersionScope) {
+	deleteMatchingVersions(state, func(key versionKey, v ModPlatformVersion) bool {
+		return key.Platform == platform && key.ProjectID == projectID && platformVersionMatchesAnyScope(v.GameVersions, v.Loaders, scopes)
 	})
 }
 
-type versionDelete struct {
-	key string
-	id  string
-}
-
-func deleteMatchingVersionsTx(tx *buntdb.Tx, pattern string, shouldDelete func(ModPlatformVersion) bool) error {
-	deletes := make([]versionDelete, 0)
-	var scanErr error
-	if err := tx.AscendKeys(pattern, func(key, value string) bool {
-		var v ModPlatformVersion
-		if err := json.Unmarshal([]byte(value), &v); err != nil {
-			scanErr = err
-			return false
-		}
-		if shouldDelete(v) {
-			deletes = append(deletes, versionDelete{key: key, id: v.ID})
-		}
-		return true
-	}); err != nil {
-		return err
-	}
-	if scanErr != nil {
-		return scanErr
-	}
-	for _, item := range deletes {
-		if err := deleteKey(tx, item.key); err != nil {
-			return err
-		}
-		if item.id != "" {
-			if err := deleteKey(tx, dbKey(kindVersionByID, item.id)); err != nil {
-				return err
+func deleteMatchingVersions(state *cacheState, shouldDelete func(versionKey, ModPlatformVersion) bool) {
+	for key, v := range state.PlatformVersions {
+		if shouldDelete(key, v) {
+			delete(state.PlatformVersions, key)
+			if v.ID != "" {
+				delete(state.PlatformVersionKeyByID, v.ID)
 			}
 		}
 	}
-	return nil
 }
 
 func platformVersionMatchesAnyScope(gameVersions, loaders []string, scopes []ModPlatformVersionScope) bool {
@@ -733,27 +529,22 @@ func containsFoldDB(values []string, expected string) bool {
 	return false
 }
 
-func savePlatformVersionTx(tx *buntdb.Tx, platform, projectID string, v ModPlatformVersion) error {
+func savePlatformVersion(state *cacheState, platform, projectID string, v ModPlatformVersion) {
+	v = copyVersion(v)
 	v.Platform = platform
 	v.ProjectID = projectID
 	v.VersionID = strings.TrimSpace(v.VersionID)
-	key := dbKey(kindVersion, platform, projectID, v.VersionID)
+	key := makeVersionKey(platform, projectID, v.VersionID)
 
-	var existing ModPlatformVersion
-	if ok, err := getJSON(tx, key, &existing); err != nil {
-		return err
-	} else if ok && existing.ID != "" {
+	if existing, ok := state.PlatformVersions[key]; ok && existing.ID != "" {
 		v.ID = existing.ID
 	}
 	if v.ID == "" {
 		v.ID = NewID()
 	}
 	v.Dependencies = normalizeDependencies(v.ID, v.Dependencies)
-	if err := setJSON(tx, key, v); err != nil {
-		return err
-	}
-	_, _, err := tx.Set(dbKey(kindVersionByID, v.ID), key, nil)
-	return err
+	state.PlatformVersions[key] = v
+	state.PlatformVersionKeyByID[v.ID] = key
 }
 
 func normalizeDependencies(platformVersionID string, deps []ModDependency) []ModDependency {
@@ -787,23 +578,15 @@ func GetPlatformVersionScopeUpdatedAt(platform, projectID string, scope ModPlatf
 	if platform == "" || projectID == "" || len(scopes) == 0 {
 		return 0, false
 	}
-	scope = scopes[0]
+	key := makeVersionScopeKey(platform, projectID, scopes[0])
 
 	var rec storedVersionScope
-	err = d.View(func(tx *buntdb.Tx) error {
-		ok, err := getJSON(tx, dbKey(kindVersionScope, platform, projectID, scope.MinecraftVersion, scope.ModLoader), &rec)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			return buntdb.ErrNotFound
-		}
+	found := false
+	err = d.view(func(state *cacheState) error {
+		rec, found = state.PlatformVersionScopes[key]
 		return nil
 	})
-	if err != nil {
-		if !errors.Is(err, buntdb.ErrNotFound) {
-			logging.Error("get platform version scope failed", "platform", platform, "projectID", projectID, "minecraftVersion", scope.MinecraftVersion, "modLoader", scope.ModLoader, "error", err)
-		}
+	if err != nil || !found {
 		return 0, false
 	}
 	return rec.UpdatedAt, true
@@ -821,20 +604,16 @@ func GetPlatformVersions(platform, projectID string) ([]ModPlatformVersion, erro
 	}
 
 	versions := make([]ModPlatformVersion, 0)
-	err = d.View(func(tx *buntdb.Tx) error {
-		var scanErr error
-		if err := tx.AscendKeys(dbPattern(kindVersion, platform, projectID), func(key, value string) bool {
-			var v ModPlatformVersion
-			if err := json.Unmarshal([]byte(value), &v); err != nil {
-				scanErr = err
-				return false
+	err = d.view(func(state *cacheState) error {
+		for key, v := range state.PlatformVersions {
+			if key.Platform == platform && key.ProjectID == projectID {
+				versions = append(versions, copyVersion(v))
 			}
-			versions = append(versions, v)
-			return true
-		}); err != nil {
-			return err
 		}
-		return scanErr
+		sort.Slice(versions, func(i, j int) bool {
+			return versions[i].VersionID < versions[j].VersionID
+		})
+		return nil
 	})
 	if err != nil {
 		logging.Error("get platform versions failed", "platform", platform, "projectID", projectID, "error", err)
@@ -857,22 +636,18 @@ func SetVersionDependencies(platformVersionID string, deps []ModDependency) erro
 	}
 
 	logging.Debug("set version dependencies started", "platformVersionID", platformVersionID, "dependencyCount", len(deps))
-	err = d.Update(func(tx *buntdb.Tx) error {
-		versionKey, err := tx.Get(dbKey(kindVersionByID, platformVersionID))
-		if err != nil {
-			if errors.Is(err, buntdb.ErrNotFound) {
-				return nil
-			}
-			return err
+	err = d.update(func(state *cacheState) error {
+		key, ok := state.PlatformVersionKeyByID[platformVersionID]
+		if !ok {
+			return nil
 		}
-		var v ModPlatformVersion
-		if ok, err := getJSON(tx, versionKey, &v); err != nil {
-			return err
-		} else if !ok {
+		v, ok := state.PlatformVersions[key]
+		if !ok {
 			return nil
 		}
 		v.Dependencies = normalizeDependencies(platformVersionID, deps)
-		return setJSON(tx, versionKey, v)
+		state.PlatformVersions[key] = v
+		return nil
 	})
 	if err != nil {
 		logging.Error("set version dependencies failed", "platformVersionID", platformVersionID, "dependencyCount", len(deps), "error", err)
@@ -893,19 +668,13 @@ func GetVersionDependencies(platformVersionID string) ([]ModDependency, error) {
 	}
 
 	var deps []ModDependency
-	err = d.View(func(tx *buntdb.Tx) error {
-		versionKey, err := tx.Get(dbKey(kindVersionByID, platformVersionID))
-		if err != nil {
-			if errors.Is(err, buntdb.ErrNotFound) {
-				return nil
-			}
-			return err
+	err = d.view(func(state *cacheState) error {
+		key, ok := state.PlatformVersionKeyByID[platformVersionID]
+		if !ok {
+			return nil
 		}
-		var v ModPlatformVersion
-		if ok, err := getJSON(tx, versionKey, &v); err != nil {
-			return err
-		} else if ok {
-			deps = append(deps, v.Dependencies...)
+		if v, ok := state.PlatformVersions[key]; ok {
+			deps = copyDependencies(v.Dependencies)
 		}
 		return nil
 	})
@@ -929,18 +698,16 @@ func UpsertPinnedMod(p PinnedMod) error {
 		return nil
 	}
 
-	err = d.Update(func(tx *buntdb.Tx) error {
-		key := dbKey(kindPinnedMod, p.Platform, p.ModID, p.MinecraftVersion, p.ModLoader)
-		var existing PinnedMod
-		if ok, err := getJSON(tx, key, &existing); err != nil {
-			return err
-		} else if ok && existing.ID != "" {
+	err = d.update(func(state *cacheState) error {
+		key := makePinnedModKey(p.Platform, p.ModID, p.MinecraftVersion, p.ModLoader)
+		if existing, ok := state.PinnedMods[key]; ok && existing.ID != "" {
 			p.ID = existing.ID
 		}
 		if p.ID == "" {
 			p.ID = NewID()
 		}
-		return setJSON(tx, key, p)
+		state.PinnedMods[key] = p
+		return nil
 	})
 	if err != nil {
 		logging.Error("upsert pinned mod failed", "platform", p.Platform, "modID", p.ModID, "versionID", p.VersionID, "minecraftVersion", p.MinecraftVersion, "modLoader", p.ModLoader, "error", err)
@@ -955,31 +722,22 @@ func GetPinnedMod(platform, modID, mcVersion, modLoader string) (PinnedMod, bool
 	if err != nil {
 		return PinnedMod{}, false
 	}
-	platform, modID, mcVersion, modLoader = normalizePinnedModKey(platform, modID, mcVersion, modLoader)
-	if platform == "" || modID == "" || mcVersion == "" || modLoader == "" {
+	key := makePinnedModKey(platform, modID, mcVersion, modLoader)
+	if key.Platform == "" || key.ModID == "" || key.MinecraftVersion == "" || key.ModLoader == "" {
 		return PinnedMod{}, false
 	}
 
 	var p PinnedMod
-	err = d.View(func(tx *buntdb.Tx) error {
-		ok, err := getJSON(tx, dbKey(kindPinnedMod, platform, modID, mcVersion, modLoader), &p)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			return buntdb.ErrNotFound
-		}
+	found := false
+	err = d.view(func(state *cacheState) error {
+		p, found = state.PinnedMods[key]
 		return nil
 	})
-	if err != nil {
-		if !errors.Is(err, buntdb.ErrNotFound) {
-			logging.Error("get pinned mod failed", "platform", platform, "modID", modID, "minecraftVersion", mcVersion, "modLoader", modLoader, "error", err)
-		} else {
-			logging.Debug("pinned mod miss", "platform", platform, "modID", modID, "minecraftVersion", mcVersion, "modLoader", modLoader)
-		}
+	if err != nil || !found {
+		logging.Debug("pinned mod miss", "platform", key.Platform, "modID", key.ModID, "minecraftVersion", key.MinecraftVersion, "modLoader", key.ModLoader)
 		return PinnedMod{}, false
 	}
-	logging.Debug("pinned mod hit", "platform", platform, "modID", modID, "versionID", p.VersionID, "minecraftVersion", mcVersion, "modLoader", modLoader)
+	logging.Debug("pinned mod hit", "platform", key.Platform, "modID", key.ModID, "versionID", p.VersionID, "minecraftVersion", key.MinecraftVersion, "modLoader", key.ModLoader)
 	return p, true
 }
 
@@ -988,19 +746,20 @@ func DeletePinnedMod(platform, modID, mcVersion, modLoader string) error {
 	if err != nil {
 		return err
 	}
-	platform, modID, mcVersion, modLoader = normalizePinnedModKey(platform, modID, mcVersion, modLoader)
-	if platform == "" || modID == "" || mcVersion == "" || modLoader == "" {
+	key := makePinnedModKey(platform, modID, mcVersion, modLoader)
+	if key.Platform == "" || key.ModID == "" || key.MinecraftVersion == "" || key.ModLoader == "" {
 		return nil
 	}
 
-	err = d.Update(func(tx *buntdb.Tx) error {
-		return deleteKey(tx, dbKey(kindPinnedMod, platform, modID, mcVersion, modLoader))
+	err = d.update(func(state *cacheState) error {
+		delete(state.PinnedMods, key)
+		return nil
 	})
 	if err != nil {
-		logging.Error("delete pinned mod failed", "platform", platform, "modID", modID, "minecraftVersion", mcVersion, "modLoader", modLoader, "error", err)
+		logging.Error("delete pinned mod failed", "platform", key.Platform, "modID", key.ModID, "minecraftVersion", key.MinecraftVersion, "modLoader", key.ModLoader, "error", err)
 		return err
 	}
-	logging.Info("pinned mod deleted", "platform", platform, "modID", modID, "minecraftVersion", mcVersion, "modLoader", modLoader)
+	logging.Info("pinned mod deleted", "platform", key.Platform, "modID", key.ModID, "minecraftVersion", key.MinecraftVersion, "modLoader", key.ModLoader)
 	return nil
 }
 
@@ -1018,22 +777,14 @@ func GetJarMetadata(sha1 string) ([]structs.ModInfo, bool) {
 	}
 
 	var mods []structs.ModInfo
-	err = d.View(func(tx *buntdb.Tx) error {
-		ok, err := getJSON(tx, dbKey(kindJarMetadata, sha1), &mods)
-		if err != nil {
-			return err
-		}
-		if !ok || len(mods) == 0 {
-			return buntdb.ErrNotFound
-		}
+	found := false
+	err = d.view(func(state *cacheState) error {
+		mods, found = state.JarMetadata[sha1]
+		mods = copyModInfos(mods)
 		return nil
 	})
-	if err != nil {
-		if !errors.Is(err, buntdb.ErrNotFound) {
-			logging.Error("get jar metadata failed", "sha1", sha1, "error", err)
-		} else {
-			logging.Debug("jar metadata miss", "sha1", sha1)
-		}
+	if err != nil || !found || len(mods) == 0 {
+		logging.Debug("jar metadata miss", "sha1", sha1)
 		return nil, false
 	}
 	logging.Debug("jar metadata hit", "sha1", sha1, "modCount", len(mods))
@@ -1066,12 +817,13 @@ func SetJarMetadata(sha1 string, mods []structs.ModInfo) error {
 		filtered = append(filtered, mod)
 	}
 
-	err = d.Update(func(tx *buntdb.Tx) error {
-		key := dbKey(kindJarMetadata, sha1)
+	err = d.update(func(state *cacheState) error {
 		if len(filtered) == 0 {
-			return deleteKey(tx, key)
+			delete(state.JarMetadata, sha1)
+			return nil
 		}
-		return setJSON(tx, key, filtered)
+		state.JarMetadata[sha1] = copyModInfos(filtered)
+		return nil
 	})
 	if err != nil {
 		logging.Error("set jar metadata failed", "sha1", sha1, "modCount", len(mods), "error", err)

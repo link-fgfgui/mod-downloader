@@ -14,7 +14,7 @@ A desktop Minecraft mod downloader and local mod manager built with Go, Wails, V
 - Pin a specific project version for future installs.
 - Scan local `mods` folders and display installed mod IDs, versions, files, and enabled state.
 - Parse mod metadata directly from jars, including Fabric, Forge, NeoForge, jar-in-jar metadata, nested jars, and manifest-backed `${file.jarVersion}` values.
-- Cache platform and jar metadata locally with BuntDB.
+- Cache platform and jar metadata locally with gob + zstd.
 
 ## Supported Sources And Loaders
 
@@ -97,4 +97,4 @@ npm run build --prefix frontend
 The app stores local runtime data in the working directory:
 
 - `mod-downloader.toml` for configuration
-- `mods.buntdb` for cached mod platform and jar metadata
+- `mods.gob.zst` for cached mod platform and jar metadata
