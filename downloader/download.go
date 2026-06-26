@@ -415,7 +415,7 @@ func queueMissingRequiredDependencies(ctx context.Context, req appstructs.ModDow
 
 		depReq, ok := dependencyDownloadRequest(version.Platform, dep, req)
 		if !ok {
-			logging.Warn("required dependency cannot be queued", "platform", version.Platform, "projectID", dep.ProjectID, "versionID", dep.VersionID, "type", dep.Type)
+			logging.Warn("required dependency cannot be queued", "platform", version.Platform, "projectID", dep.DependencyProjectID, "versionID", dep.DependencyVersionID, "type", dep.DependencyType)
 			continue
 		}
 
@@ -424,7 +424,7 @@ func queueMissingRequiredDependencies(ctx context.Context, req appstructs.ModDow
 		}
 		result := queueModDownload(ctx, depReq, visited)
 		if result.Skipped {
-			logging.Warn("required dependency queue skipped", "platform", depReq.Result.Platform, "projectID", depReq.ProjectID, "versionID", dep.VersionID, "reason", result.Reason)
+			logging.Warn("required dependency queue skipped", "platform", depReq.Result.Platform, "projectID", depReq.ProjectID, "versionID", dep.DependencyVersionID, "reason", result.Reason)
 		}
 	}
 }
@@ -451,11 +451,11 @@ func hasRequiredDependency(deps []appstructs.ProjectDependency) bool {
 }
 
 func isRequiredDependency(dep appstructs.ProjectDependency) bool {
-	return strings.EqualFold(strings.TrimSpace(dep.Type), "required")
+	return strings.EqualFold(strings.TrimSpace(dep.DependencyType), "required")
 }
 
 func dependencyDownloadRequest(platform string, dep appstructs.ProjectDependency, parent appstructs.ModDownloadRequest) (appstructs.ModDownloadRequest, bool) {
-	projectID := strings.TrimSpace(dep.ProjectID)
+	projectID := strings.TrimSpace(dep.DependencyProjectID)
 	platform = strings.ToLower(strings.TrimSpace(platform))
 	if projectID == "" || (platform != "curseforge" && platform != "modrinth") {
 		return appstructs.ModDownloadRequest{}, false

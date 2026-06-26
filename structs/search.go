@@ -1,5 +1,7 @@
 package structs
 
+import "mod-downloader/models"
+
 type SearchModsRequest struct {
 	RequestID string `json:"requestId"`
 	Query     string `json:"query"`
@@ -16,38 +18,14 @@ type SearchModsUpdate struct {
 	Append    bool              `json:"append"`
 }
 
-type SearchModResult struct {
-	ID          string `json:"id"`
-	Platform    string `json:"platform"`
-	Title       string `json:"title"`
-	Icon        string `json:"icon"`
-	IconURL     string `json:"iconUrl"`
-	Description string `json:"description"`
-	Downloads   int64  `json:"downloads"`
-	Slug        string `json:"slug"`
-}
+// SearchModResult is now an alias to the unified ModProject type
+type SearchModResult = models.ModProject
 
-type ProjectVersionResult struct {
-	ID           string              `json:"id"`
-	Platform     string              `json:"platform"`
-	ProjectID    string              `json:"projectId"`
-	Name         string              `json:"name"`
-	Version      string              `json:"version"`
-	FileName     string              `json:"fileName"`
-	DownloadURL  string              `json:"downloadUrl"`
-	SHA1         string              `json:"sha1"`
-	PublishedAt  int64               `json:"publishedAt"`
-	Downloads    int64               `json:"downloads"`
-	GameVersions []string            `json:"gameVersions"`
-	Loaders      []string            `json:"loaders"`
-	Dependencies []ProjectDependency `json:"dependencies,omitempty"`
-}
+// ProjectVersionResult is now an alias to the unified ModVersion type
+type ProjectVersionResult = models.ModVersion
 
-type ProjectDependency struct {
-	ProjectID string `json:"projectId"`
-	VersionID string `json:"versionId,omitempty"`
-	Type      string `json:"type,omitempty"`
-}
+// ProjectDependency is now an alias to the unified ModDependency type
+type ProjectDependency = models.ModDependency
 
 type ModVersionPinRequest struct {
 	Platform         string `json:"platform"`
