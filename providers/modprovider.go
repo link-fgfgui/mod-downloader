@@ -627,9 +627,9 @@ func (p modrinthProvider) dependenciesFromVersion(deps []*modrinth.Dependency) [
 			depType = strings.ToLower(strings.TrimSpace(*dep.DependencyType))
 		}
 		results = append(results, appstructs.ProjectDependency{
-			ProjectID: projectID,
-			VersionID: versionID,
-			Type:      depType,
+			DependencyProjectID: projectID,
+			DependencyVersionID: versionID,
+			DependencyType:      depType,
 		})
 	}
 	return results
@@ -642,8 +642,8 @@ func (p curseForgeProvider) dependenciesFromFile(deps []cfSchema.FileDependency)
 			continue
 		}
 		results = append(results, appstructs.ProjectDependency{
-			ProjectID: strconv.Itoa(int(dep.ModID)),
-			Type:      curseForgeRelationType(dep.RelationType),
+			DependencyProjectID: strconv.Itoa(int(dep.ModID)),
+			DependencyType:      curseForgeRelationType(dep.RelationType),
 		})
 	}
 	return results
@@ -969,13 +969,13 @@ func projectVersionResultsToDB(platform, projectID string, versions []appstructs
 func projectDependenciesToDB(deps []appstructs.ProjectDependency) []database.ModDependency {
 	results := make([]database.ModDependency, 0, len(deps))
 	for _, dep := range deps {
-		if strings.TrimSpace(dep.ProjectID) == "" && strings.TrimSpace(dep.VersionID) == "" {
+		if strings.TrimSpace(dep.DependencyProjectID) == "" && strings.TrimSpace(dep.DependencyVersionID) == "" {
 			continue
 		}
 		results = append(results, database.ModDependency{
-			DependencyProjectID: dep.ProjectID,
-			DependencyVersionID: dep.VersionID,
-			DependencyType:      dep.Type,
+			DependencyProjectID: dep.DependencyProjectID,
+			DependencyVersionID: dep.DependencyVersionID,
+			DependencyType:      dep.DependencyType,
 		})
 	}
 	return results
@@ -1007,9 +1007,208 @@ func dbDependenciesToResults(deps []database.ModDependency) []appstructs.Project
 	results := make([]appstructs.ProjectDependency, 0, len(deps))
 	for _, dep := range deps {
 		results = append(results, appstructs.ProjectDependency{
-			ProjectID: dep.DependencyProjectID,
-			VersionID: dep.DependencyVersionID,
-			Type:      dep.DependencyType,
+			DependencyProjectID: dep.DependencyProjectID,
+			DependencyVersionID: dep.DependencyVersionID,
+			DependencyType:      dep.DependencyType,
+		})
+	}
+	return results
+}
+
+// --- New conversion methods (SDK → Unified Model) ---
+
+// CurseForge SDK → ModProject
+func (p curseForgeProvider) modToModProject(mod cfSchema.Mod) ModProject {
+	id := strconv.Itoa(int(mod.ID))
+	return ModProject{
+		ID:          ProjectKey("curseforge", id),
+		Platform:    "CurseForge",
+		ProjectID:   id,
+		Slug:        mod.Slug,
+		Title:       mod.Name,
+		Icon:        "mdi-package-variant",
+		IconURL:     mod.Logo.ThumbnailUrl,
+		Description: mod.Summary,
+		Downloads:   mod.DownloadCount,
+		UpdatedAt:   0, // Set by caller if needed
+	}
+}
+
+// CurseForge SDK → ModVersion
+func (p curseForgeProvider) fileToModVersion(file cfSchema.File) ModVersion {
+	return ModVersion{
+		ID:           strconv.Itoa(int(file.ID)),
+		Platform:     "CurseForge",
+		ProjectID:    strconv.Itoa(int(file.ModID)),
+		VersionID:    strconv.Itoa(int(file.ID)),
+		Name:         file.DisplayName,
+		Version:      file.DisplayName,
+		FileName:     file.FileName,
+		DownloadURL:  file.DownloadURL,
+		SHA1:         curseForgeFileSHA1(file),
+		PublishedAt:  file.FileDate.Unix(),
+		Downloads:    file.DownloadCount,
+		GameVersions: p.gameVersionsToStrings(file.GameVersions),
+		Loaders:      p.loadersFromGameVersions(file.GameVersions),
+		Dependencies: p.dependenciesFromFileToModDeps(file.Dependencies),
+	}
+}
+
+func (p curseForgeProvider) dependenciesFromFileToModDeps(deps []cfSchema.FileDependency) []ModDependency {
+	results := make([]ModDependency, 0, len(deps))
+	for _, dep := range deps {
+		if dep.ModID == 0 {
+			continue
+		}
+		results = append(results, ModDependency{
+			DependencyProjectID: strconv.Itoa(int(dep.ModID)),
+			DependencyVersionID: "",
+			DependencyType:      curseForgeRelationType(dep.RelationType),
+		})
+	}
+	return results
+}
+
+// Modrinth SDK → ModProject (from SearchResult)
+func (p modrinthProvider) searchHitToModProject(hit *modrinth.SearchResult) ModProject {
+	project := ModProject{
+		Platform: "Modrinth",
+		Icon:     "mdi-leaf",
+	}
+	if hit.ProjectID != nil {
+		project.ID = ProjectKey("modrinth", *hit.ProjectID)
+		project.ProjectID = *hit.ProjectID
+	}
+	if hit.Title != nil {
+		project.Title = *hit.Title
+	}
+	if hit.Description != nil {
+		project.Description = *hit.Description
+	}
+	if hit.IconURL != nil {
+		project.IconURL = *hit.IconURL
+	}
+	if hit.Downloads != nil {
+		project.Downloads = int64(*hit.Downloads)
+	}
+	if hit.Slug != nil {
+		project.Slug = *hit.Slug
+	}
+	return project
+}
+
+// Modrinth SDK → ModProject (from Project)
+func (p modrinthProvider) projectToModProject(project *modrinth.Project) ModProject {
+	result := ModProject{
+		Platform: "Modrinth",
+		Icon:     "mdi-leaf",
+	}
+	if project.ID != nil {
+		result.ID = ProjectKey("modrinth", *project.ID)
+		result.ProjectID = *project.ID
+	}
+	if project.Title != nil {
+		result.Title = *project.Title
+	}
+	if project.Description != nil {
+		result.Description = *project.Description
+	}
+	if project.IconURL != nil {
+		result.IconURL = *project.IconURL
+	}
+	if project.Downloads != nil {
+		result.Downloads = int64(*project.Downloads)
+	}
+	if project.Slug != nil {
+		result.Slug = *project.Slug
+	}
+	return result
+}
+
+// Modrinth SDK → ModVersion
+func (p modrinthProvider) versionToModVersion(version *modrinth.Version) ModVersion {
+	result := ModVersion{Platform: "Modrinth"}
+	if version == nil {
+		return result
+	}
+	if version.ID != nil {
+		result.ID = *version.ID
+		result.VersionID = *version.ID
+	}
+	if version.ProjectID != nil {
+		result.ProjectID = *version.ProjectID
+	}
+	if version.Name != nil {
+		result.Name = *version.Name
+	}
+	if version.VersionNumber != nil {
+		result.Version = *version.VersionNumber
+	}
+	if version.Downloads != nil {
+		result.Downloads = int64(*version.Downloads)
+	}
+	if version.DatePublished != nil {
+		result.PublishedAt = version.DatePublished.Unix()
+	}
+	result.GameVersions = version.GameVersions
+	result.Loaders = version.Loaders
+	result.Dependencies = p.dependenciesFromVersionToModDeps(version.Dependencies)
+
+	for _, file := range version.Files {
+		if file == nil {
+			continue
+		}
+		if file.Primary != nil && *file.Primary {
+			p.setModVersionFileFields(&result, file)
+			return result
+		}
+	}
+	if len(version.Files) > 0 {
+		p.setModVersionFileFields(&result, version.Files[0])
+	}
+	return result
+}
+
+func (p modrinthProvider) setModVersionFileFields(result *ModVersion, file *modrinth.File) {
+	if file == nil {
+		return
+	}
+	if file.Filename != nil {
+		result.FileName = *file.Filename
+	}
+	if file.URL != nil {
+		result.DownloadURL = *file.URL
+	}
+	if file.Hashes != nil {
+		result.SHA1 = strings.TrimSpace(file.Hashes["sha1"])
+	}
+}
+
+func (p modrinthProvider) dependenciesFromVersionToModDeps(deps []*modrinth.Dependency) []ModDependency {
+	results := make([]ModDependency, 0, len(deps))
+	for _, dep := range deps {
+		if dep == nil {
+			continue
+		}
+		projectID := ""
+		if dep.ProjectID != nil {
+			projectID = strings.TrimSpace(*dep.ProjectID)
+		}
+		versionID := ""
+		if dep.VersionID != nil {
+			versionID = strings.TrimSpace(*dep.VersionID)
+		}
+		if projectID == "" && versionID == "" {
+			continue
+		}
+		depType := ""
+		if dep.DependencyType != nil {
+			depType = strings.ToLower(strings.TrimSpace(*dep.DependencyType))
+		}
+		results = append(results, ModDependency{
+			DependencyProjectID: projectID,
+			DependencyVersionID: versionID,
+			DependencyType:      depType,
 		})
 	}
 	return results
