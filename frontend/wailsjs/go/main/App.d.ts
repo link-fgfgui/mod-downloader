@@ -3,6 +3,7 @@
 import {structs} from '../models';
 import {database} from '../models';
 import {main} from '../models';
+import {models} from '../models';
 
 export function CancelDownload(arg1:string):Promise<boolean>;
 
@@ -24,7 +25,7 @@ export function GetSelectedVersion():Promise<structs.VersionInfo>;
 
 export function GetVersions():Promise<Array<structs.VersionInfo>>;
 
-export function ListMatchingProjectVersions(arg1:structs.SearchModResult,arg2:string,arg3:string):Promise<Array<structs.ProjectVersionResult>>;
+export function ListMatchingProjectVersions(arg1:models.ModProject,arg2:string,arg3:string):Promise<Array<models.ModVersion>>;
 
 export function PinModVersion(arg1:structs.ModVersionPinRequest):Promise<database.PinnedMod>;
 

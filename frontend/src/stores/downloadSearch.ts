@@ -9,7 +9,7 @@ import {
     SearchMods,
 } from "../../wailsjs/go/main/App";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
-import type { structs } from "../../wailsjs/go/models";
+import type { structs, models } from "../../wailsjs/go/models";
 
 const searchModsUpdatedEvent = "search-mods-updated";
 const downloadQueueUpdatedEvent = "download-queue-updated";
@@ -18,8 +18,8 @@ const downloadFailedEvent = "download-failed";
 const searchPageSize = 10;
 
 type VersionInfoSnapshot = Partial<structs.VersionInfo> & Record<string, any>;
-type SearchModSnapshot = structs.SearchModResult;
-type ProjectVersionSnapshot = structs.ProjectVersionResult;
+type SearchModSnapshot = models.ModProject;
+type ProjectVersionSnapshot = models.ModVersion;
 type DownloadStateSnapshot = structs.ModDownloadButtonState;
 
 const downloadErrorKeys: Record<string, string> = {
@@ -185,7 +185,7 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
             try {
                 const res = await QueueModDownload({
                     projectId: key,
-                    result: result as structs.SearchModResult,
+                    result: result as models.ModProject,
                     minecraftVersion: this.selectedVersion,
                     modLoader: this.selectedModLoader,
                 } as structs.ModDownloadRequest);

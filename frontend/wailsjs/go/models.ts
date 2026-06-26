@@ -42,6 +42,117 @@ export namespace main {
 
 }
 
+export namespace models {
+	
+	export class ModDependency {
+	    id?: string;
+	    platformVersionId?: string;
+	    projectId: string;
+	    versionId?: string;
+	    type?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ModDependency(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.platformVersionId = source["platformVersionId"];
+	        this.projectId = source["projectId"];
+	        this.versionId = source["versionId"];
+	        this.type = source["type"];
+	    }
+	}
+	export class ModProject {
+	    id: string;
+	    platform: string;
+	    projectId: string;
+	    slug: string;
+	    title: string;
+	    icon: string;
+	    iconUrl: string;
+	    description: string;
+	    downloads: number;
+	    updatedAt: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ModProject(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.platform = source["platform"];
+	        this.projectId = source["projectId"];
+	        this.slug = source["slug"];
+	        this.title = source["title"];
+	        this.icon = source["icon"];
+	        this.iconUrl = source["iconUrl"];
+	        this.description = source["description"];
+	        this.downloads = source["downloads"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	}
+	export class ModVersion {
+	    id: string;
+	    platform: string;
+	    projectId: string;
+	    versionId: string;
+	    name: string;
+	    version: string;
+	    fileName: string;
+	    downloadUrl: string;
+	    sha1: string;
+	    publishedAt: number;
+	    downloads: number;
+	    gameVersions: string[];
+	    loaders: string[];
+	    dependencies?: ModDependency[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ModVersion(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.platform = source["platform"];
+	        this.projectId = source["projectId"];
+	        this.versionId = source["versionId"];
+	        this.name = source["name"];
+	        this.version = source["version"];
+	        this.fileName = source["fileName"];
+	        this.downloadUrl = source["downloadUrl"];
+	        this.sha1 = source["sha1"];
+	        this.publishedAt = source["publishedAt"];
+	        this.downloads = source["downloads"];
+	        this.gameVersions = source["gameVersions"];
+	        this.loaders = source["loaders"];
+	        this.dependencies = this.convertValues(source["dependencies"], ModDependency);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+
 export namespace structs {
 	
 	export class DownloadQueueItem {
@@ -108,34 +219,8 @@ export namespace structs {
 		    return a;
 		}
 	}
-	export class SearchModResult {
-	    id: string;
-	    platform: string;
-	    title: string;
-	    icon: string;
-	    iconUrl: string;
-	    description: string;
-	    downloads: number;
-	    slug: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new SearchModResult(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.platform = source["platform"];
-	        this.title = source["title"];
-	        this.icon = source["icon"];
-	        this.iconUrl = source["iconUrl"];
-	        this.description = source["description"];
-	        this.downloads = source["downloads"];
-	        this.slug = source["slug"];
-	    }
-	}
 	export class DownloadStatesRequest {
-	    results: SearchModResult[];
+	    results: models.ModProject[];
 	    minecraftVersion: string;
 	    modLoader: string;
 	
@@ -145,7 +230,7 @@ export namespace structs {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.results = this.convertValues(source["results"], SearchModResult);
+	        this.results = this.convertValues(source["results"], models.ModProject);
 	        this.minecraftVersion = source["minecraftVersion"];
 	        this.modLoader = source["modLoader"];
 	    }
@@ -190,7 +275,7 @@ export namespace structs {
 	}
 	export class ModDownloadRequest {
 	    projectId: string;
-	    result: SearchModResult;
+	    result: models.ModProject;
 	    minecraftVersion: string;
 	    modLoader: string;
 	
@@ -201,7 +286,7 @@ export namespace structs {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.projectId = source["projectId"];
-	        this.result = this.convertValues(source["result"], SearchModResult);
+	        this.result = this.convertValues(source["result"], models.ModProject);
 	        this.minecraftVersion = source["minecraftVersion"];
 	        this.modLoader = source["modLoader"];
 	    }
@@ -290,77 +375,6 @@ export namespace structs {
 	        this.modLoader = source["modLoader"];
 	    }
 	}
-	export class ProjectDependency {
-	    projectId: string;
-	    versionId?: string;
-	    type?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new ProjectDependency(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.projectId = source["projectId"];
-	        this.versionId = source["versionId"];
-	        this.type = source["type"];
-	    }
-	}
-	export class ProjectVersionResult {
-	    id: string;
-	    platform: string;
-	    projectId: string;
-	    name: string;
-	    version: string;
-	    fileName: string;
-	    downloadUrl: string;
-	    sha1: string;
-	    publishedAt: number;
-	    downloads: number;
-	    gameVersions: string[];
-	    loaders: string[];
-	    dependencies?: ProjectDependency[];
-	
-	    static createFrom(source: any = {}) {
-	        return new ProjectVersionResult(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.platform = source["platform"];
-	        this.projectId = source["projectId"];
-	        this.name = source["name"];
-	        this.version = source["version"];
-	        this.fileName = source["fileName"];
-	        this.downloadUrl = source["downloadUrl"];
-	        this.sha1 = source["sha1"];
-	        this.publishedAt = source["publishedAt"];
-	        this.downloads = source["downloads"];
-	        this.gameVersions = source["gameVersions"];
-	        this.loaders = source["loaders"];
-	        this.dependencies = this.convertValues(source["dependencies"], ProjectDependency);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
 	export class SearchModsRequest {
 	    requestId: string;
 	    query: string;

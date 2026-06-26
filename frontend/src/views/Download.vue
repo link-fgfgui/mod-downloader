@@ -97,7 +97,7 @@ import SearchResultList from "../components/SearchResultList.vue";
 import { ValidateMinecraftDir } from "../../wailsjs/go/main/App";
 import { useDownloadSearchStore } from "../stores/downloadSearch";
 import { useMinecraftStore } from "../stores/minecraft";
-import type { structs } from "../../wailsjs/go/models";
+import type { structs, models } from "../../wailsjs/go/models";
 
 const downloadStore = useDownloadSearchStore();
 const minecraftStore = useMinecraftStore();
@@ -126,13 +126,13 @@ const {
 
 const searchMods = () => downloadStore.runSearch();
 const loadMoreSearchResults = () => downloadStore.loadMoreSearchResults();
-const installMod = (payload: { result?: structs.SearchModResult; key?: string; status?: string; confirm?: boolean }) => downloadStore.installMod(payload);
+const installMod = (payload: { result?: models.ModProject; key?: string; status?: string; confirm?: boolean }) => downloadStore.installMod(payload);
 const confirmInstall = () => downloadStore.confirmInstall();
-const openVersionsOverlay = (result: structs.SearchModResult) => downloadStore.openVersionsOverlay(result);
-const pinVersion = (version: structs.ProjectVersionResult) => downloadStore.pinVersion(version);
-const isPinnedVersion = (version: structs.ProjectVersionResult) => downloadStore.isPinnedVersion(version);
-const isPinningAnotherVersion = (version: structs.ProjectVersionResult) => downloadStore.isPinningAnotherVersion(version);
-const versionFileName = (version: structs.ProjectVersionResult) => downloadStore.versionFileName(version);
+const openVersionsOverlay = (result: models.ModProject) => downloadStore.openVersionsOverlay(result);
+const pinVersion = (version: models.ModVersion) => downloadStore.pinVersion(version);
+const isPinnedVersion = (version: models.ModVersion) => downloadStore.isPinnedVersion(version);
+const isPinningAnotherVersion = (version: models.ModVersion) => downloadStore.isPinningAnotherVersion(version);
+const versionFileName = (version: models.ModVersion) => downloadStore.versionFileName(version);
 
 const checkMinecraftDir = async () => {
     showDirOverlay.value = !(await ValidateMinecraftDir());
