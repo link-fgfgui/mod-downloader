@@ -227,6 +227,7 @@ func downloadModJob(ctx context.Context, job downloadJob) error {
 		if alreadyInstalled(existing, job.Version.SHA1) {
 			return nil
 		}
+		existing = modbridge.FilterFullyCoveredPaths(modIDs, existing)
 		return downloadModToTarget(ctx, job, existing)
 	}
 
@@ -533,7 +534,7 @@ func downloadModWithLocalParse(ctx context.Context, job downloadJob) error {
 		_ = os.Remove(resp.Filename)
 		return nil
 	}
-	archiveSupersededModJars(existing)
+	archiveSupersededModJars(modbridge.FilterFullyCoveredPaths(modIDs, existing))
 
 	finalPath := filepath.Join(job.TargetDir, filepath.Base(resp.Filename))
 	if downloadTargetExists(finalPath) {
