@@ -757,6 +757,13 @@ func projectIDFromVersions(versions []models.ModVersion, fallback string) string
 	return strings.TrimSpace(fallback)
 }
 
+func curseForgeLogoURL(logo cfSchema.ModAsset) string {
+	if url := strings.TrimSpace(logo.ThumbnailUrl); url != "" {
+		return url
+	}
+	return strings.TrimSpace(logo.URL)
+}
+
 // --- Conversion methods (SDK → Unified Model) ---
 
 // CurseForge SDK → ModProject
@@ -769,7 +776,7 @@ func (p curseForgeProvider) modToModProject(mod cfSchema.Mod) models.ModProject 
 		Slug:        mod.Slug,
 		Title:       mod.Name,
 		Icon:        "mdi-package-variant",
-		IconURL:     mod.Logo.ThumbnailUrl,
+		IconURL:     curseForgeLogoURL(mod.Logo),
 		Description: mod.Summary,
 		Downloads:   mod.DownloadCount,
 		UpdatedAt:   0, // Set by caller if needed
