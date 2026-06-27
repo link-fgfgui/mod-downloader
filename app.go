@@ -248,11 +248,29 @@ func loadVersionsFromDisk(mcDir string) []structs.VersionInfo {
 		return nil
 	}
 
-	versionsDir := filepath.Join(mcDir, "versions")
+	var infos []structs.VersionInfo
+	if minecraft.IsPrismInstancesDir(mcDir) {
+		infos = loadPrismInstancesVersions(mcDir)
+	} else {
+		infos = loadMinecraftDirVersions(mcDir)
+	}
+
+	global.SetVersionsForDir(mcDir, infos)
+	ensureSelectedVersion(infos)
+	generation := global.HardlinkIndexGeneration()
+	go scanAllModDirsForHardlinkIndex(mcDir, infos, generation)
+	return infos
+}
+
+// loadMinecraftDirVersions scans <gameDir>/versions/*/ and returns the
+// recognized Minecraft instances. gameDir is the directory that directly
+// contains the versions/ subfolder (i.e. a .minecraft folder, or a Prism
+// instance's .minecraft subfolder).
+func loadMinecraftDirVersions(gameDir string) []structs.VersionInfo {
+	versionsDir := filepath.Join(gameDir, "versions")
 	entries, err := os.ReadDir(versionsDir)
 	if err != nil {
 		logging.Error("read versions dir failed", "versionsDir", versionsDir, "error", err)
-		global.SetVersionsForDir(mcDir, nil)
 		return nil
 	}
 
@@ -275,11 +293,44 @@ func loadVersionsFromDisk(mcDir string) []structs.VersionInfo {
 		}
 		infos = append(infos, info)
 	}
+	return infos
+}
 
-	global.SetVersionsForDir(mcDir, infos)
-	ensureSelectedVersion(infos)
-	generation := global.HardlinkIndexGeneration()
-	go scanAllModDirsForHardlinkIndex(mcDir, infos, generation)
+// loadPrismInstancesVersions scans a Prism Launcher "instances/" folder and
+// produces one VersionInfo entry per Prism instance — mirroring how the
+// original .minecraft logic produces one entry per version folder. The entry's
+// Name is the Prism instance name (shown in the sidebar, aligned with the
+// original showing the version folder name). The ID is the composite
+// "<instanceName>/<versionFolder>" so the version folder can be located on disk
+// via VersionDirPath; the instance name alone is not enough because a Prism
+// instance's versions/<folder> name is not predictable from the instance name.
+func loadPrismInstancesVersions(instancesDir string) []structs.VersionInfo {
+	entries, err := os.ReadDir(instancesDir)
+	if err != nil {
+		logging.Error("read prism instances dir failed", "instancesDir", instancesDir, "error", err)
+		return nil
+	}
+
+	var infos []structs.VersionInfo
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		instanceName := entry.Name()
+		instanceDir := filepath.Join(instancesDir, instanceName)
+		gameDir := minecraft.PrismInstanceGameDir(instanceDir)
+		instanceVersions := loadMinecraftDirVersions(gameDir)
+		if len(instanceVersions) == 0 {
+			continue
+		}
+		// One entry per Prism instance: take the first valid version folder.
+		// A Prism instance is conceptually one modpack, so multiple version
+		// folders inside one instance is an edge case we don't surface.
+		info := instanceVersions[0]
+		info.ID = minecraft.MakePrismVersionID(instanceName, info.ID)
+		info.Name = instanceName
+		infos = append(infos, info)
+	}
 	return infos
 }
 
@@ -326,7 +377,11 @@ func scanVersionMods(version structs.VersionInfo, mcDir string) structs.VersionI
 		version.Mods = nil
 		return version
 	}
-	versionDir := filepath.Join(mcDir, "versions", versionDirName)
+	// versionDirName is the composite ID (e.g. "MyInstance/fabric-loader-...")
+	// for Prism versions; it serves as the unique instanceID for local mod
+	// storage. versionDir is the absolute path to the actual on-disk version
+	// folder, which for Prism lives under <instances>/<instance>/.minecraft/.
+	versionDir := minecraft.VersionDirPath(mcDir, version)
 	version.Mods = minecraft.ScanVersionMods(versionDir, versionDirName, version.MinecraftVersion, version.ModLoader, mcDir)
 	return version
 }
