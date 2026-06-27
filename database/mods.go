@@ -89,8 +89,8 @@ func UpsertModPlatform(p models.ModProject) error {
 
 	isFullMetadata := strings.TrimSpace(p.Title) != ""
 
-	err = d.update(func(state *cacheState) error {
-		key := makePlatformKey(p.Platform, p.ProjectID)
+	err = d.update(func(state *cacheState, pool *stringPool) error {
+		key := internPlatformKey(pool, makePlatformKey(p.Platform, p.ProjectID))
 		if existing, ok := state.ModPlatforms[key]; ok {
 			if strings.TrimSpace(p.Slug) == "" {
 				p.Slug = existing.Slug
@@ -109,7 +109,7 @@ func UpsertModPlatform(p models.ModProject) error {
 		} else if isFullMetadata {
 			p.CachedAt = time.Now().Unix()
 		}
-		state.ModPlatforms[key] = p
+		state.ModPlatforms[key] = internModProject(pool, p)
 		return nil
 	})
 	if err != nil {
@@ -185,12 +185,13 @@ func TouchModPlatform(platform, projectID string, updatedAt int64) error {
 		return nil
 	}
 
-	err = d.update(func(state *cacheState) error {
+	err = d.update(func(state *cacheState, pool *stringPool) error {
+		key := internPlatformKey(pool, key)
 		p := state.ModPlatforms[key]
 		p.Platform = key.Platform
 		p.ProjectID = key.ProjectID
 		p.UpdatedAt = updatedAt
-		state.ModPlatforms[key] = p
+		state.ModPlatforms[key] = internModProject(pool, p)
 		return nil
 	})
 	if err != nil {
@@ -214,7 +215,8 @@ func UpsertPlatformAssociation(a PlatformAssociation) error {
 		a.ID = NewID()
 	}
 
-	err = d.update(func(state *cacheState) error {
+	err = d.update(func(state *cacheState, pool *stringPool) error {
+		a = internPlatformAssociation(pool, a)
 		state.PlatformAssociations[a.ID] = a
 		return nil
 	})
@@ -237,7 +239,7 @@ func UpsertPlatformAssociationByProjects(curseForgeProjectID, modrinthProjectID 
 		return nil
 	}
 
-	err = d.update(func(state *cacheState) error {
+	err = d.update(func(state *cacheState, pool *stringPool) error {
 		ids := make([]string, 0, 2)
 		for _, a := range state.PlatformAssociations {
 			if a.CurseForgeProjectID == curseForgeProjectID || a.ModrinthProjectID == modrinthProjectID {
@@ -251,11 +253,11 @@ func UpsertPlatformAssociationByProjects(curseForgeProjectID, modrinthProjectID 
 				delete(state.PlatformAssociations, duplicateID)
 			}
 		}
-		state.PlatformAssociations[id] = PlatformAssociation{
+		state.PlatformAssociations[id] = internPlatformAssociation(pool, PlatformAssociation{
 			ID:                  id,
 			CurseForgeProjectID: curseForgeProjectID,
 			ModrinthProjectID:   modrinthProjectID,
-		}
+		})
 		return nil
 	})
 	if err != nil {
@@ -366,9 +368,9 @@ func SetPlatformVersions(platform, projectID string, versions []models.ModVersio
 	}
 
 	logging.Debug("set platform versions started", "platform", platform, "projectID", projectID, "versionCount", len(versions))
-	err = d.update(func(state *cacheState) error {
+	err = d.update(func(state *cacheState, pool *stringPool) error {
 		for _, v := range versions {
-			savePlatformVersion(state, platform, projectID, v)
+			savePlatformVersion(state, pool, platform, projectID, v)
 		}
 		return nil
 	})
@@ -393,20 +395,20 @@ func SetPlatformVersionSnapshot(platform, projectID string, versions []models.Mo
 	scopes = normalizePlatformVersionScopes(scopes)
 
 	logging.Debug("set platform version snapshot started", "platform", platform, "projectID", projectID, "versionCount", len(versions), "updatedAt", updatedAt, "scopeCount", len(scopes))
-	err = d.update(func(state *cacheState) error {
-		touchSnapshotPlatform(state, platform, projectID, updatedAt, len(scopes) == 0)
+	err = d.update(func(state *cacheState, pool *stringPool) error {
+		touchSnapshotPlatform(state, pool, platform, projectID, updatedAt, len(scopes) == 0)
 		for _, v := range versions {
-			savePlatformVersion(state, platform, projectID, v)
+			savePlatformVersion(state, pool, platform, projectID, v)
 		}
 		for _, scope := range scopes {
-			key := makeVersionScopeKey(platform, projectID, scope)
-			state.PlatformVersionScopes[key] = storedVersionScope{
+			key := internVersionScopeKey(pool, makeVersionScopeKey(platform, projectID, scope))
+			state.PlatformVersionScopes[key] = internStoredVersionScope(pool, storedVersionScope{
 				Platform:         platform,
 				ProjectID:        projectID,
 				MinecraftVersion: scope.MinecraftVersion,
 				ModLoader:        scope.ModLoader,
 				UpdatedAt:        updatedAt,
-			}
+			})
 		}
 		return nil
 	})
@@ -418,15 +420,15 @@ func SetPlatformVersionSnapshot(platform, projectID string, versions []models.Mo
 	return nil
 }
 
-func touchSnapshotPlatform(state *cacheState, platform, projectID string, updatedAt int64, updateProjectTimestamp bool) {
-	key := makePlatformKey(platform, projectID)
+func touchSnapshotPlatform(state *cacheState, pool *stringPool, platform, projectID string, updatedAt int64, updateProjectTimestamp bool) {
+	key := internPlatformKey(pool, makePlatformKey(platform, projectID))
 	p := state.ModPlatforms[key]
-	p.Platform = platform
-	p.ProjectID = projectID
+	p.Platform = key.Platform
+	p.ProjectID = key.ProjectID
 	if updateProjectTimestamp {
 		p.UpdatedAt = updatedAt
 	}
-	state.ModPlatforms[key] = p
+	state.ModPlatforms[key] = internModProject(pool, p)
 }
 
 func normalizePlatformVersionScopes(scopes []ModPlatformVersionScope) []ModPlatformVersionScope {
@@ -448,12 +450,12 @@ func normalizePlatformVersionScopes(scopes []ModPlatformVersionScope) []ModPlatf
 	return out
 }
 
-func savePlatformVersion(state *cacheState, platform, projectID string, v models.ModVersion) {
+func savePlatformVersion(state *cacheState, pool *stringPool, platform, projectID string, v models.ModVersion) {
 	v = copyVersion(v)
 	v.Platform = platform
 	v.ProjectID = projectID
 	v.VersionID = strings.TrimSpace(v.VersionID)
-	key := makeVersionKey(platform, projectID, v.VersionID)
+	key := internVersionKey(pool, makeVersionKey(platform, projectID, v.VersionID))
 
 	if existing, ok := state.PlatformVersions[key]; ok && existing.ID != "" {
 		v.ID = existing.ID
@@ -462,6 +464,7 @@ func savePlatformVersion(state *cacheState, platform, projectID string, v models
 		v.ID = NewID()
 	}
 	v.Dependencies = normalizeDependencies(v.ID, v.Dependencies)
+	v = internModVersion(pool, v)
 	state.PlatformVersions[key] = v
 	state.PlatformVersionKeyByID[v.ID] = key
 }
@@ -555,7 +558,7 @@ func SetVersionDependencies(platformVersionID string, deps []models.ModDependenc
 	}
 
 	logging.Debug("set version dependencies started", "platformVersionID", platformVersionID, "dependencyCount", len(deps))
-	err = d.update(func(state *cacheState) error {
+	err = d.update(func(state *cacheState, pool *stringPool) error {
 		key, ok := state.PlatformVersionKeyByID[platformVersionID]
 		if !ok {
 			return nil
@@ -564,7 +567,7 @@ func SetVersionDependencies(platformVersionID string, deps []models.ModDependenc
 		if !ok {
 			return nil
 		}
-		v.Dependencies = normalizeDependencies(platformVersionID, deps)
+		v.Dependencies = internDependencies(pool, normalizeDependencies(platformVersionID, deps))
 		state.PlatformVersions[key] = v
 		return nil
 	})
@@ -617,15 +620,15 @@ func UpsertPinnedMod(p PinnedMod) error {
 		return nil
 	}
 
-	err = d.update(func(state *cacheState) error {
-		key := makePinnedModKey(p.Platform, p.ModID, p.MinecraftVersion, p.ModLoader)
+	err = d.update(func(state *cacheState, pool *stringPool) error {
+		key := internPinnedModKey(pool, makePinnedModKey(p.Platform, p.ModID, p.MinecraftVersion, p.ModLoader))
 		if existing, ok := state.PinnedMods[key]; ok && existing.ID != "" {
 			p.ID = existing.ID
 		}
 		if p.ID == "" {
 			p.ID = NewID()
 		}
-		state.PinnedMods[key] = p
+		state.PinnedMods[key] = internPinnedMod(pool, p)
 		return nil
 	})
 	if err != nil {
@@ -670,7 +673,7 @@ func DeletePinnedMod(platform, modID, mcVersion, modLoader string) error {
 		return nil
 	}
 
-	err = d.update(func(state *cacheState) error {
+	err = d.update(func(state *cacheState, pool *stringPool) error {
 		delete(state.PinnedMods, key)
 		return nil
 	})
@@ -695,7 +698,7 @@ func SetVersionModIDs(platformVersionID string, modIDs []string) error {
 	}
 
 	logging.Debug("set version mod IDs started", "platformVersionID", platformVersionID, "modIDCount", len(modIDs))
-	err = d.update(func(state *cacheState) error {
+	err = d.update(func(state *cacheState, pool *stringPool) error {
 		key, ok := state.PlatformVersionKeyByID[platformVersionID]
 		if !ok {
 			return nil
@@ -715,7 +718,7 @@ func SetVersionModIDs(platformVersionID string, modIDs []string) error {
 				continue
 			}
 			seen[id] = struct{}{}
-			out = append(out, id)
+			out = append(out, pool.Intern(id))
 		}
 		v.ModIDs = out
 		state.PlatformVersions[key] = v
