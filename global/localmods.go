@@ -170,6 +170,27 @@ func LocalModPathsInInstanceByModID(instanceID, modID string) []LocalModFilePath
 	return out
 }
 
+// LocalModIDsBySHA1 返回某 SHA1 对应 JAR 的全部 ModID（小写、去重）。
+func LocalModIDsBySHA1(sha1 string) []string {
+	sha1 = strings.TrimSpace(sha1)
+	if sha1 == "" {
+		return nil
+	}
+	localModsMu.RLock()
+	defer localModsMu.RUnlock()
+	files := localModFiles[sha1]
+	if len(files) == 0 {
+		return nil
+	}
+	ids := make([]string, 0, len(files))
+	for _, f := range files {
+		if id := strings.ToLower(strings.TrimSpace(f.ModID)); id != "" {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
 // RemoveLocalModByPath 从内存表移除某个本地 mod 路径记录（替换旧版本时配合磁盘删除使用）。
 func RemoveLocalModByPath(path string) {
 	path = strings.TrimSpace(path)

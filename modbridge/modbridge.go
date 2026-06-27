@@ -376,6 +376,41 @@ func LocalModPathsForModIDs(modIDs []string, instanceID string) []global.LocalMo
 	return out
 }
 
+// FilterFullyCoveredPaths 实现 jij 弱引用规则：仅保留那些 modID 集合被 newModIDs 完全覆盖的
+// 已有本地 mod 路径。如果已安装 mod 提供了 newModIDs 中不存在的 modID，则跳过替换。
+func FilterFullyCoveredPaths(newModIDs []string, existing []global.LocalModFilePath) []global.LocalModFilePath {
+	if len(existing) == 0 {
+		return existing
+	}
+	newSet := make(map[string]struct{}, len(newModIDs))
+	for _, id := range newModIDs {
+		if s := strings.ToLower(strings.TrimSpace(id)); s != "" {
+			newSet[s] = struct{}{}
+		}
+	}
+
+	out := make([]global.LocalModFilePath, 0, len(existing))
+	for _, p := range existing {
+		existingIDs := global.LocalModIDsBySHA1(p.FileSHA1)
+		if modIDsCoveredBy(existingIDs, newSet) {
+			out = append(out, p)
+		} else {
+			logging.Info("jij weak-ref: skip archive, existing mod has uncovered mod IDs",
+				"path", p.Path, "existingModIDs", existingIDs, "newModIDs", newModIDs)
+		}
+	}
+	return out
+}
+
+func modIDsCoveredBy(ids []string, superSet map[string]struct{}) bool {
+	for _, id := range ids {
+		if _, ok := superSet[id]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
 func selectedVersionModsDir(selected mcstructs.VersionInfo) string {
 	mcDir := global.GetMinecraftDir()
 	versionDirName := versionInstanceID(selected)
