@@ -11,14 +11,13 @@ import (
 
 	"mod-downloader/logging"
 	"mod-downloader/models"
-	structs "mod-downloader/structs/minecraft"
 
 	"github.com/klauspost/compress/zstd"
 )
 
 const (
 	databaseFileName = "mods.gob.zst"
-	cacheVersion     = 2
+	cacheVersion     = 3
 )
 
 var (
@@ -36,13 +35,11 @@ type cacheDB struct {
 
 type cacheState struct {
 	Version                int
-	JarMetadataVersion     string
 	ModPlatforms           map[platformKey]models.ModProject
 	PlatformAssociations   map[string]PlatformAssociation
 	PlatformVersions       map[versionKey]models.ModVersion
 	PlatformVersionScopes  map[versionScopeKey]storedVersionScope
 	PinnedMods             map[pinnedModKey]PinnedMod
-	JarMetadata            map[string][]structs.ModInfo
 	PlatformVersionKeyByID map[string]versionKey
 }
 
@@ -97,7 +94,6 @@ func Open() error {
 	}
 	state.normalize()
 	nextDB := &cacheDB{path: targetPath, state: state}
-	nextDB.migrateLocked()
 
 	db = nextDB
 	dbPath = targetPath
@@ -188,9 +184,6 @@ func (s *cacheState) normalize() {
 	if s.PinnedMods == nil {
 		s.PinnedMods = make(map[pinnedModKey]PinnedMod)
 	}
-	if s.JarMetadata == nil {
-		s.JarMetadata = make(map[string][]structs.ModInfo)
-	}
 	if s.PlatformVersionKeyByID == nil {
 		s.PlatformVersionKeyByID = make(map[string]versionKey)
 		for key, version := range s.PlatformVersions {
@@ -199,14 +192,6 @@ func (s *cacheState) normalize() {
 			}
 		}
 	}
-}
-
-func (d *cacheDB) migrateLocked() {
-	if d.state.JarMetadataVersion == jarMetadataVersion {
-		return
-	}
-	d.state.JarMetadata = make(map[string][]structs.ModInfo)
-	d.state.JarMetadataVersion = jarMetadataVersion
 }
 
 func (d *cacheDB) view(fn func(*cacheState) error) error {
@@ -286,18 +271,10 @@ func copyDependencies(deps []models.ModDependency) []models.ModDependency {
 	return out
 }
 
-func copyModInfos(mods []structs.ModInfo) []structs.ModInfo {
-	if len(mods) == 0 {
-		return nil
-	}
-	out := make([]structs.ModInfo, len(mods))
-	copy(out, mods)
-	return out
-}
-
 func copyVersion(v models.ModVersion) models.ModVersion {
 	v.GameVersions = copyStringSlice(v.GameVersions)
 	v.Loaders = copyStringSlice(v.Loaders)
 	v.Dependencies = copyDependencies(v.Dependencies)
+	v.ModIDs = copyStringSlice(v.ModIDs)
 	return v
 }

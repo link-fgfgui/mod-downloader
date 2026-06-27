@@ -10,14 +10,13 @@ import (
 	"strings"
 	"sync"
 
-	"mod-downloader/database"
 	"mod-downloader/global"
 	"mod-downloader/logging"
 	"mod-downloader/minecraft"
+	"mod-downloader/modbridge"
 	"mod-downloader/models"
 	"mod-downloader/providers"
 	appstructs "mod-downloader/structs"
-	mcstructs "mod-downloader/structs/minecraft"
 
 	"github.com/cavaliergopher/grab/v3"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -25,14 +24,6 @@ import (
 
 const downloadQueueUpdatedEvent = "download-queue-updated"
 const downloadFailedEvent = "download-failed"
-
-// 下载按钮的四种状态。
-const (
-	btnStatusNew       = "new"       // 实例内无同 modId → 标准下载
-	btnStatusInstalled = "installed" // 已装且与最新版同 sha1 → 禁用
-	btnStatusUpdate    = "update"    // 同 modId 同项目但非最新 → 更新
-	btnStatusConflict  = "conflict"  // 同 modId 但不属于本项目任何版本 → 换源下载
-)
 
 type downloadJob struct {
 	ID               string
@@ -65,7 +56,7 @@ func queueModDownload(ctx context.Context, req appstructs.ModDownloadRequest, vi
 		req.ProjectID = providers.ProjectReferenceFromSearchResult(req.Result)
 	}
 
-	req, instanceID, targetDir, ok := applySelectedInstance(req)
+	req, instanceID, targetDir, ok := modbridge.ApplySelectedInstance(req)
 	if !ok {
 		return appstructs.ModDownloadResult{Skipped: true, Reason: "no selected version"}
 	}
@@ -73,7 +64,7 @@ func queueModDownload(ctx context.Context, req appstructs.ModDownloadRequest, vi
 		return appstructs.ModDownloadResult{Skipped: true, Reason: "invalid request"}
 	}
 
-	version, ok := downloadVersionForRequest(req)
+	version, ok := modbridge.ResolveVersion(req)
 	if !ok {
 		return appstructs.ModDownloadResult{Skipped: true, Reason: "no matching version"}
 	}
@@ -105,27 +96,6 @@ func queueModDownload(ctx context.Context, req appstructs.ModDownloadRequest, vi
 		FileName:  version.FileName,
 		VersionID: version.ID,
 	}
-}
-
-// applySelectedInstance 用当前选中的实例覆盖请求的 MC 版本与 mod loader，
-// 使"版本匹配 / 下载目标目录 / 安装标记"三者始终以侧边栏选中的实例为准。
-// instanceID(实例文件夹名)与 targetDir 来自选中实例；未选实例时 ok 为 false。
-// 注意：MC 版本必须取 selected.MinecraftVersion，绝不能用 instanceID(实例名)——
-// 实例名不是合法 MC 版本，会导致版本匹配恒为空。
-func applySelectedInstance(req appstructs.ModDownloadRequest) (appstructs.ModDownloadRequest, string, string, bool) {
-	selected := global.GetSelectedVersion()
-	instanceID := versionInstanceID(selected)
-	targetDir := selectedVersionModsDir(selected)
-	if targetDir == "" || instanceID == "" {
-		return req, instanceID, targetDir, false
-	}
-	if mcVersion := strings.TrimSpace(selected.MinecraftVersion); mcVersion != "" {
-		req.MinecraftVersion = mcVersion
-	}
-	if loader := strings.ToLower(strings.TrimSpace(selected.ModLoader)); loader != "" && loader != "vanilla" {
-		req.ModLoader = loader
-	}
-	return req, instanceID, targetDir, true
 }
 
 func GetDownloadQueueState() appstructs.DownloadQueueState {
@@ -164,314 +134,7 @@ func CancelDownload(ctx context.Context, id string) bool {
 }
 
 func GetDownloadStates(req appstructs.DownloadStatesRequest) []appstructs.ModDownloadButtonState {
-	req.MinecraftVersion = strings.TrimSpace(req.MinecraftVersion)
-	req.ModLoader = strings.ToLower(strings.TrimSpace(req.ModLoader))
-
-	states := make([]appstructs.ModDownloadButtonState, len(req.Results))
-	selected := global.GetSelectedVersion()
-	instanceID := versionInstanceID(selected)
-	if instanceID == "" || !global.HasLocalModPathsInInstance(instanceID) {
-		for i := range req.Results {
-			states[i] = defaultDownloadButtonState(req.Results[i])
-		}
-		return states
-	}
-
-	var wg sync.WaitGroup
-	for i := range req.Results {
-		result := req.Results[i]
-		states[i] = defaultDownloadButtonState(result)
-		if states[i].Key == "" {
-			continue
-		}
-
-		wg.Add(1)
-		go func(idx int) {
-			defer wg.Done()
-			status := localModButtonStatus(appstructs.ModDownloadRequest{
-				ProjectID:        states[idx].Key,
-				Result:           result,
-				MinecraftVersion: req.MinecraftVersion,
-				ModLoader:        req.ModLoader,
-			})
-			applyButtonStatus(&states[idx], status)
-		}(i)
-	}
-	wg.Wait()
-	return states
-}
-
-func defaultDownloadButtonState(result models.ModProject) appstructs.ModDownloadButtonState {
-	return appstructs.ModDownloadButtonState{Key: providers.ProjectReferenceFromSearchResult(result), Status: btnStatusNew, Icon: "mdi-download", Color: "primary"}
-}
-
-// applyButtonStatus 把状态映射成按钮的禁用/图标/颜色。
-func applyButtonStatus(state *appstructs.ModDownloadButtonState, status string) {
-	state.Status = status
-	switch status {
-	case btnStatusInstalled:
-		state.Disabled = true
-		state.Icon = "mdi-check"
-		state.Color = ""
-	case btnStatusUpdate:
-		state.Icon = "mdi-arrow-up-bold-circle"
-		state.Color = "warning"
-	case btnStatusConflict:
-		state.Icon = "mdi-download"
-		state.Color = "warning"
-	default:
-		state.Icon = "mdi-download"
-		state.Color = "primary"
-	}
-}
-
-// localModButtonStatus 判定某搜索结果在当前选中实例下的按钮状态。
-func localModButtonStatus(req appstructs.ModDownloadRequest) string {
-	req.ProjectID = strings.TrimSpace(req.ProjectID)
-	if req.ProjectID == "" {
-		req.ProjectID = providers.ProjectReferenceFromSearchResult(req.Result)
-	}
-
-	req, instanceID, _, ok := applySelectedInstance(req)
-	if !ok || req.ProjectID == "" || req.MinecraftVersion == "" || req.ModLoader == "" {
-		return btnStatusNew
-	}
-
-	versions := downloadVersionsForRequest(req)
-	if len(versions) == 0 {
-		return btnStatusNew
-	}
-	version := versions[0]
-
-	localPaths := global.LocalModPathsInInstance(instanceID)
-	if len(localPaths) == 0 {
-		return btnStatusNew
-	}
-
-	latestSHA1 := strings.ToLower(strings.TrimSpace(version.SHA1))
-	if latestSHA1 != "" {
-		for _, p := range localPaths {
-			if strings.ToLower(strings.TrimSpace(p.FileSHA1)) == latestSHA1 {
-				return btnStatusInstalled
-			}
-		}
-	}
-
-	projectSHA1s := projectVersionSHA1Set(versions)
-	hasProjectFile := false
-	for _, p := range localPaths {
-		if projectSHA1s[strings.ToLower(strings.TrimSpace(p.FileSHA1))] {
-			hasProjectFile = true
-			break
-		}
-	}
-	if hasProjectFile {
-		return btnStatusUpdate
-	}
-
-	if mods, ok := database.GetJarMetadata(version.SHA1); ok {
-		for _, p := range localModPathsForMods(mods, instanceID) {
-			if strings.ToLower(strings.TrimSpace(p.FileSHA1)) != latestSHA1 {
-				return btnStatusConflict
-			}
-		}
-	}
-
-	return btnStatusNew
-}
-
-// localModButtonStatusPrecise may parse the remote jar to discover mod ids.
-// Use it for install-time dependency decisions, not for search-list button state.
-func localModButtonStatusPrecise(req appstructs.ModDownloadRequest) string {
-	req.ProjectID = strings.TrimSpace(req.ProjectID)
-	if req.ProjectID == "" {
-		req.ProjectID = providers.ProjectReferenceFromSearchResult(req.Result)
-	}
-
-	req, instanceID, _, ok := applySelectedInstance(req)
-	if !ok || req.ProjectID == "" || req.MinecraftVersion == "" || req.ModLoader == "" {
-		return btnStatusNew
-	}
-
-	version, ok := downloadVersionForRequest(req)
-	if !ok {
-		return btnStatusNew
-	}
-	mods, ok := metadataForProjectVersion(version, req.ModLoader)
-	if !ok {
-		return btnStatusNew
-	}
-
-	localPaths := localModPathsForMods(mods, instanceID)
-	if len(localPaths) == 0 {
-		return btnStatusNew
-	}
-
-	latestSHA1 := strings.ToLower(strings.TrimSpace(version.SHA1))
-	if latestSHA1 != "" {
-		for _, p := range localPaths {
-			if strings.ToLower(strings.TrimSpace(p.FileSHA1)) == latestSHA1 {
-				return btnStatusInstalled
-			}
-		}
-	}
-
-	projectSHA1s := providers.ProjectVersionSHA1Set(req.Result)
-	for _, p := range localPaths {
-		if projectSHA1s[strings.ToLower(strings.TrimSpace(p.FileSHA1))] {
-			return btnStatusUpdate
-		}
-	}
-	return btnStatusConflict
-}
-
-func projectVersionSHA1Set(versions []models.ModVersion) map[string]bool {
-	out := make(map[string]bool, len(versions))
-	for _, version := range versions {
-		if sha1 := strings.ToLower(strings.TrimSpace(version.SHA1)); sha1 != "" {
-			out[sha1] = true
-		}
-	}
-	return out
-}
-
-// localModPathsForMods 汇总实例内与给定 mod 集合任一 modId 匹配的本地文件记录（按路径去重）。
-func localModPathsForMods(mods []mcstructs.ModInfo, instanceID string) []global.LocalModFilePath {
-	out := make([]global.LocalModFilePath, 0)
-	seen := make(map[string]struct{})
-	for _, m := range mods {
-		for _, p := range global.LocalModPathsInInstanceByModID(instanceID, m.ID) {
-			if _, dup := seen[p.Path]; dup {
-				continue
-			}
-			seen[p.Path] = struct{}{}
-			out = append(out, p)
-		}
-	}
-	return out
-}
-
-func downloadVersionForRequest(req appstructs.ModDownloadRequest) (models.ModVersion, bool) {
-	versions := downloadVersionsForRequest(req)
-	if len(versions) == 0 {
-		return models.ModVersion{}, false
-	}
-	return versions[0], true
-}
-
-func downloadVersionsForRequest(req appstructs.ModDownloadRequest) []models.ModVersion {
-	platform := strings.ToLower(strings.TrimSpace(req.Result.Platform))
-	projectID := strings.TrimSpace(req.ProjectID)
-	if platform == "" {
-		platform, projectID = providers.SplitProjectReference(projectID)
-	}
-	if _, project := providers.SplitProjectReference(projectID); project != "" {
-		projectID = project
-	}
-
-	if pin, ok := database.GetPinnedMod(platform, projectID, req.MinecraftVersion, req.ModLoader); ok {
-		if version, found := findProjectVersionByID(providers.ListMatchingProjectVersions(req.Result, req.MinecraftVersion, req.ModLoader), pin.VersionID); found {
-			return []models.ModVersion{version}
-		}
-	}
-
-	versions := providers.ListMatchingProjectVersions(req.Result, req.MinecraftVersion, req.ModLoader)
-	return versions
-}
-
-func findProjectVersionByID(versions []models.ModVersion, versionID string) (models.ModVersion, bool) {
-	versionID = strings.TrimSpace(versionID)
-	if versionID == "" {
-		return models.ModVersion{}, false
-	}
-	for _, version := range versions {
-		if version.ID == versionID {
-			return version, true
-		}
-	}
-	return models.ModVersion{}, false
-}
-
-func selectedVersionModsDir(selected mcstructs.VersionInfo) string {
-	mcDir := global.GetMinecraftDir()
-	versionDirName := versionInstanceID(selected)
-	if strings.TrimSpace(mcDir) == "" || strings.TrimSpace(versionDirName) == "" {
-		return ""
-	}
-	return filepath.Join(mcDir, "versions", versionDirName, "mods")
-}
-
-func versionInstanceID(version mcstructs.VersionInfo) string {
-	if strings.TrimSpace(version.ID) != "" {
-		return strings.TrimSpace(version.ID)
-	}
-	return strings.TrimSpace(version.Name)
-}
-
-func queueMissingRequiredDependencies(ctx context.Context, req appstructs.ModDownloadRequest, version models.ModVersion, instanceID string, visited map[string]bool) {
-	for _, dep := range version.Dependencies {
-		if !isRequiredDependency(dep) {
-			continue
-		}
-
-		depReq, ok := dependencyDownloadRequest(version.Platform, dep, req)
-		if !ok {
-			logging.Warn("required dependency cannot be queued", "platform", version.Platform, "projectID", dep.DependencyProjectID, "versionID", dep.DependencyVersionID, "type", dep.DependencyType)
-			continue
-		}
-
-		if localModButtonStatusPrecise(depReq) != btnStatusNew {
-			continue
-		}
-		result := queueModDownload(ctx, depReq, visited)
-		if result.Skipped {
-			logging.Warn("required dependency queue skipped", "platform", depReq.Result.Platform, "projectID", depReq.ProjectID, "versionID", dep.DependencyVersionID, "reason", result.Reason)
-		}
-	}
-}
-
-func hydrateRequiredDependencies(req appstructs.ModDownloadRequest, version models.ModVersion) models.ModVersion {
-	if hasRequiredDependency(version.Dependencies) {
-		return version
-	}
-
-	refreshed := providers.RefreshMatchingProjectVersions(req.Result, req.MinecraftVersion, req.ModLoader)
-	if refreshedVersion, found := findProjectVersionByID(refreshed, version.ID); found && hasRequiredDependency(refreshedVersion.Dependencies) {
-		return refreshedVersion
-	}
-	return version
-}
-
-func hasRequiredDependency(deps []models.ModDependency) bool {
-	for _, dep := range deps {
-		if isRequiredDependency(dep) {
-			return true
-		}
-	}
-	return false
-}
-
-func isRequiredDependency(dep models.ModDependency) bool {
-	return strings.EqualFold(strings.TrimSpace(dep.DependencyType), "required")
-}
-
-func dependencyDownloadRequest(platform string, dep models.ModDependency, parent appstructs.ModDownloadRequest) (appstructs.ModDownloadRequest, bool) {
-	projectID := strings.TrimSpace(dep.DependencyProjectID)
-	platform = strings.ToLower(strings.TrimSpace(platform))
-	if projectID == "" || (platform != "curseforge" && platform != "modrinth") {
-		return appstructs.ModDownloadRequest{}, false
-	}
-
-	ref := platform + ":" + projectID
-	return appstructs.ModDownloadRequest{
-		ProjectID: ref,
-		Result: models.ModProject{
-			ID:       ref,
-			Platform: platform,
-		},
-		MinecraftVersion: parent.MinecraftVersion,
-		ModLoader:        parent.ModLoader,
-	}, true
+	return modbridge.DownloadStates(req)
 }
 
 func projectVersionJobKey(version models.ModVersion) string {
@@ -554,18 +217,20 @@ func downloadModJob(ctx context.Context, job downloadJob) error {
 	if err := os.MkdirAll(job.TargetDir, 0o755); err != nil {
 		return err
 	}
-	if mods, ok := metadataForProjectVersionWithResult(job.Version, job.Result, job.ModLoader); ok {
-		existing := localModPathsForMods(mods, job.InstanceID)
+	// Try to get mod IDs from platform version (persisted or lazy-parsed via modbridge)
+	modIDs := modbridge.VersionModIDs(job.Version, job.ModLoader)
+	if len(modIDs) > 0 {
+		existing := modbridge.LocalModPathsForModIDs(modIDs, job.InstanceID)
 		if alreadyInstalled(existing, job.Version.SHA1) {
 			return nil
 		}
-		return downloadModToTarget(ctx, job, mods, existing)
+		return downloadModToTarget(ctx, job, existing)
 	}
 
 	return downloadModWithLocalParse(ctx, job)
 }
 
-// alreadyInstalled 判断现有同 modId 文件里是否已有与目标版本完全相同的 jar（同 sha1）。
+// alreadyInstalled checks whether any existing file with the same modId already has the target SHA1.
 func alreadyInstalled(existing []global.LocalModFilePath, latestSHA1 string) bool {
 	latestSHA1 = strings.ToLower(strings.TrimSpace(latestSHA1))
 	if latestSHA1 == "" {
@@ -609,67 +274,73 @@ func nextOldJarPath(path string) string {
 	}
 }
 
-func metadataForProjectVersion(version models.ModVersion, modLoader string) ([]mcstructs.ModInfo, bool) {
-	return metadataForProjectVersionWithResult(version, models.ModProject{}, modLoader)
+func queueMissingRequiredDependencies(ctx context.Context, req appstructs.ModDownloadRequest, version models.ModVersion, instanceID string, visited map[string]bool) {
+	for _, dep := range version.Dependencies {
+		if !isRequiredDependency(dep) {
+			continue
+		}
+
+		depReq, ok := dependencyDownloadRequest(version.Platform, dep, req)
+		if !ok {
+			logging.Warn("required dependency cannot be queued", "platform", version.Platform, "projectID", dep.DependencyProjectID, "versionID", dep.DependencyVersionID, "type", dep.DependencyType)
+			continue
+		}
+
+		if modbridge.InstallStatusPrecise(depReq) != modbridge.BtnStatusNew {
+			continue
+		}
+		result := queueModDownload(ctx, depReq, visited)
+		if result.Skipped {
+			logging.Warn("required dependency queue skipped", "platform", depReq.Result.Platform, "projectID", depReq.ProjectID, "versionID", dep.DependencyVersionID, "reason", result.Reason)
+		}
+	}
 }
 
-func metadataForProjectVersionWithResult(version models.ModVersion, result models.ModProject, modLoader string) ([]mcstructs.ModInfo, bool) {
-	if mods, ok := database.GetJarMetadata(version.SHA1); ok {
-		return applyPlatformMetadata(mods, version, result), true
+func hydrateRequiredDependencies(req appstructs.ModDownloadRequest, version models.ModVersion) models.ModVersion {
+	if hasRequiredDependency(version.Dependencies) {
+		return version
 	}
-	mods, err := parseRemoteModJar(version.DownloadURL, modLoader)
-	if err != nil {
-		logging.Warn("range parse mod jar failed, fallback to full download", "downloadURL", version.DownloadURL, "modLoader", modLoader, "error", err)
-		return nil, false
+
+	refreshed := providers.RefreshMatchingProjectVersions(req.Result, req.MinecraftVersion, req.ModLoader)
+	if refreshedVersion, found := modbridge.FindVersionByID(refreshed, version.ID); found && hasRequiredDependency(refreshedVersion.Dependencies) {
+		return refreshedVersion
 	}
-	mods = applyPlatformMetadata(mods, version, result)
-	_ = database.SetJarMetadata(version.SHA1, mods)
-	return mods, true
+	return version
 }
 
-func applyPlatformMetadata(mods []mcstructs.ModInfo, version models.ModVersion, result models.ModProject) []mcstructs.ModInfo {
-	if len(mods) == 0 {
-		return mods
+func hasRequiredDependency(deps []models.ModDependency) bool {
+	for _, dep := range deps {
+		if isRequiredDependency(dep) {
+			return true
+		}
 	}
-
-	name := strings.TrimSpace(version.Name)
-	if strings.TrimSpace(result.Title) != "" {
-		name = strings.TrimSpace(result.Title)
-	}
-	if name == "" {
-		name = strings.TrimSpace(version.FileName)
-	}
-	versionText := strings.TrimSpace(version.Version)
-	description := strings.TrimSpace(result.Description)
-
-	out := make([]mcstructs.ModInfo, len(mods))
-	copy(out, mods)
-	for i := range out {
-		out[i].Name = name
-		out[i].Version = versionText
-		out[i].Description = description
-	}
-	return out
+	return false
 }
 
-func parseRemoteModJar(downloadURL string, modLoader string) ([]mcstructs.ModInfo, error) {
-	reader, err := minecraft.NewHTTPRangeReaderAt(downloadURL)
-	if err != nil {
-		return nil, err
-	}
-
-	zr, err := zip.NewReader(reader, reader.Size())
-	if err != nil {
-		return nil, err
-	}
-	mods := minecraft.ParseModZipReader(zr, downloadURL, modLoader)
-	if len(mods) == 0 {
-		return nil, fmt.Errorf("no parseable mod metadata")
-	}
-	return mods, nil
+func isRequiredDependency(dep models.ModDependency) bool {
+	return strings.EqualFold(strings.TrimSpace(dep.DependencyType), "required")
 }
 
-func downloadModToTarget(ctx context.Context, job downloadJob, mods []mcstructs.ModInfo, existing []global.LocalModFilePath) error {
+func dependencyDownloadRequest(platform string, dep models.ModDependency, parent appstructs.ModDownloadRequest) (appstructs.ModDownloadRequest, bool) {
+	projectID := strings.TrimSpace(dep.DependencyProjectID)
+	platform = strings.ToLower(strings.TrimSpace(platform))
+	if projectID == "" || (platform != "curseforge" && platform != "modrinth") {
+		return appstructs.ModDownloadRequest{}, false
+	}
+
+	ref := platform + ":" + projectID
+	return appstructs.ModDownloadRequest{
+		ProjectID: ref,
+		Result: models.ModProject{
+			ID:       ref,
+			Platform: platform,
+		},
+		MinecraftVersion: parent.MinecraftVersion,
+		ModLoader:        parent.ModLoader,
+	}, true
+}
+
+func downloadModToTarget(ctx context.Context, job downloadJob, existing []global.LocalModFilePath) error {
 	tempDir := filepath.Join(filepath.Dir(job.TargetDir), ".mod-downloader-tmp")
 	if err := os.MkdirAll(tempDir, 0o755); err != nil {
 		return err
@@ -708,7 +379,7 @@ func downloadModToTarget(ctx context.Context, job downloadJob, mods []mcstructs.
 	if err := os.Rename(resp.Filename, finalPath); err != nil {
 		return err
 	}
-	upsertDownloadedMod(finalPath, mods, job)
+	upsertDownloadedMod(finalPath, job)
 	return nil
 }
 
@@ -742,7 +413,19 @@ func downloadModWithLocalParse(ctx context.Context, job downloadJob) error {
 		_ = os.Remove(resp.Filename)
 		return fmt.Errorf("downloaded jar has no parseable mod metadata: %s", filepath.Base(resp.Filename))
 	}
-	existing := localModPathsForMods(mods, job.InstanceID)
+
+	// Extract mod IDs for future version mod ID persistence
+	modIDs := make([]string, 0, len(mods))
+	for _, m := range mods {
+		if id := strings.TrimSpace(m.ID); id != "" {
+			modIDs = append(modIDs, strings.ToLower(id))
+		}
+	}
+	if len(modIDs) > 0 && job.Version.ID != "" {
+		_ = modbridge.PersistVersionModIDs(job.Version.ID, modIDs)
+	}
+
+	existing := modbridge.LocalModPathsForModIDs(modIDs, job.InstanceID)
 	if alreadyInstalled(existing, sha1) {
 		_ = os.Remove(resp.Filename)
 		return nil
@@ -758,7 +441,7 @@ func downloadModWithLocalParse(ctx context.Context, job downloadJob) error {
 	if err := os.Rename(resp.Filename, finalPath); err != nil {
 		return err
 	}
-	upsertDownloadedMod(finalPath, mods, job)
+	upsertDownloadedMod(finalPath, job)
 	return nil
 }
 
@@ -789,11 +472,25 @@ func pathInLocalModPaths(path string, paths []global.LocalModFilePath) bool {
 	return false
 }
 
-func upsertDownloadedMod(path string, mods []mcstructs.ModInfo, job downloadJob) {
+func upsertDownloadedMod(path string, job downloadJob) {
 	fileName := minecraft.StripJarSuffix(filepath.Base(path))
 	sha1 := minecraft.FileSHA1(path)
-	mods = applyPlatformMetadata(mods, job.Version, job.Result)
-	_ = database.SetJarMetadata(sha1, mods)
+	// Parse the downloaded JAR for mod metadata (pure local, no platform merging)
+	r, err := zip.OpenReader(path)
+	if err != nil {
+		logging.Warn("parse downloaded jar failed", "path", path, "error", err)
+		return
+	}
+	defer r.Close()
+	mods := minecraft.ParseModZipReader(&r.Reader, filepath.Base(path), job.ModLoader)
+	if len(mods) == 0 {
+		logging.Warn("downloaded jar has no parseable mod metadata", "path", path)
+		return
+	}
+
+	// Store JAR metadata in global memory cache (local-only, no platform enrichment)
+	global.SetJarMetadata(sha1, mods)
+
 	relPath := filepath.Base(path)
 	if mcDir := global.GetMinecraftDir(); mcDir != "" {
 		if rel, err := filepath.Rel(mcDir, path); err == nil {

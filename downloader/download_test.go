@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"mod-downloader/global"
+	"mod-downloader/modbridge"
 	"mod-downloader/models"
 	appstructs "mod-downloader/structs"
 	mcstructs "mod-downloader/structs/minecraft"
@@ -38,37 +39,8 @@ func TestGetDownloadStatesReturnsDefaultWhenSelectedInstanceHasNoLocalMods(t *te
 	if len(states) != 1 {
 		t.Fatalf("state count = %d, want 1", len(states))
 	}
-	if states[0].Key != "modrinth:sodium" || states[0].Status != btnStatusNew || states[0].Icon != "mdi-download" || states[0].Color != "primary" || states[0].Disabled {
+	if states[0].Key != "modrinth:sodium" || states[0].Status != modbridge.BtnStatusNew || states[0].Icon != "mdi-download" || states[0].Color != "primary" || states[0].Disabled {
 		t.Fatalf("state = %#v", states[0])
-	}
-}
-
-func TestProjectVersionSHA1Set(t *testing.T) {
-	set := projectVersionSHA1Set([]models.ModVersion{
-		{SHA1: " ABC "},
-		{SHA1: ""},
-		{SHA1: "def"},
-	})
-
-	if !set["abc"] || !set["def"] || len(set) != 2 {
-		t.Fatalf("sha1 set = %#v", set)
-	}
-}
-
-func TestSelectedVersionModsDirUsesInstanceIDNotDisplayName(t *testing.T) {
-	mcDir := t.TempDir()
-	global.SetMinecraftDir(mcDir)
-	t.Cleanup(func() {
-		global.SetMinecraftDir("")
-	})
-
-	got := selectedVersionModsDir(mcstructs.VersionInfo{
-		ID:   "instance-folder",
-		Name: "Display Name",
-	})
-	want := filepath.Join(mcDir, "versions", "instance-folder", "mods")
-	if got != want {
-		t.Fatalf("selectedVersionModsDir() = %q, want %q", got, want)
 	}
 }
 

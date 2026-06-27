@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"mod-downloader/models"
-	structs "mod-downloader/structs/minecraft"
 )
 
 func openTestDB(t *testing.T) string {
@@ -107,7 +106,7 @@ func TestCachePlatformVersionsAndDependencies(t *testing.T) {
 	}
 }
 
-func TestCachePinnedModsAndJarMetadata(t *testing.T) {
+func TestCachePinnedMods(t *testing.T) {
 	path := openTestDB(t)
 
 	if err := UpsertPinnedMod(PinnedMod{
@@ -119,18 +118,58 @@ func TestCachePinnedModsAndJarMetadata(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := SetJarMetadata("sha1", []structs.ModInfo{{ID: "jei"}, {ID: "jei"}, {ID: "tmrv"}}); err != nil {
-		t.Fatal(err)
-	}
 
 	reopenTestDB(t, path)
 
 	if pin, ok := GetPinnedMod("modrinth", "sodium", "1.21.1", "neoforge"); !ok || pin.VersionID != "v1" {
 		t.Fatalf("pin = %#v, %v", pin, ok)
 	}
+}
 
-	mods, ok := GetJarMetadata("sha1")
-	if !ok || len(mods) != 2 || mods[0].ID != "jei" || mods[1].ID != "tmrv" {
-		t.Fatalf("jar metadata = %#v, %v", mods, ok)
+func TestCacheVersionModIDs(t *testing.T) {
+	path := openTestDB(t)
+
+	if err := UpsertModPlatform(models.ModProject{
+		Platform:  "Modrinth",
+		ProjectID: "sodium",
+		Slug:      "sodium-slug",
+		Title:     "Sodium",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetPlatformVersionSnapshot("Modrinth", "sodium", []models.ModVersion{
+		{
+			VersionID:    "v1",
+			Name:         "1.0",
+			SHA1:         "abc",
+			PublishedAt:  10,
+			GameVersions: []string{"1.21.1"},
+			Loaders:      []string{"neoforge"},
+		},
+	}, 100, []ModPlatformVersionScope{{
+		MinecraftVersion: "1.21.1",
+		ModLoader:        "NeoForge",
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	versions, err := GetPlatformVersions("Modrinth", "sodium")
+	if err != nil || len(versions) != 1 {
+		t.Fatalf("get versions: %v, count=%d", err, len(versions))
+	}
+
+	if err := SetVersionModIDs(versions[0].ID, []string{"sodium", "Sodium", "other", ""}); err != nil {
+		t.Fatal(err)
+	}
+
+	reopenTestDB(t, path)
+
+	versions, err = GetPlatformVersions("Modrinth", "sodium")
+	if err != nil || len(versions) != 1 {
+		t.Fatalf("get versions after reopen: %v, count=%d", err, len(versions))
+	}
+	modIDs := versions[0].ModIDs
+	if len(modIDs) != 2 || modIDs[0] != "sodium" || modIDs[1] != "other" {
+		t.Fatalf("modIDs = %#v", modIDs)
 	}
 }

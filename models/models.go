@@ -34,11 +34,12 @@ type ModVersion struct {
 	GameVersions []string        `json:"gameVersions"` // e.g. ["1.20.1", "1.20.2"]
 	Loaders      []string        `json:"loaders"`      // e.g. ["fabric", "forge"]
 	Dependencies []ModDependency `json:"dependencies,omitempty"`
+	ModIDs       []string        `json:"modIds,omitempty"` // Remote JAR parsed mod IDs (deduplicated, lowercase-normalized)
 }
 
 // ModDependency represents a dependency link between versions.
 type ModDependency struct {
-	ID                  string `json:"id,omitempty"`              // Internal database ID
+	ID                  string `json:"id,omitempty"`                // Internal database ID
 	PlatformVersionID   string `json:"platformVersionId,omitempty"` // Parent version ID
 	DependencyProjectID string `json:"projectId"`                   // Target project ID (JSON alias for frontend)
 	DependencyVersionID string `json:"versionId,omitempty"`         // Target version ID (JSON alias for frontend)

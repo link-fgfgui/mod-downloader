@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"mod-downloader/database"
 	"mod-downloader/global"
 	"mod-downloader/logging"
 	structs "mod-downloader/structs/minecraft"
@@ -30,6 +29,9 @@ type ModMetadataParser interface {
 type parsedModMetadata struct {
 	Mods       []structs.ModInfo
 	NestedJars []string
+	// TODO: Add Dependencies field for JAR-embedded dependency declarations.
+	// Each parser (Fabric: depends in fabric.mod.json, Forge/NeoForge: [[dependencies]] in mods.toml)
+	// should populate this. Not implemented yet — only platform-level dependencies are used.
 }
 
 // --- Fabric ---
@@ -317,7 +319,7 @@ func parseModJar(jarPath string, modLoader string) []structs.ModInfo {
 }
 
 func ParseModJarWithSHA1(jarPath string, sha1 string, modLoader string) []structs.ModInfo {
-	if mods, ok := database.GetJarMetadata(sha1); ok {
+	if mods, ok := global.GetJarMetadata(sha1); ok {
 		return mods
 	}
 
@@ -329,7 +331,7 @@ func ParseModJarWithSHA1(jarPath string, sha1 string, modLoader string) []struct
 
 	mods := ParseModZipReader(&r.Reader, filepath.Base(jarPath), modLoader)
 	if len(mods) > 0 {
-		_ = database.SetJarMetadata(sha1, mods)
+		global.SetJarMetadata(sha1, mods)
 	}
 	return mods
 }

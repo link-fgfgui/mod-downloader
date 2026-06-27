@@ -6,10 +6,7 @@ import (
 
 	"mod-downloader/logging"
 	"mod-downloader/models"
-	structs "mod-downloader/structs/minecraft"
 )
-
-const jarMetadataVersion = "recursive-jar-mod-id-v5"
 
 // --- record types ---
 
@@ -721,72 +718,49 @@ func DeletePinnedMod(platform, modID, mcVersion, modLoader string) error {
 	return nil
 }
 
-// --- jar metadata cache ---
+// --- version mod IDs ---
 
-func GetJarMetadata(sha1 string) ([]structs.ModInfo, bool) {
-	d, err := readyDB()
-	if err != nil {
-		return nil, false
-	}
-	sha1 = strings.TrimSpace(sha1)
-	if sha1 == "" {
-		logging.Debug("jar metadata skipped for empty sha1")
-		return nil, false
-	}
-
-	var mods []structs.ModInfo
-	found := false
-	err = d.view(func(state *cacheState) error {
-		mods, found = state.JarMetadata[sha1]
-		mods = copyModInfos(mods)
-		return nil
-	})
-	if err != nil || !found || len(mods) == 0 {
-		logging.Debug("jar metadata miss", "sha1", sha1)
-		return nil, false
-	}
-	logging.Debug("jar metadata hit", "sha1", sha1, "modCount", len(mods))
-	return mods, true
-}
-
-func SetJarMetadata(sha1 string, mods []structs.ModInfo) error {
+func SetVersionModIDs(platformVersionID string, modIDs []string) error {
 	d, err := readyDB()
 	if err != nil {
 		return err
 	}
-	sha1 = strings.TrimSpace(sha1)
-	if sha1 == "" || len(mods) == 0 {
-		logging.Debug("set jar metadata skipped", "sha1", sha1, "modCount", len(mods))
+	platformVersionID = strings.TrimSpace(platformVersionID)
+	if platformVersionID == "" {
 		return nil
 	}
 
-	filtered := make([]structs.ModInfo, 0, len(mods))
-	seen := make(map[string]struct{}, len(mods))
-	for _, mod := range mods {
-		mod.ID = strings.TrimSpace(mod.ID)
-		if mod.ID == "" {
-			continue
-		}
-		key := strings.ToLower(mod.ID)
-		if _, ok := seen[key]; ok {
-			continue
-		}
-		seen[key] = struct{}{}
-		filtered = append(filtered, mod)
-	}
-
+	logging.Debug("set version mod IDs started", "platformVersionID", platformVersionID, "modIDCount", len(modIDs))
 	err = d.update(func(state *cacheState) error {
-		if len(filtered) == 0 {
-			delete(state.JarMetadata, sha1)
+		key, ok := state.PlatformVersionKeyByID[platformVersionID]
+		if !ok {
 			return nil
 		}
-		state.JarMetadata[sha1] = copyModInfos(filtered)
+		v, ok := state.PlatformVersions[key]
+		if !ok {
+			return nil
+		}
+		seen := make(map[string]struct{}, len(modIDs))
+		out := make([]string, 0, len(modIDs))
+		for _, id := range modIDs {
+			id = strings.ToLower(strings.TrimSpace(id))
+			if id == "" {
+				continue
+			}
+			if _, dup := seen[id]; dup {
+				continue
+			}
+			seen[id] = struct{}{}
+			out = append(out, id)
+		}
+		v.ModIDs = out
+		state.PlatformVersions[key] = v
 		return nil
 	})
 	if err != nil {
-		logging.Error("set jar metadata failed", "sha1", sha1, "modCount", len(mods), "error", err)
+		logging.Error("set version mod IDs failed", "platformVersionID", platformVersionID, "modIDCount", len(modIDs), "error", err)
 		return err
 	}
-	logging.Info("jar metadata set", "sha1", sha1, "modCount", len(filtered))
+	logging.Info("version mod IDs set", "platformVersionID", platformVersionID, "modIDCount", len(modIDs))
 	return nil
 }
