@@ -21,7 +21,10 @@ import (
 	cfEnum "github.com/sjet47/go-curseforge/schema/enum"
 )
 
-const projectVersionsSnapshotTTL = 15 * time.Minute
+const (
+	projectMetadataTTL         = 30 * 24 * time.Hour
+	projectVersionsSnapshotTTL = 15 * time.Minute
+)
 
 // modProvider defines the interface for mod platform providers.
 type modProvider interface {
@@ -596,6 +599,22 @@ func sortModVersions(results []models.ModVersion) []models.ModVersion {
 		return results[i].ID < results[j].ID
 	})
 	return results
+}
+
+func refreshProjectMetadataIfStale(provider modProvider, platform, projectIDOrSlug string) {
+	record, ok := getProjectSnapshotPlatform(platform, projectIDOrSlug)
+	if ok && record.CachedAt > 0 && time.Since(time.Unix(record.CachedAt, 0)) <= projectMetadataTTL {
+		return
+	}
+	results, err := provider.ExactSearch(appstructs.SearchModsRequest{Query: projectIDOrSlug})
+	if err != nil || len(results) == 0 {
+		return
+	}
+	for _, r := range results {
+		if err := database.UpsertModPlatform(r); err != nil {
+			logging.Error("refresh project metadata failed", "platform", platform, "projectID", projectIDOrSlug, "error", err)
+		}
+	}
 }
 
 func listProjectVersions(provider modProvider, projectIDOrSlug string) []models.ModVersion {

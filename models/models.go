@@ -16,6 +16,7 @@ type ModProject struct {
 	Description string `json:"description"` // Short description
 	Downloads   int64  `json:"downloads"`   // Total download count
 	UpdatedAt   int64  `json:"updatedAt"`   // Last fetched timestamp (Unix seconds)
+	CachedAt    int64  `json:"cachedAt"`    // Metadata cache timestamp (Unix seconds)
 }
 
 // ModVersion represents a specific version file.

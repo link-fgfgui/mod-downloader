@@ -3,6 +3,7 @@ package database
 import (
 	"sort"
 	"strings"
+	"time"
 
 	"mod-downloader/logging"
 	"mod-downloader/models"
@@ -86,6 +87,8 @@ func UpsertModPlatform(p models.ModProject) error {
 		return nil
 	}
 
+	isFullMetadata := strings.TrimSpace(p.Title) != ""
+
 	err = d.update(func(state *cacheState) error {
 		key := makePlatformKey(p.Platform, p.ProjectID)
 		if existing, ok := state.ModPlatforms[key]; ok {
@@ -93,6 +96,18 @@ func UpsertModPlatform(p models.ModProject) error {
 				p.Slug = existing.Slug
 			}
 			p.UpdatedAt = existing.UpdatedAt
+			if isFullMetadata {
+				p.CachedAt = time.Now().Unix()
+			} else {
+				p.Title = existing.Title
+				p.Icon = existing.Icon
+				p.IconURL = existing.IconURL
+				p.Description = existing.Description
+				p.Downloads = existing.Downloads
+				p.CachedAt = existing.CachedAt
+			}
+		} else if isFullMetadata {
+			p.CachedAt = time.Now().Unix()
 		}
 		state.ModPlatforms[key] = p
 		return nil
@@ -352,7 +367,6 @@ func SetPlatformVersions(platform, projectID string, versions []models.ModVersio
 
 	logging.Debug("set platform versions started", "platform", platform, "projectID", projectID, "versionCount", len(versions))
 	err = d.update(func(state *cacheState) error {
-		deleteProjectVersions(state, platform, projectID)
 		for _, v := range versions {
 			savePlatformVersion(state, platform, projectID, v)
 		}
@@ -381,11 +395,6 @@ func SetPlatformVersionSnapshot(platform, projectID string, versions []models.Mo
 	logging.Debug("set platform version snapshot started", "platform", platform, "projectID", projectID, "versionCount", len(versions), "updatedAt", updatedAt, "scopeCount", len(scopes))
 	err = d.update(func(state *cacheState) error {
 		touchSnapshotPlatform(state, platform, projectID, updatedAt, len(scopes) == 0)
-		if len(scopes) == 0 {
-			deleteProjectVersions(state, platform, projectID)
-		} else {
-			deletePlatformVersionSnapshotScopes(state, platform, projectID, scopes)
-		}
 		for _, v := range versions {
 			savePlatformVersion(state, platform, projectID, v)
 		}
@@ -437,51 +446,6 @@ func normalizePlatformVersionScopes(scopes []ModPlatformVersionScope) []ModPlatf
 		out = append(out, scope)
 	}
 	return out
-}
-
-func deleteProjectVersions(state *cacheState, platform, projectID string) {
-	deleteMatchingVersions(state, func(key versionKey, v models.ModVersion) bool {
-		return key.Platform == platform && key.ProjectID == projectID
-	})
-}
-
-func deletePlatformVersionSnapshotScopes(state *cacheState, platform, projectID string, scopes []ModPlatformVersionScope) {
-	deleteMatchingVersions(state, func(key versionKey, v models.ModVersion) bool {
-		return key.Platform == platform && key.ProjectID == projectID && platformVersionMatchesAnyScope(v.GameVersions, v.Loaders, scopes)
-	})
-}
-
-func deleteMatchingVersions(state *cacheState, shouldDelete func(versionKey, models.ModVersion) bool) {
-	for key, v := range state.PlatformVersions {
-		if shouldDelete(key, v) {
-			delete(state.PlatformVersions, key)
-			if v.ID != "" {
-				delete(state.PlatformVersionKeyByID, v.ID)
-			}
-		}
-	}
-}
-
-func platformVersionMatchesAnyScope(gameVersions, loaders []string, scopes []ModPlatformVersionScope) bool {
-	for _, scope := range scopes {
-		if scope.MinecraftVersion != "" && !containsFoldDB(gameVersions, scope.MinecraftVersion) {
-			continue
-		}
-		if scope.ModLoader != "" && !containsFoldDB(loaders, scope.ModLoader) {
-			continue
-		}
-		return true
-	}
-	return false
-}
-
-func containsFoldDB(values []string, expected string) bool {
-	for _, value := range values {
-		if strings.EqualFold(strings.TrimSpace(value), expected) {
-			return true
-		}
-	}
-	return false
 }
 
 func savePlatformVersion(state *cacheState, platform, projectID string, v models.ModVersion) {

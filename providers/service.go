@@ -89,6 +89,27 @@ func SearchMods(req appstructs.SearchModsRequest, emitUpdate func(appstructs.Sea
 		}()
 	}
 	wg.Wait()
+
+	mu.Lock()
+	var finalResults []models.ModProject
+	if len(exactResults) > 0 {
+		finalResults = exactResults
+	} else {
+		finalResults = mergeProviderSearchResults(providerResults)
+	}
+	mu.Unlock()
+	go cacheSearchResults(finalResults)
+}
+
+func cacheSearchResults(results []models.ModProject) {
+	for _, r := range results {
+		if strings.TrimSpace(r.Title) == "" {
+			continue
+		}
+		if err := database.UpsertModPlatform(r); err != nil {
+			logging.Error("cache search result failed", "platform", r.Platform, "projectID", r.ProjectID, "error", err)
+		}
+	}
 }
 
 func ListMatchingProjectVersions(result models.ModProject, minecraftVersion string, modLoader string) []models.ModVersion {
@@ -97,6 +118,7 @@ func ListMatchingProjectVersions(result models.ModProject, minecraftVersion stri
 		return nil
 	}
 
+	go refreshProjectMetadataIfStale(provider, provider.Name(), projectIDOrSlug)
 	req := appstructs.SearchModsRequest{
 		Version:   strings.TrimSpace(minecraftVersion),
 		ModLoader: strings.ToLower(strings.TrimSpace(modLoader)),
@@ -195,6 +217,7 @@ type associatedPlatformProject struct {
 }
 
 func addProjectVersionSHA1s(set map[string]bool, provider modProvider, project string) {
+	go refreshProjectMetadataIfStale(provider, provider.Name(), project)
 	for _, v := range listProjectVersions(provider, project) {
 		if s := strings.ToLower(strings.TrimSpace(v.SHA1)); s != "" {
 			set[s] = true
