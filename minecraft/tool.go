@@ -2,10 +2,13 @@ package minecraft
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"mod-downloader/logging"
 	structs "mod-downloader/structs/minecraft"
 )
 
@@ -179,4 +182,102 @@ func manifestJarPaths(jsonPath string, mv structs.MinecraftVersion) []string {
 		paths = append(paths, filepath.Join(versionsDir, jarID, jarID+".jar"))
 	}
 	return paths
+}
+
+// CreateHardLinkOrCopy creates a hard link from src to dst, falling back to a
+// no-overwrite byte copy if the link cannot be created (e.g. cross-device).
+func CreateHardLinkOrCopy(src, dst string) error {
+	src = filepath.Clean(src)
+	dst = filepath.Clean(dst)
+	if src == "" || dst == "" {
+		return errors.New("source or destination path is empty")
+	}
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return err
+	}
+	if err := os.Link(src, dst); err == nil {
+		return nil
+	}
+	return copyFileNoOverwrite(src, dst)
+}
+
+func copyFileNoOverwrite(src, dst string) error {
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	srcInfo, err := srcFile.Stat()
+	if err != nil {
+		return err
+	}
+
+	dstFile, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_EXCL, srcInfo.Mode())
+	if err != nil {
+		return err
+	}
+	created := true
+	defer func() {
+		_ = dstFile.Close()
+		if created {
+			_ = os.Remove(dst)
+		}
+	}()
+
+	if _, err := io.Copy(dstFile, srcFile); err != nil {
+		return err
+	}
+	if err := dstFile.Sync(); err != nil {
+		return err
+	}
+	created = false
+	return nil
+}
+
+func scanModsDirForHardlink(modsDir string, add func(sha1, path string) bool) int {
+	modsDir = filepath.Clean(strings.TrimSpace(modsDir))
+	if modsDir == "" || add == nil {
+		return 0
+	}
+	entries, err := os.ReadDir(modsDir)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			logging.Warn("hardlink index scan mods dir failed", "modsDir", modsDir, "error", err)
+		}
+		return 0
+	}
+	added := 0
+	for _, entry := range entries {
+		if entry.IsDir() || !isModJar(entry.Name()) {
+			continue
+		}
+		jarPath := filepath.Join(modsDir, entry.Name())
+		hash := FileSHA1(jarPath)
+		if hash == "" {
+			continue
+		}
+		if add(hash, jarPath) {
+			added++
+		}
+	}
+	return added
+}
+
+func ScanAllModDirsForHardlink(mcDir string, versionInstanceIDs []string, add func(sha1, path string) bool) int {
+	mcDir = filepath.Clean(strings.TrimSpace(mcDir))
+	if mcDir == "" || add == nil {
+		return 0
+	}
+	total := 0
+	for _, instanceID := range versionInstanceIDs {
+		id := strings.TrimSpace(instanceID)
+		if id == "" {
+			continue
+		}
+		modsDir := filepath.Join(mcDir, "versions", id, "mods")
+		total += scanModsDirForHardlink(modsDir, add)
+	}
+	logging.Info("hardlink index full scan completed", "minecraftDir", mcDir, "versionCount", len(versionInstanceIDs), "fileCount", total)
+	return total
 }

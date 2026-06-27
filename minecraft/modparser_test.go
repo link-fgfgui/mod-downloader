@@ -3,6 +3,9 @@ package minecraft
 import (
 	"archive/zip"
 	"bytes"
+	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -148,6 +151,30 @@ version="${missing.version}"
 	}
 	if got[0].Name != "" || got[0].Version != "" {
 		t.Fatalf("metadata placeholders were not dropped: %#v", got[0])
+	}
+}
+
+func TestCreateHardLinkOrCopyDoesNotOverwriteExistingTarget(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "src.jar")
+	dst := filepath.Join(dir, "dst.jar")
+	if err := os.WriteFile(src, []byte("source"), 0o644); err != nil {
+		t.Fatalf("write src: %v", err)
+	}
+	if err := os.WriteFile(dst, []byte("target"), 0o644); err != nil {
+		t.Fatalf("write dst: %v", err)
+	}
+
+	err := CreateHardLinkOrCopy(src, dst)
+	if !errors.Is(err, os.ErrExist) {
+		t.Fatalf("CreateHardLinkOrCopy() error = %v, want os.ErrExist", err)
+	}
+	got, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatalf("read dst: %v", err)
+	}
+	if string(got) != "target" {
+		t.Fatalf("dst content = %q, want target", got)
 	}
 }
 

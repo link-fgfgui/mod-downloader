@@ -217,6 +217,9 @@ func downloadModJob(ctx context.Context, job downloadJob) error {
 	if err := os.MkdirAll(job.TargetDir, 0o755); err != nil {
 		return err
 	}
+	if tryHardlinkInstall(job) {
+		return nil
+	}
 	// Try to get mod IDs from platform version (persisted or lazy-parsed via modbridge)
 	modIDs := modbridge.VersionModIDs(job.Version, job.ModLoader)
 	if len(modIDs) > 0 {
@@ -228,6 +231,105 @@ func downloadModJob(ctx context.Context, job downloadJob) error {
 	}
 
 	return downloadModWithLocalParse(ctx, job)
+}
+
+// tryHardlinkInstall consults the SHA1→path hardlink index before downloading.
+// On a hit with an existing source file it hardlinks (falling back to a no-overwrite
+// copy) into the target location and fires a discard fetch in the background to
+// preserve the mod author's download count.
+// SHA1 is always available before download, so this works whether or not mod IDs
+// are resolvable: with mod IDs it links straight to the final path; without them it
+// links to a temp dir, parses locally, then moves to the final path.
+func tryHardlinkInstall(job downloadJob) bool {
+	srcPath, ok := global.HardlinkIndexLookup(job.Version.SHA1)
+	if !ok {
+		return false
+	}
+	finalPath := filepath.Join(job.TargetDir, filepath.Base(srcPath))
+	if job.Version.FileName != "" {
+		finalPath = filepath.Join(job.TargetDir, job.Version.FileName)
+	}
+
+	modIDs := modbridge.VersionModIDs(job.Version, job.ModLoader)
+	var existing []global.LocalModFilePath
+	if len(modIDs) > 0 {
+		existing = modbridge.LocalModPathsForModIDs(modIDs, job.InstanceID)
+		if alreadyInstalled(existing, job.Version.SHA1) {
+			return true
+		}
+	}
+
+	if downloadTargetExists(finalPath) && !pathInLocalModPaths(finalPath, existing) {
+		logging.Info("hardlink skipped because target file already exists", "path", finalPath, "versionID", job.Version.ID)
+		return true
+	}
+	archiveSupersededModJars(existing)
+	if downloadTargetExists(finalPath) {
+		logging.Info("hardlink skipped because target file already exists after archiving", "path", finalPath, "versionID", job.Version.ID)
+		return true
+	}
+
+	if len(modIDs) > 0 {
+		if err := minecraft.CreateHardLinkOrCopy(srcPath, finalPath); err != nil {
+			logging.Warn("hardlink creation failed, falling back to download", "src", srcPath, "dst", finalPath, "error", err)
+			return false
+		}
+		logging.Info("mod installed via hardlink/copy", "src", srcPath, "dst", finalPath, "versionID", job.Version.ID)
+		go DiscardFetchFromNetwork(job.Version.DownloadURL)
+		upsertDownloadedMod(finalPath, job)
+		return true
+	}
+
+	tempDir := filepath.Join(filepath.Dir(job.TargetDir), ".mod-downloader-tmp")
+	if err := os.MkdirAll(tempDir, 0o755); err != nil {
+		logging.Warn("hardlink temp dir creation failed", "error", err)
+		return false
+	}
+	tempPath := filepath.Join(tempDir, filepath.Base(finalPath))
+	if err := os.Remove(tempPath); err != nil && !os.IsNotExist(err) {
+		logging.Warn("hardlink temp cleanup failed", "path", tempPath, "error", err)
+		return false
+	}
+	if err := minecraft.CreateHardLinkOrCopy(srcPath, tempPath); err != nil {
+		logging.Warn("hardlink to temp failed, falling back to download", "src", srcPath, "dst", tempPath, "error", err)
+		return false
+	}
+	sha1 := minecraft.FileSHA1(tempPath)
+	parsedMods := minecraft.ParseModJarWithSHA1(tempPath, sha1, job.ModLoader)
+	if len(parsedMods) == 0 {
+		_ = os.Remove(tempPath)
+		logging.Warn("hardlink source jar has no parseable metadata, falling back to download", "src", srcPath)
+		return false
+	}
+	// Extract mod IDs for future version mod ID persistence (mirrors downloadModWithLocalParse)
+	parsedModIDs := make([]string, 0, len(parsedMods))
+	for _, m := range parsedMods {
+		if id := strings.TrimSpace(m.ID); id != "" {
+			parsedModIDs = append(parsedModIDs, strings.ToLower(id))
+		}
+	}
+	if len(parsedModIDs) > 0 && job.Version.ID != "" {
+		_ = modbridge.PersistVersionModIDs(job.Version.ID, parsedModIDs)
+	}
+	parsedExisting := modbridge.LocalModPathsForModIDs(parsedModIDs, job.InstanceID)
+	if alreadyInstalled(parsedExisting, sha1) {
+		_ = os.Remove(tempPath)
+		return true
+	}
+	archiveSupersededModJars(parsedExisting)
+	if downloadTargetExists(finalPath) {
+		logging.Info("hardlink skipped because target file already exists", "path", finalPath, "versionID", job.Version.ID)
+		_ = os.Remove(tempPath)
+		return true
+	}
+	if err := os.Rename(tempPath, finalPath); err != nil {
+		_ = os.Remove(tempPath)
+		return false
+	}
+	logging.Info("mod installed via hardlink (local parse path)", "src", srcPath, "dst", finalPath, "versionID", job.Version.ID)
+	go DiscardFetchFromNetwork(job.Version.DownloadURL)
+	upsertDownloadedMod(finalPath, job)
+	return true
 }
 
 // alreadyInstalled checks whether any existing file with the same modId already has the target SHA1.
@@ -258,6 +360,7 @@ func archiveSupersededModJars(paths []global.LocalModFilePath) {
 			logging.Info("superseded mod jar archived", "path", abs, "archivedPath", archivedPath)
 		}
 		global.RemoveLocalModByPath(p.Path)
+		global.HardlinkIndexRemove(abs)
 	}
 }
 
@@ -497,6 +600,13 @@ func upsertDownloadedMod(path string, job downloadJob) {
 			relPath = rel
 		}
 	}
+	absPath := path
+	if !filepath.IsAbs(absPath) {
+		if mcDir := global.GetMinecraftDir(); mcDir != "" {
+			absPath = filepath.Join(mcDir, path)
+		}
+	}
+	global.HardlinkIndexAdd(sha1, absPath)
 	for i := range mods {
 		mods[i].FileName = fileName
 		mods[i].Path = relPath

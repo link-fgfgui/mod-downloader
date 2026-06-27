@@ -287,6 +287,7 @@ func ScanVersionMods(versionDir string, instanceID string, minecraftVersion stri
 
 		jarPath := filepath.Join(modsDir, entry.Name())
 		hash := FileSHA1(jarPath)
+		global.HardlinkIndexAdd(hash, jarPath)
 		mods := ParseModJarWithSHA1(jarPath, hash, modLoader)
 		enabled := isJarEnabled(entry.Name())
 		baseName := StripJarSuffix(entry.Name())

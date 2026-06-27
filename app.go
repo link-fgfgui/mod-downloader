@@ -177,12 +177,14 @@ func (a *App) ChooseMinecraftDir() string {
 	simplified := minecraft.SimplifyPathWithEnv(dir)
 	global.SetMinecraftDir(dir)
 	global.ClearLocalMods()
+	global.HardlinkIndexClear()
 	global.InvalidateVersions()
 	versions := loadVersionsFromDisk(dir)
 	if len(versions) == 0 {
 		logging.Warn("chosen minecraft dir has no versions", "minecraftDir", dir)
 		global.SetMinecraftDir(previousDir)
 		global.ClearLocalMods()
+		global.HardlinkIndexClear()
 		global.InvalidateVersions()
 		if strings.TrimSpace(previousDir) != "" {
 			loadVersionsFromDisk(previousDir)
@@ -276,6 +278,8 @@ func loadVersionsFromDisk(mcDir string) []structs.VersionInfo {
 
 	global.SetVersionsForDir(mcDir, infos)
 	ensureSelectedVersion(infos)
+	generation := global.HardlinkIndexGeneration()
+	go scanAllModDirsForHardlinkIndex(mcDir, infos, generation)
 	return infos
 }
 
@@ -374,4 +378,22 @@ func validMinecraftInstance(version structs.VersionInfo) bool {
 	default:
 		return false
 	}
+}
+
+func scanAllModDirsForHardlinkIndex(mcDir string, versions []structs.VersionInfo, generation uint64) {
+	if global.GetMinecraftDir() != mcDir || global.HardlinkIndexGeneration() != generation {
+		return
+	}
+	ids := make([]string, 0, len(versions))
+	for _, v := range versions {
+		if id := versionInstanceDir(v); id != "" {
+			ids = append(ids, id)
+		}
+	}
+	minecraft.ScanAllModDirsForHardlink(mcDir, ids, func(sha1, path string) bool {
+		if global.GetMinecraftDir() != mcDir {
+			return false
+		}
+		return global.HardlinkIndexAddForGeneration(sha1, path, generation)
+	})
 }
