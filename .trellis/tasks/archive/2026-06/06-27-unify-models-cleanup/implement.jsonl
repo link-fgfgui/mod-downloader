@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/directory-structure.md", "reason": "Task deletes providers/model.go and providers/model_test.go and rewrites cross-package type references — confirms module organization conventions."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Refactor must follow project code standards and forbidden-patterns list; cleanup is a rename + dead-code-removal pass."}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Directly applicable: removing parallel conversion functions and alias layers is a code-reuse / dedup exercise."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Type references span models/structs/providers/downloader/app layers and trigger Wails binding regeneration — cross-layer data flow guidance applies."}

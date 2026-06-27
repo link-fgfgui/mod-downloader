@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Check sub-agent verifies the refactor meets project code standards and avoids forbidden patterns."}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "Verify no error-handling regressions introduced during the type-rename pass."}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Check sub-agent confirms legacy duplicate conversion functions are fully removed and no parallel paths remain."}
