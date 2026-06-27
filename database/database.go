@@ -208,12 +208,66 @@ func (s *cacheState) normalize() {
 	}
 	if s.PlatformVersionKeyByID == nil {
 		s.PlatformVersionKeyByID = make(map[string]versionKey)
-		for key, version := range s.PlatformVersions {
-			if version.ID != "" {
-				s.PlatformVersionKeyByID[version.ID] = key
-			}
+	}
+	s.normalizeKeys()
+}
+
+func (s *cacheState) normalizeKeys() {
+	modPlatforms := make(map[platformKey]models.ModProject, len(s.ModPlatforms))
+	for key, project := range s.ModPlatforms {
+		key = makePlatformKey(key.Platform, key.ProjectID)
+		if project.Platform == "" {
+			project.Platform = key.Platform
+		}
+		if project.ProjectID == "" {
+			project.ProjectID = key.ProjectID
+		}
+		modPlatforms[key] = project
+	}
+	s.ModPlatforms = modPlatforms
+
+	versions := make(map[versionKey]models.ModVersion, len(s.PlatformVersions))
+	versionKeyByID := make(map[string]versionKey, len(s.PlatformVersions))
+	for key, version := range s.PlatformVersions {
+		key = makeVersionKey(key.Platform, key.ProjectID, key.VersionID)
+		if version.Platform == "" {
+			version.Platform = key.Platform
+		}
+		if version.ProjectID == "" {
+			version.ProjectID = key.ProjectID
+		}
+		if version.VersionID == "" {
+			version.VersionID = key.VersionID
+		}
+		versions[key] = version
+		if version.ID != "" {
+			versionKeyByID[version.ID] = key
 		}
 	}
+	s.PlatformVersions = versions
+	s.PlatformVersionKeyByID = versionKeyByID
+
+	scopes := make(map[versionScopeKey]storedVersionScope, len(s.PlatformVersionScopes))
+	for key, scope := range s.PlatformVersionScopes {
+		key = makeVersionScopeKey(key.Platform, key.ProjectID, ModPlatformVersionScope{
+			MinecraftVersion: key.MinecraftVersion,
+			ModLoader:        key.ModLoader,
+		})
+		if scope.Platform == "" {
+			scope.Platform = key.Platform
+		}
+		if scope.ProjectID == "" {
+			scope.ProjectID = key.ProjectID
+		}
+		if scope.MinecraftVersion == "" {
+			scope.MinecraftVersion = key.MinecraftVersion
+		}
+		if scope.ModLoader == "" {
+			scope.ModLoader = key.ModLoader
+		}
+		scopes[key] = scope
+	}
+	s.PlatformVersionScopes = scopes
 }
 
 func (s *cacheState) intern(pool *stringPool) {

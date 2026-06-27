@@ -449,13 +449,7 @@ func scanAllModDirsForHardlinkIndex(mcDir string, versions []structs.VersionInfo
 	if global.GetMinecraftDir() != mcDir || global.HardlinkIndexGeneration() != generation {
 		return
 	}
-	ids := make([]string, 0, len(versions))
-	for _, v := range versions {
-		if id := versionInstanceDir(v); id != "" {
-			ids = append(ids, id)
-		}
-	}
-	minecraft.ScanAllModDirsForHardlink(mcDir, ids, func(sha1, path string) bool {
+	minecraft.ScanAllModDirsForHardlink(mcDir, versions, func(sha1, path string) bool {
 		if global.GetMinecraftDir() != mcDir {
 			return false
 		}

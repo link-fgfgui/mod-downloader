@@ -106,6 +106,47 @@ func TestCachePlatformVersionsAndDependencies(t *testing.T) {
 	}
 }
 
+func TestPlatformCacheKeysAreCaseInsensitive(t *testing.T) {
+	openTestDB(t)
+
+	if err := UpsertModPlatform(models.ModProject{
+		Platform:  "Modrinth",
+		ProjectID: "sodium",
+		Slug:      "sodium-slug",
+		Title:     "Sodium",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetPlatformVersionSnapshot("Modrinth", "sodium", []models.ModVersion{
+		{
+			VersionID:   "v1",
+			SHA1:        "abc",
+			PublishedAt: 10,
+		},
+	}, 100, []ModPlatformVersionScope{{
+		MinecraftVersion: "1.21.1",
+		ModLoader:        "NeoForge",
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	if p, ok := GetModPlatform("modrinth", "sodium"); !ok || p.Title != "Sodium" || p.Platform != "Modrinth" {
+		t.Fatalf("GetModPlatform lower-case = %#v, %v", p, ok)
+	}
+	if p, ok := GetModPlatformBySlug("modrinth", "sodium-slug"); !ok || p.ProjectID != "sodium" {
+		t.Fatalf("GetModPlatformBySlug lower-case = %#v, %v", p, ok)
+	}
+	if versions, err := GetPlatformVersions("modrinth", "sodium"); err != nil || len(versions) != 1 || versions[0].VersionID != "v1" {
+		t.Fatalf("GetPlatformVersions lower-case = %#v, %v", versions, err)
+	}
+	if ts, ok := GetPlatformVersionScopeUpdatedAt("modrinth", "sodium", ModPlatformVersionScope{MinecraftVersion: "1.21.1", ModLoader: "neoforge"}); !ok || ts != 100 {
+		t.Fatalf("GetPlatformVersionScopeUpdatedAt lower-case = %d, %v", ts, ok)
+	}
+	if version, ok := GetLatestProjectBySHA1("modrinth", "abc"); !ok || version.VersionID != "v1" || version.Platform != "Modrinth" {
+		t.Fatalf("GetLatestProjectBySHA1 lower-case = %#v, %v", version, ok)
+	}
+}
+
 func TestCachePinnedMods(t *testing.T) {
 	path := openTestDB(t)
 

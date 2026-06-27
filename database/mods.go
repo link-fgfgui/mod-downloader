@@ -53,11 +53,11 @@ func normalizePinnedMod(p PinnedMod) PinnedMod {
 }
 
 func makePlatformKey(platform, projectID string) platformKey {
-	return platformKey{Platform: strings.TrimSpace(platform), ProjectID: strings.TrimSpace(projectID)}
+	return platformKey{Platform: normalizePlatform(platform), ProjectID: strings.TrimSpace(projectID)}
 }
 
 func makeVersionKey(platform, projectID, versionID string) versionKey {
-	return versionKey{Platform: strings.TrimSpace(platform), ProjectID: strings.TrimSpace(projectID), VersionID: strings.TrimSpace(versionID)}
+	return versionKey{Platform: normalizePlatform(platform), ProjectID: strings.TrimSpace(projectID), VersionID: strings.TrimSpace(versionID)}
 }
 
 func makePinnedModKey(platform, modID, mcVersion, modLoader string) pinnedModKey {
@@ -67,11 +67,15 @@ func makePinnedModKey(platform, modID, mcVersion, modLoader string) pinnedModKey
 
 func makeVersionScopeKey(platform, projectID string, scope ModPlatformVersionScope) versionScopeKey {
 	return versionScopeKey{
-		Platform:         strings.TrimSpace(platform),
+		Platform:         normalizePlatform(platform),
 		ProjectID:        strings.TrimSpace(projectID),
 		MinecraftVersion: scope.MinecraftVersion,
 		ModLoader:        scope.ModLoader,
 	}
+}
+
+func normalizePlatform(platform string) string {
+	return strings.ToLower(strings.TrimSpace(platform))
 }
 
 // --- mod platforms ---
@@ -149,7 +153,7 @@ func GetModPlatformBySlug(platform, slug string) (models.ModProject, bool) {
 	if err != nil {
 		return models.ModProject{}, false
 	}
-	platform = strings.TrimSpace(platform)
+	platform = normalizePlatform(platform)
 	slug = strings.TrimSpace(slug)
 	if platform == "" || slug == "" {
 		return models.ModProject{}, false
@@ -312,7 +316,7 @@ func GetLatestProjectBySHA1(platform, sha1 string) (models.ModVersion, bool) {
 	if err != nil {
 		return models.ModVersion{}, false
 	}
-	platform = strings.TrimSpace(platform)
+	platform = normalizePlatform(platform)
 	sha1 = strings.ToLower(strings.TrimSpace(sha1))
 	if platform == "" || sha1 == "" {
 		return models.ModVersion{}, false
@@ -423,8 +427,12 @@ func SetPlatformVersionSnapshot(platform, projectID string, versions []models.Mo
 func touchSnapshotPlatform(state *cacheState, pool *stringPool, platform, projectID string, updatedAt int64, updateProjectTimestamp bool) {
 	key := internPlatformKey(pool, makePlatformKey(platform, projectID))
 	p := state.ModPlatforms[key]
-	p.Platform = key.Platform
-	p.ProjectID = key.ProjectID
+	if strings.TrimSpace(p.Platform) == "" {
+		p.Platform = key.Platform
+	}
+	if strings.TrimSpace(p.ProjectID) == "" {
+		p.ProjectID = key.ProjectID
+	}
 	if updateProjectTimestamp {
 		p.UpdatedAt = updatedAt
 	}
@@ -452,10 +460,10 @@ func normalizePlatformVersionScopes(scopes []ModPlatformVersionScope) []ModPlatf
 
 func savePlatformVersion(state *cacheState, pool *stringPool, platform, projectID string, v models.ModVersion) {
 	v = copyVersion(v)
-	v.Platform = platform
+	v.Platform = strings.TrimSpace(platform)
 	v.ProjectID = projectID
 	v.VersionID = strings.TrimSpace(v.VersionID)
-	key := internVersionKey(pool, makeVersionKey(platform, projectID, v.VersionID))
+	key := internVersionKey(pool, makeVersionKey(v.Platform, projectID, v.VersionID))
 
 	if existing, ok := state.PlatformVersions[key]; ok && existing.ID != "" {
 		v.ID = existing.ID
@@ -494,7 +502,7 @@ func GetPlatformVersionScopeUpdatedAt(platform, projectID string, scope ModPlatf
 	if err != nil {
 		return 0, false
 	}
-	platform = strings.TrimSpace(platform)
+	platform = normalizePlatform(platform)
 	projectID = strings.TrimSpace(projectID)
 	scopes := normalizePlatformVersionScopes([]ModPlatformVersionScope{scope})
 	if platform == "" || projectID == "" || len(scopes) == 0 {
@@ -519,7 +527,7 @@ func GetPlatformVersions(platform, projectID string) ([]models.ModVersion, error
 	if err != nil {
 		return nil, err
 	}
-	platform = strings.TrimSpace(platform)
+	platform = normalizePlatform(platform)
 	projectID = strings.TrimSpace(projectID)
 	if platform == "" || projectID == "" {
 		return nil, nil

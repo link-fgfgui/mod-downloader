@@ -59,3 +59,20 @@ func TestPathInLocalModPathsMatchesRelativePaths(t *testing.T) {
 		t.Fatalf("pathInLocalModPaths(%q) = false, want true", path)
 	}
 }
+
+func TestDependencyDownloadRequestCarriesDependencyVersionID(t *testing.T) {
+	req, ok := dependencyDownloadRequest("Modrinth", models.ModDependency{
+		DependencyProjectID: "fabric-api",
+		DependencyVersionID: "version-123",
+		DependencyType:      "required",
+	}, appstructs.ModDownloadRequest{
+		MinecraftVersion: "1.21.1",
+		ModLoader:        "Fabric",
+	})
+	if !ok {
+		t.Fatal("dependencyDownloadRequest() ok = false")
+	}
+	if req.VersionID != "version-123" {
+		t.Fatalf("VersionID = %q, want version-123", req.VersionID)
+	}
+}

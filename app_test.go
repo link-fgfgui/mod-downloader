@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"testing"
@@ -64,6 +66,35 @@ func TestScanAllModDirsForHardlinkIndexIgnoresStaleGeneration(t *testing.T) {
 	scanAllModDirsForHardlinkIndex(dir, []structs.VersionInfo{{ID: "first"}}, generation)
 	if _, ok := global.HardlinkIndexLookup("8a38e4e8d082c15b2104c026f910da1fe949f36d"); ok {
 		t.Fatalf("stale generation added hardlink index entry")
+	}
+}
+
+func TestScanAllModDirsForHardlinkIndexResolvesPrismCompositeID(t *testing.T) {
+	instancesDir := t.TempDir()
+	modsDir := filepath.Join(instancesDir, "MyFabric", ".minecraft", "versions", "fabric-loader-1.21.1", "mods")
+	if err := os.MkdirAll(modsDir, 0o755); err != nil {
+		t.Fatalf("mkdir mods: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(modsDir, "mod.jar"), []byte("jar"), 0o644); err != nil {
+		t.Fatalf("write jar: %v", err)
+	}
+	hash := sha1.Sum([]byte("jar"))
+	sha1Hex := hex.EncodeToString(hash[:])
+
+	global.SetMinecraftDir(instancesDir)
+	global.HardlinkIndexClear()
+	generation := global.HardlinkIndexGeneration()
+	t.Cleanup(func() {
+		global.SetMinecraftDir("")
+		global.HardlinkIndexClear()
+	})
+
+	scanAllModDirsForHardlinkIndex(instancesDir, []structs.VersionInfo{{
+		ID:   "MyFabric/fabric-loader-1.21.1",
+		Name: "MyFabric",
+	}}, generation)
+	if path, ok := global.HardlinkIndexLookup(sha1Hex); !ok || path != filepath.Join(modsDir, "mod.jar") {
+		t.Fatalf("hardlink index lookup = %q, %v", path, ok)
 	}
 }
 

@@ -441,6 +441,7 @@ func dependencyDownloadRequest(platform string, dep models.ModDependency, parent
 		},
 		MinecraftVersion: parent.MinecraftVersion,
 		ModLoader:        parent.ModLoader,
+		VersionID:        strings.TrimSpace(dep.DependencyVersionID),
 	}, true
 }
 

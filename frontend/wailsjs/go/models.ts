@@ -75,6 +75,7 @@ export namespace models {
 	    description: string;
 	    downloads: number;
 	    updatedAt: number;
+	    cachedAt: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new ModProject(source);
@@ -92,6 +93,7 @@ export namespace models {
 	        this.description = source["description"];
 	        this.downloads = source["downloads"];
 	        this.updatedAt = source["updatedAt"];
+	        this.cachedAt = source["cachedAt"];
 	    }
 	}
 	export class ModVersion {
@@ -109,6 +111,7 @@ export namespace models {
 	    gameVersions: string[];
 	    loaders: string[];
 	    dependencies?: ModDependency[];
+	    modIds?: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new ModVersion(source);
@@ -130,6 +133,7 @@ export namespace models {
 	        this.gameVersions = source["gameVersions"];
 	        this.loaders = source["loaders"];
 	        this.dependencies = this.convertValues(source["dependencies"], ModDependency);
+	        this.modIds = source["modIds"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -278,6 +282,7 @@ export namespace structs {
 	    result: models.ModProject;
 	    minecraftVersion: string;
 	    modLoader: string;
+	    versionId?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ModDownloadRequest(source);
@@ -289,6 +294,7 @@ export namespace structs {
 	        this.result = this.convertValues(source["result"], models.ModProject);
 	        this.minecraftVersion = source["minecraftVersion"];
 	        this.modLoader = source["modLoader"];
+	        this.versionId = source["versionId"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

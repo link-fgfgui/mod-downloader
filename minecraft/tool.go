@@ -264,20 +264,20 @@ func scanModsDirForHardlink(modsDir string, add func(sha1, path string) bool) in
 	return added
 }
 
-func ScanAllModDirsForHardlink(mcDir string, versionInstanceIDs []string, add func(sha1, path string) bool) int {
+func ScanAllModDirsForHardlink(mcDir string, versions []structs.VersionInfo, add func(sha1, path string) bool) int {
 	mcDir = filepath.Clean(strings.TrimSpace(mcDir))
 	if mcDir == "" || add == nil {
 		return 0
 	}
 	total := 0
-	for _, instanceID := range versionInstanceIDs {
-		id := strings.TrimSpace(instanceID)
-		if id == "" {
+	for _, version := range versions {
+		versionDir := VersionDirPath(mcDir, version)
+		if versionDir == "" {
 			continue
 		}
-		modsDir := filepath.Join(mcDir, "versions", id, "mods")
+		modsDir := filepath.Join(versionDir, "mods")
 		total += scanModsDirForHardlink(modsDir, add)
 	}
-	logging.Info("hardlink index full scan completed", "minecraftDir", mcDir, "versionCount", len(versionInstanceIDs), "fileCount", total)
+	logging.Info("hardlink index full scan completed", "minecraftDir", mcDir, "versionCount", len(versions), "fileCount", total)
 	return total
 }
