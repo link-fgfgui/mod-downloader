@@ -2,8 +2,9 @@
     <v-virtual-scroll :items="virtualItems" class="search-result-scroll px-2" item-height="88">
         <template #default="{ item }">
             <v-list-item v-if="item.type === 'result'" :key="item.key" :title="item.result.title"
-                :subtitle="item.result.description" class="mb-2 border-b" bg-color="surface" rounded="xl" elevation="1"
-                lines="two">
+                :subtitle="item.result.description" class="mb-2 border-b md-animate-fade-up md-hover-lift" bg-color="surface" rounded="xl" elevation="1"
+                lines="two"
+                :style="itemEnterStyle(item.index)">
                 <template #prepend>
                     <div class="align-self-start pt-1 me-3">
                         <v-avatar class="cursor-pointer" color="surface-container-high" rounded="lg" size="48"
@@ -20,7 +21,7 @@
                             {{ item.result.platform }}
                         </v-chip>
 
-                        <v-btn variant="tonal" rounded="xl" size="small"
+                        <v-btn class="md-btn-press md-hover-scale" variant="tonal" rounded="xl" size="small"
                             :color="colorFor(item.index)"
                             :icon="iconFor(item.index)"
                             :loading="loadingFor(item.index)"
@@ -114,6 +115,10 @@ const loadingFor = (index) => {
 };
 
 const disabledFor = (index) => Boolean(stateFor(index)?.disabled);
+
+const itemEnterStyle = (index) => ({
+    animationDelay: `${Math.min(index, 15) * 40}ms`,
+});
 
 const setLoadMoreTarget = (element) => {
     if (loadMoreTarget.value === element) {

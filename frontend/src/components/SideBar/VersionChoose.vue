@@ -1,26 +1,28 @@
 <template>
     <v-divider></v-divider>
     <div class="pa-2">
-        <div v-show="isExpanded">
-            <div class="d-flex align-center" style="gap: 8px">
-                <v-select
-                    v-model="selectedVersionName"
-                    :items="versionList"
-                    label="Version"
-                    density="compact"
-                    hide-details
-                    variant="outlined"
-                    class="flex-grow-1"
-                ></v-select>
-                <v-btn
-                    icon="mdi-refresh"
-                    variant="text"
-                    :disabled="isRefreshing"
-                    density="compact"
-                    size="small"
-                    @click="refreshSelectedMods"
-                ></v-btn>
-            </div>
+        <transition name="md-expand">
+            <div v-show="isExpanded" class="md-animate-fade-up">
+                <div class="d-flex align-center" style="gap: 8px">
+                    <v-select
+                        v-model="selectedVersionName"
+                        :items="versionList"
+                        label="Version"
+                        density="compact"
+                        hide-details
+                        variant="outlined"
+                        class="flex-grow-1"
+                    ></v-select>
+                    <v-btn
+                        class="md-btn-press md-hover-scale"
+                        icon="mdi-refresh"
+                        variant="text"
+                        :disabled="isRefreshing"
+                        density="compact"
+                        size="small"
+                        @click="refreshSelectedMods"
+                    ></v-btn>
+                </div>
             <v-text-field
                 v-model="downloadFolder"
                 label=".minecraft folder"
@@ -33,6 +35,7 @@
                 @click="selectFolder"
             ></v-text-field>
         </div>
+        </transition>
         <span
             v-show="!isExpanded"
             style="font-size: 32px; writing-mode: vertical-rl"

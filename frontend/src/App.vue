@@ -4,7 +4,7 @@
         <v-main>
             <v-container fluid class="position-relative">
                 <router-view v-slot="{ Component, route }">
-                    <transition name="fade" mode="out-in">
+                    <transition name="slide-fade" mode="out-in">
                         <keep-alive>
                             <component :is="Component" :key="route.path" />
                         </keep-alive>
@@ -12,14 +12,16 @@
                 </router-view>
             </v-container>
         </v-main>
-        <div v-if="downloadQueueStore.queue.active" class="download-fab">
-            <v-badge :model-value="downloadQueueStore.queue.pending + downloadQueueStore.queue.running > 1"
-                :content="downloadQueueStore.queue.pending + downloadQueueStore.queue.running" color="error" floating>
-                <v-btn color="primary" icon size="large" aria-label="Download status">
-                    <v-icon icon="mdi-download"></v-icon>
-                </v-btn>
-            </v-badge>
-        </div>
+        <transition name="md-fab">
+            <div v-if="downloadQueueStore.queue.active" class="download-fab">
+                <v-badge :model-value="downloadQueueStore.queue.pending + downloadQueueStore.queue.running > 1"
+                    :content="downloadQueueStore.queue.pending + downloadQueueStore.queue.running" color="error" floating>
+                    <v-btn class="md-btn-press md-hover-scale" color="primary" icon size="large" aria-label="Download status">
+                        <v-icon icon="mdi-download"></v-icon>
+                    </v-btn>
+                </v-badge>
+            </div>
+        </transition>
     </v-app>
 </template>
 
@@ -83,16 +85,6 @@ onUnmounted(() => {
 </script>
 
 <style>
-.fade-enter-active,
-.fade-leave-active {
-    transition: opacity 0.1s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-    opacity: 0;
-}
-
 .download-fab {
     bottom: 24px;
     position: fixed;

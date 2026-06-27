@@ -4,7 +4,7 @@
         <div style="user-select: none;">
             <v-list>
                 <v-list-item title="Mod Downloader">
-                    <template #append><v-btn v-show="isHovered || isPinned" :icon="isPinned ? 'mdi-pin-off' : 'mdi-pin'"
+                    <template #append><v-btn v-show="isHovered || isPinned" class="md-btn-press md-hover-scale" :icon="isPinned ? 'mdi-pin-off' : 'mdi-pin'"
                             variant="text" density="compact"
                             @click.stop="isPinned = !isPinned"></v-btn></template></v-list-item>
             </v-list>

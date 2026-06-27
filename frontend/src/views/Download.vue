@@ -1,20 +1,20 @@
 <template>
-    <v-container class="download-page pa-6" fluid>
-        <v-row class="align-center" dense>
+    <v-container class="download-page pa-6 md-page" fluid>
+        <v-row class="align-center md-stagger" dense>
             <v-col cols="12" md="10">
                 <v-text-field v-model="searchText" placeholder="emi" label="Search mods" prepend-inner-icon="mdi-magnify"
                     variant="outlined" density="comfortable" hide-details clearable
                     @keyup.enter.prevent="searchMods"></v-text-field>
             </v-col>
             <v-col cols="12" md="2">
-                <v-btn block color="primary" height="48" prepend-icon="mdi-magnify" :loading="isSearching"
+                <v-btn class="md-btn-press" block color="primary" height="48" prepend-icon="mdi-magnify" :loading="isSearching"
                     @click="searchMods">
                     Search
                 </v-btn>
             </v-col>
         </v-row>
 
-        <v-row class="mt-4" dense>
+        <v-row class="mt-4 md-stagger" dense>
             <v-col cols="12" md="6">
                 <v-select v-model="selectedVersion" :items="versionList" label="Minecraft Version" variant="outlined"
                     density="comfortable" hide-details></v-select>
@@ -29,9 +29,9 @@
             :states="downloadStates" :downloading-keys="downloadingKeys" @install="installMod"
             @load-more="loadMoreSearchResults" @show-versions="openVersionsOverlay"></SearchResultList>
 
-        <v-overlay v-model="showDirOverlay" contained persistent class="align-center justify-center" scrim="surface">
-            <v-card class="pa-6 text-center" max-width="420" variant="elevated">
-                <v-icon class="mb-3" color="warning" icon="mdi-folder-alert" size="48"></v-icon>
+        <v-overlay v-model="showDirOverlay" transition="scale-fade" contained persistent class="align-center justify-center" scrim="surface">
+            <v-card class="pa-6 text-center md-animate-scale" max-width="420" variant="elevated">
+                <v-icon class="mb-3 md-animate-pulse" color="warning" icon="mdi-folder-alert" size="48"></v-icon>
                 <v-card-title class="pa-0 text-h6">{{ $t('download.selectDirTitle') }}</v-card-title>
                 <v-card-text class="px-0 pb-0 pt-3">
                     {{ $t('download.selectDirDesc') }}
@@ -39,7 +39,7 @@
             </v-card>
         </v-overlay>
 
-        <v-overlay v-model="showVersionsOverlay" location="center" scrim="surface">
+        <v-overlay v-model="showVersionsOverlay" transition="scale-fade" location="center" scrim="surface">
             <v-card class="version-overlay" width="680" max-width="calc(100vw - 32px)" max-height="calc(100vh - 64px)">
                 <v-toolbar density="compact" color="surface">
                     <v-toolbar-title>{{ selectedMod?.title || "Mod Versions" }}</v-toolbar-title>
@@ -71,8 +71,8 @@
             {{ $t(snackbar.key, snackbar.params) }}
         </v-snackbar>
 
-        <v-dialog v-model="confirmDialog.show" max-width="420">
-            <v-card>
+        <v-dialog v-model="confirmDialog.show" transition="scale-fade" max-width="420">
+            <v-card class="md-animate-scale">
                 <v-card-title class="text-h6">
                     {{ confirmDialog.status === 'update' ? $t('download.confirmReplace.updateTitle') : $t('download.confirmReplace.conflictTitle') }}
                 </v-card-title>
