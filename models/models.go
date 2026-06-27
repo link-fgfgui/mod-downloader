@@ -5,7 +5,6 @@ import (
 )
 
 // ModProject represents a mod project on any platform.
-// Replaces both SearchModResult (from structs/search.go) and ModPlatform (from database/mods.go).
 type ModProject struct {
 	ID          string `json:"id"`          // Composite: "platform:projectID" or just projectID
 	Platform    string `json:"platform"`    // "CurseForge" | "Modrinth"
@@ -20,7 +19,6 @@ type ModProject struct {
 }
 
 // ModVersion represents a specific version file.
-// Replaces both ProjectVersionResult (from structs/search.go) and ModPlatformVersion (from database/mods.go).
 type ModVersion struct {
 	ID           string          `json:"id"`           // Platform-specific version ID
 	Platform     string          `json:"platform"`     // "CurseForge" | "Modrinth"
@@ -39,7 +37,6 @@ type ModVersion struct {
 }
 
 // ModDependency represents a dependency link between versions.
-// Replaces both ProjectDependency (from structs/search.go) and ModDependency (from database/mods.go).
 type ModDependency struct {
 	ID                  string `json:"id,omitempty"`              // Internal database ID
 	PlatformVersionID   string `json:"platformVersionId,omitempty"` // Parent version ID

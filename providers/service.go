@@ -6,6 +6,7 @@ import (
 
 	"mod-downloader/database"
 	"mod-downloader/logging"
+	"mod-downloader/models"
 	appstructs "mod-downloader/structs"
 )
 
@@ -22,8 +23,8 @@ func SearchMods(req appstructs.SearchModsRequest, emitUpdate func(appstructs.Sea
 
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	providerResults := make(map[string][]appstructs.SearchModResult, len(modProviders))
-	var exactResults []appstructs.SearchModResult
+	providerResults := make(map[string][]models.ModProject, len(modProviders))
+	var exactResults []models.ModProject
 	remaining := len(modProviders)
 	if req.Query == "" {
 		remaining = len(modProviders)
@@ -90,7 +91,7 @@ func SearchMods(req appstructs.SearchModsRequest, emitUpdate func(appstructs.Sea
 	wg.Wait()
 }
 
-func ListMatchingProjectVersions(result appstructs.SearchModResult, minecraftVersion string, modLoader string) []appstructs.ProjectVersionResult {
+func ListMatchingProjectVersions(result models.ModProject, minecraftVersion string, modLoader string) []models.ModVersion {
 	provider, projectIDOrSlug, ok := providerAndProjectFromSearchResult(result)
 	if !ok {
 		return nil
@@ -104,7 +105,7 @@ func ListMatchingProjectVersions(result appstructs.SearchModResult, minecraftVer
 	return filterProjectVersionsForSearch(versions, req)
 }
 
-func RefreshMatchingProjectVersions(result appstructs.SearchModResult, minecraftVersion string, modLoader string) []appstructs.ProjectVersionResult {
+func RefreshMatchingProjectVersions(result models.ModProject, minecraftVersion string, modLoader string) []models.ModVersion {
 	provider, projectIDOrSlug, ok := providerAndProjectFromSearchResult(result)
 	if !ok {
 		return nil
@@ -120,7 +121,7 @@ func RefreshMatchingProjectVersions(result appstructs.SearchModResult, minecraft
 		return nil
 	}
 
-	versions = sortProjectVersionResults(versions)
+	versions = sortModVersions(versions)
 	projectID := projectIDFromVersions(versions, projectIDOrSlug)
 	if err := saveProjectVersionsSnapshot(provider.Name(), projectIDOrSlug, projectID, versions, filter); err != nil {
 		logging.Error("save refreshed project versions snapshot failed", "platform", provider.Name(), "requestedProject", projectIDOrSlug, "projectID", projectID, "versionCount", len(versions), "error", err)
@@ -128,7 +129,7 @@ func RefreshMatchingProjectVersions(result appstructs.SearchModResult, minecraft
 	return filterProjectVersionsForFilter(versions, filter)
 }
 
-func ProjectReferenceFromSearchResult(result appstructs.SearchModResult) string {
+func ProjectReferenceFromSearchResult(result models.ModProject) string {
 	if result.ID != "" {
 		return result.ID
 	}
@@ -142,7 +143,7 @@ func SplitProjectReference(projectIDOrSlug string) (string, string) {
 	return splitProjectReference(projectIDOrSlug)
 }
 
-func ProjectVersionSHA1Set(result appstructs.SearchModResult) map[string]bool {
+func ProjectVersionSHA1Set(result models.ModProject) map[string]bool {
 	set := make(map[string]bool)
 	provider, project, ok := providerAndProjectFromSearchResult(result)
 	if !ok {
@@ -155,7 +156,7 @@ func ProjectVersionSHA1Set(result appstructs.SearchModResult) map[string]bool {
 	return set
 }
 
-func providerAndProjectFromSearchResult(result appstructs.SearchModResult) (modProvider, string, bool) {
+func providerAndProjectFromSearchResult(result models.ModProject) (modProvider, string, bool) {
 	platform, project := splitProjectReference(result.ID)
 	if project == "" {
 		project = result.Slug

@@ -26,9 +26,9 @@ const projectVersionsSnapshotTTL = 15 * time.Minute
 // modProvider defines the interface for mod platform providers.
 type modProvider interface {
 	Name() string
-	ExactSearch(req appstructs.SearchModsRequest) ([]appstructs.SearchModResult, error)
-	Search(req appstructs.SearchModsRequest) ([]appstructs.SearchModResult, error)
-	ListVersions(projectIDOrSlug string, filter projectVersionFilter) ([]appstructs.ProjectVersionResult, error)
+	ExactSearch(req appstructs.SearchModsRequest) ([]models.ModProject, error)
+	Search(req appstructs.SearchModsRequest) ([]models.ModProject, error)
+	ListVersions(projectIDOrSlug string, filter projectVersionFilter) ([]models.ModVersion, error)
 }
 
 type projectVersionFilter struct {
@@ -42,7 +42,7 @@ type modrinthProvider struct{}
 
 func (curseForgeProvider) Name() string { return "CurseForge" }
 
-func (p curseForgeProvider) ExactSearch(req appstructs.SearchModsRequest) ([]appstructs.SearchModResult, error) {
+func (p curseForgeProvider) ExactSearch(req appstructs.SearchModsRequest) ([]models.ModProject, error) {
 	client := global.GetCurseForgeClient()
 	if client == nil {
 		return nil, nil
@@ -53,9 +53,9 @@ func (p curseForgeProvider) ExactSearch(req appstructs.SearchModsRequest) ([]app
 		return nil, err
 	}
 
-	results := make([]appstructs.SearchModResult, 0, len(mods))
+	results := make([]models.ModProject, 0, len(mods))
 	for _, mod := range mods {
-		result := p.modToSearchResult(mod)
+		result := p.modToModProject(mod)
 		if projectHasExactMatchingVersion(p, result, req) {
 			results = append(results, result)
 		}
@@ -63,7 +63,7 @@ func (p curseForgeProvider) ExactSearch(req appstructs.SearchModsRequest) ([]app
 	return results, nil
 }
 
-func (p curseForgeProvider) Search(req appstructs.SearchModsRequest) ([]appstructs.SearchModResult, error) {
+func (p curseForgeProvider) Search(req appstructs.SearchModsRequest) ([]models.ModProject, error) {
 	client := global.GetCurseForgeClient()
 	if client == nil {
 		return nil, nil
@@ -94,15 +94,15 @@ func (p curseForgeProvider) Search(req appstructs.SearchModsRequest) ([]appstruc
 		return nil, err
 	}
 
-	results := make([]appstructs.SearchModResult, 0, len(response.Data))
+	results := make([]models.ModProject, 0, len(response.Data))
 	for _, mod := range response.Data {
-		results = append(results, p.modToSearchResult(mod))
+		results = append(results, p.modToModProject(mod))
 	}
 
 	return results, nil
 }
 
-func (p curseForgeProvider) ListVersions(projectIDOrSlug string, filter projectVersionFilter) ([]appstructs.ProjectVersionResult, error) {
+func (p curseForgeProvider) ListVersions(projectIDOrSlug string, filter projectVersionFilter) ([]models.ModVersion, error) {
 	client := global.GetCurseForgeClient()
 	if client == nil {
 		return nil, nil
@@ -130,16 +130,16 @@ func (p curseForgeProvider) ListVersions(projectIDOrSlug string, filter projectV
 		return nil, err
 	}
 
-	results := make([]appstructs.ProjectVersionResult, 0, len(response.Data))
+	results := make([]models.ModVersion, 0, len(response.Data))
 	for _, file := range response.Data {
-		results = append(results, p.fileToProjectVersionResult(file))
+		results = append(results, p.fileToModVersion(file))
 	}
 	return results, nil
 }
 
 func (modrinthProvider) Name() string { return "Modrinth" }
 
-func (p modrinthProvider) ExactSearch(req appstructs.SearchModsRequest) ([]appstructs.SearchModResult, error) {
+func (p modrinthProvider) ExactSearch(req appstructs.SearchModsRequest) ([]models.ModProject, error) {
 	result, err := p.searchExactMod(req)
 	if err != nil || result.ID == "" {
 		return nil, err
@@ -147,10 +147,10 @@ func (p modrinthProvider) ExactSearch(req appstructs.SearchModsRequest) ([]appst
 	if !projectHasExactMatchingVersion(p, result, req) {
 		return nil, nil
 	}
-	return []appstructs.SearchModResult{result}, nil
+	return []models.ModProject{result}, nil
 }
 
-func (p modrinthProvider) Search(req appstructs.SearchModsRequest) ([]appstructs.SearchModResult, error) {
+func (p modrinthProvider) Search(req appstructs.SearchModsRequest) ([]models.ModProject, error) {
 	client := global.GetModrinthClient()
 	if client == nil {
 		return nil, nil
@@ -175,15 +175,15 @@ func (p modrinthProvider) Search(req appstructs.SearchModsRequest) ([]appstructs
 		return nil, err
 	}
 
-	results := make([]appstructs.SearchModResult, 0, len(response.Hits))
+	results := make([]models.ModProject, 0, len(response.Hits))
 	for _, hit := range response.Hits {
-		results = append(results, p.searchHitToSearchResult(hit))
+		results = append(results, p.searchHitToModProject(hit))
 	}
 
 	return results, nil
 }
 
-func (p modrinthProvider) ListVersions(projectIDOrSlug string, filter projectVersionFilter) ([]appstructs.ProjectVersionResult, error) {
+func (p modrinthProvider) ListVersions(projectIDOrSlug string, filter projectVersionFilter) ([]models.ModVersion, error) {
 	client := global.GetModrinthClient()
 	if client == nil {
 		return nil, nil
@@ -202,12 +202,12 @@ func (p modrinthProvider) ListVersions(projectIDOrSlug string, filter projectVer
 		return nil, err
 	}
 
-	results := make([]appstructs.ProjectVersionResult, 0, len(versions))
+	results := make([]models.ModVersion, 0, len(versions))
 	for _, version := range versions {
 		if len(results) >= 50 {
 			break
 		}
-		results = append(results, p.versionToProjectVersionResult(version))
+		results = append(results, p.versionToModVersion(version))
 	}
 	return results, nil
 }
@@ -320,109 +320,43 @@ func dedupeCurseForgeMods(mods []cfSchema.Mod) []cfSchema.Mod {
 	return results
 }
 
-func (p curseForgeProvider) modToSearchResult(mod cfSchema.Mod) appstructs.SearchModResult {
-	id := strconv.Itoa(int(mod.ID))
-	return appstructs.SearchModResult{
-		ID:          "curseforge:" + id,
-		Platform:    "CurseForge",
-		Title:       mod.Name,
-		Icon:        "mdi-package-variant",
-		IconURL:     mod.Logo.ThumbnailUrl,
-		Description: mod.Summary,
-		Downloads:   mod.DownloadCount,
-		Slug:        mod.Slug,
-	}
-}
-
 // --- Modrinth helpers ---
 
-func (p modrinthProvider) searchExactMod(req appstructs.SearchModsRequest) (appstructs.SearchModResult, error) {
+func (p modrinthProvider) searchExactMod(req appstructs.SearchModsRequest) (models.ModProject, error) {
 	client := global.GetModrinthClient()
 	if client == nil {
-		return appstructs.SearchModResult{}, nil
+		return models.ModProject{}, nil
 	}
 
 	project, err := client.Projects.Get(req.Query)
 	if err != nil {
-		return appstructs.SearchModResult{}, nil
+		return models.ModProject{}, nil
 	}
 	if project.ProjectType == nil || *project.ProjectType != "mod" {
-		return appstructs.SearchModResult{}, nil
+		return models.ModProject{}, nil
 	}
 
-	return p.projectToSearchResult(project), nil
-}
-
-func (p modrinthProvider) searchHitToSearchResult(hit *modrinth.SearchResult) appstructs.SearchModResult {
-	result := appstructs.SearchModResult{
-		Platform: "Modrinth",
-		Icon:     "mdi-leaf",
-	}
-	if hit.ProjectID != nil {
-		result.ID = "modrinth:" + *hit.ProjectID
-	}
-	if hit.Title != nil {
-		result.Title = *hit.Title
-	}
-	if hit.Description != nil {
-		result.Description = *hit.Description
-	}
-	if hit.IconURL != nil {
-		result.IconURL = *hit.IconURL
-	}
-	if hit.Downloads != nil {
-		result.Downloads = int64(*hit.Downloads)
-	}
-	if hit.Slug != nil {
-		result.Slug = *hit.Slug
-	}
-	return result
-}
-
-func (p modrinthProvider) projectToSearchResult(project *modrinth.Project) appstructs.SearchModResult {
-	result := appstructs.SearchModResult{
-		Platform: "Modrinth",
-		Icon:     "mdi-leaf",
-	}
-	if project.ID != nil {
-		result.ID = "modrinth:" + *project.ID
-	}
-	if project.Title != nil {
-		result.Title = *project.Title
-	}
-	if project.Description != nil {
-		result.Description = *project.Description
-	}
-	if project.IconURL != nil {
-		result.IconURL = *project.IconURL
-	}
-	if project.Downloads != nil {
-		result.Downloads = int64(*project.Downloads)
-	}
-	if project.Slug != nil {
-		result.Slug = *project.Slug
-	}
-	return result
+	return p.projectToModProject(project), nil
 }
 
 // --- Search result helpers ---
 
-func mergeProviderSearchResults(providerResults map[string][]appstructs.SearchModResult) []appstructs.SearchModResult {
-	results := make([]appstructs.SearchModResult, 0)
+func mergeProviderSearchResults(providerResults map[string][]models.ModProject) []models.ModProject {
+	results := make([]models.ModProject, 0)
 	for _, providerResult := range providerResults {
 		results = append(results, providerResult...)
 	}
 	return sortSearchResultsByTitle(results)
 }
 
-func mergeSearchResultsByTitle(left, right []appstructs.SearchModResult) []appstructs.SearchModResult {
-	results := make([]appstructs.SearchModResult, 0, len(left)+len(right))
+func mergeSearchResultsByTitle(left, right []models.ModProject) []models.ModProject {
+	results := make([]models.ModProject, 0, len(left)+len(right))
 	results = append(results, left...)
 	results = append(results, right...)
 	return sortSearchResultsByTitle(results)
 }
 
-func sortSearchResultsByTitle(results []appstructs.SearchModResult) []appstructs.SearchModResult {
+func sortSearchResultsByTitle(results []models.ModProject) []models.ModProject {
 	sort.SliceStable(results, func(i, j int) bool {
 		leftTitle := strings.ToLower(results[i].Title)
 		rightTitle := strings.ToLower(results[j].Title)
@@ -437,7 +371,7 @@ func sortSearchResultsByTitle(results []appstructs.SearchModResult) []appstructs
 	return results
 }
 
-func projectHasMatchingVersion(provider modProvider, result appstructs.SearchModResult, req appstructs.SearchModsRequest) bool {
+func projectHasMatchingVersion(provider modProvider, result models.ModProject, req appstructs.SearchModsRequest) bool {
 	projectIDOrSlug := result.Slug
 	if result.ID != "" {
 		_, projectIDOrSlug = splitProjectReference(result.ID)
@@ -455,7 +389,7 @@ func projectHasMatchingVersion(provider modProvider, result appstructs.SearchMod
 	return false
 }
 
-func projectHasExactMatchingVersion(provider modProvider, result appstructs.SearchModResult, req appstructs.SearchModsRequest) bool {
+func projectHasExactMatchingVersion(provider modProvider, result models.ModProject, req appstructs.SearchModsRequest) bool {
 	if strings.TrimSpace(req.Version) == "" || strings.TrimSpace(req.ModLoader) == "" {
 		return false
 	}
@@ -476,7 +410,7 @@ func projectHasExactMatchingVersion(provider modProvider, result appstructs.Sear
 	return false
 }
 
-func versionMatchesSearchRequest(version appstructs.ProjectVersionResult, req appstructs.SearchModsRequest) bool {
+func versionMatchesSearchRequest(version models.ModVersion, req appstructs.SearchModsRequest) bool {
 	if req.Version != "" && !containsFold(version.GameVersions, req.Version) {
 		return false
 	}
@@ -499,8 +433,8 @@ func containsFold(values []string, expected string) bool {
 	return false
 }
 
-func filterProjectVersionsForSearch(versions []appstructs.ProjectVersionResult, req appstructs.SearchModsRequest) []appstructs.ProjectVersionResult {
-	results := make([]appstructs.ProjectVersionResult, 0, len(versions))
+func filterProjectVersionsForSearch(versions []models.ModVersion, req appstructs.SearchModsRequest) []models.ModVersion {
+	results := make([]models.ModVersion, 0, len(versions))
 	for _, version := range versions {
 		if versionMatchesSearchRequest(version, req) {
 			results = append(results, version)
@@ -530,124 +464,6 @@ func (p curseForgeProvider) resolveModID(projectIDOrSlug string) (cfSchema.ModID
 		return 0, fmt.Errorf("curseforge project not found: %s", projectIDOrSlug)
 	}
 	return mods[0].ID, nil
-}
-
-func (p modrinthProvider) versionToProjectVersionResult(version *modrinth.Version) appstructs.ProjectVersionResult {
-	result := appstructs.ProjectVersionResult{Platform: "Modrinth"}
-	if version == nil {
-		return result
-	}
-	if version.ID != nil {
-		result.ID = *version.ID
-	}
-	if version.ProjectID != nil {
-		result.ProjectID = *version.ProjectID
-	}
-	if version.Name != nil {
-		result.Name = *version.Name
-	}
-	if version.VersionNumber != nil {
-		result.Version = *version.VersionNumber
-	}
-	if version.Downloads != nil {
-		result.Downloads = int64(*version.Downloads)
-	}
-	if version.DatePublished != nil {
-		result.PublishedAt = version.DatePublished.Unix()
-	}
-	result.GameVersions = version.GameVersions
-	result.Loaders = version.Loaders
-	result.Dependencies = p.dependenciesFromVersion(version.Dependencies)
-	for _, file := range version.Files {
-		if file == nil {
-			continue
-		}
-		if file.Primary != nil && *file.Primary {
-			p.setFileResultFields(&result, file)
-			return result
-		}
-	}
-	if len(version.Files) > 0 {
-		p.setFileResultFields(&result, version.Files[0])
-	}
-	return result
-}
-
-func (p modrinthProvider) setFileResultFields(result *appstructs.ProjectVersionResult, file *modrinth.File) {
-	if file == nil {
-		return
-	}
-	if file.Filename != nil {
-		result.FileName = *file.Filename
-	}
-	if file.URL != nil {
-		result.DownloadURL = *file.URL
-	}
-	if file.Hashes != nil {
-		result.SHA1 = strings.TrimSpace(file.Hashes["sha1"])
-	}
-}
-
-func (p curseForgeProvider) fileToProjectVersionResult(file cfSchema.File) appstructs.ProjectVersionResult {
-	return appstructs.ProjectVersionResult{
-		ID:           strconv.Itoa(int(file.ID)),
-		Platform:     "CurseForge",
-		ProjectID:    strconv.Itoa(int(file.ModID)),
-		Name:         file.DisplayName,
-		Version:      file.DisplayName,
-		FileName:     file.FileName,
-		DownloadURL:  file.DownloadURL,
-		SHA1:         curseForgeFileSHA1(file),
-		PublishedAt:  file.FileDate.Unix(),
-		Downloads:    file.DownloadCount,
-		GameVersions: p.gameVersionsToStrings(file.GameVersions),
-		Loaders:      p.loadersFromGameVersions(file.GameVersions),
-		Dependencies: p.dependenciesFromFile(file.Dependencies),
-	}
-}
-
-func (p modrinthProvider) dependenciesFromVersion(deps []*modrinth.Dependency) []appstructs.ProjectDependency {
-	results := make([]appstructs.ProjectDependency, 0, len(deps))
-	for _, dep := range deps {
-		if dep == nil {
-			continue
-		}
-		projectID := ""
-		if dep.ProjectID != nil {
-			projectID = strings.TrimSpace(*dep.ProjectID)
-		}
-		versionID := ""
-		if dep.VersionID != nil {
-			versionID = strings.TrimSpace(*dep.VersionID)
-		}
-		if projectID == "" && versionID == "" {
-			continue
-		}
-		depType := ""
-		if dep.DependencyType != nil {
-			depType = strings.ToLower(strings.TrimSpace(*dep.DependencyType))
-		}
-		results = append(results, appstructs.ProjectDependency{
-			DependencyProjectID: projectID,
-			DependencyVersionID: versionID,
-			DependencyType:      depType,
-		})
-	}
-	return results
-}
-
-func (p curseForgeProvider) dependenciesFromFile(deps []cfSchema.FileDependency) []appstructs.ProjectDependency {
-	results := make([]appstructs.ProjectDependency, 0, len(deps))
-	for _, dep := range deps {
-		if dep.ModID == 0 {
-			continue
-		}
-		results = append(results, appstructs.ProjectDependency{
-			DependencyProjectID: strconv.Itoa(int(dep.ModID)),
-			DependencyType:      curseForgeRelationType(dep.RelationType),
-		})
-	}
-	return results
 }
 
 func curseForgeRelationType(relation cfEnum.FileRelationType) string {
@@ -741,7 +557,7 @@ func projectVersionSnapshotScopes(filter projectVersionFilter) []database.ModPla
 	return []database.ModPlatformVersionScope{projectVersionSnapshotScope(filter)}
 }
 
-func filterProjectVersionsForFilter(versions []appstructs.ProjectVersionResult, filter projectVersionFilter) []appstructs.ProjectVersionResult {
+func filterProjectVersionsForFilter(versions []models.ModVersion, filter projectVersionFilter) []models.ModVersion {
 	if !isFilteredProjectVersionRequest(filter) {
 		return versions
 	}
@@ -764,7 +580,7 @@ func splitProjectReference(projectIDOrSlug string) (string, string) {
 	return platform, strings.TrimSpace(project)
 }
 
-func sortProjectVersionResults(results []appstructs.ProjectVersionResult) []appstructs.ProjectVersionResult {
+func sortModVersions(results []models.ModVersion) []models.ModVersion {
 	sort.SliceStable(results, func(i, j int) bool {
 		if results[i].PublishedAt != results[j].PublishedAt {
 			return results[i].PublishedAt > results[j].PublishedAt
@@ -782,15 +598,15 @@ func sortProjectVersionResults(results []appstructs.ProjectVersionResult) []apps
 	return results
 }
 
-func listProjectVersions(provider modProvider, projectIDOrSlug string) []appstructs.ProjectVersionResult {
+func listProjectVersions(provider modProvider, projectIDOrSlug string) []models.ModVersion {
 	return listProjectVersionsWithFilter(provider, projectIDOrSlug, projectVersionFilter{})
 }
 
-func listProjectVersionsForSearch(provider modProvider, projectIDOrSlug string, req appstructs.SearchModsRequest) []appstructs.ProjectVersionResult {
+func listProjectVersionsForSearch(provider modProvider, projectIDOrSlug string, req appstructs.SearchModsRequest) []models.ModVersion {
 	return listProjectVersionsWithFilter(provider, projectIDOrSlug, projectVersionFilterFromSearchRequest(req))
 }
 
-func listProjectVersionsWithFilter(provider modProvider, projectIDOrSlug string, filter projectVersionFilter) []appstructs.ProjectVersionResult {
+func listProjectVersionsWithFilter(provider modProvider, projectIDOrSlug string, filter projectVersionFilter) []models.ModVersion {
 	projectIDOrSlug = strings.TrimSpace(projectIDOrSlug)
 	if projectIDOrSlug == "" {
 		return nil
@@ -801,7 +617,7 @@ func listProjectVersionsWithFilter(provider modProvider, projectIDOrSlug string,
 	platform := provider.Name()
 	if versions, ok := getFreshProjectVersionsSnapshot(platform, projectIDOrSlug, filter); ok {
 		versions = filterProjectVersionsForFilter(versions, filter)
-		versions = sortProjectVersionResults(versions)
+		versions = sortModVersions(versions)
 		return versions
 	}
 
@@ -810,13 +626,13 @@ func listProjectVersionsWithFilter(provider modProvider, projectIDOrSlug string,
 		logging.Error("list project versions failed", "provider", provider.Name(), "projectIDOrSlug", projectIDOrSlug, "minecraftVersion", filter.MinecraftVersion, "modLoader", filter.ModLoader, "error", err)
 		if versions, ok := getProjectVersionsSnapshot(platform, projectIDOrSlug, filter); ok {
 			versions = filterProjectVersionsForFilter(versions, filter)
-			versions = sortProjectVersionResults(versions)
+			versions = sortModVersions(versions)
 			return versions
 		}
 		return nil
 	}
 
-	versions = sortProjectVersionResults(versions)
+	versions = sortModVersions(versions)
 	projectID := projectIDFromVersions(versions, projectIDOrSlug)
 	if err := saveProjectVersionsSnapshot(platform, projectIDOrSlug, projectID, versions, filter); err != nil {
 		logging.Error("save project versions snapshot failed", "platform", platform, "requestedProject", projectIDOrSlug, "projectID", projectID, "versionCount", len(versions), "error", err)
@@ -826,7 +642,7 @@ func listProjectVersionsWithFilter(provider modProvider, projectIDOrSlug string,
 	return versions
 }
 
-func associateEquivalentPlatformProject(platform, projectID string, versions []appstructs.ProjectVersionResult) {
+func associateEquivalentPlatformProject(platform, projectID string, versions []models.ModVersion) {
 	projectID = strings.TrimSpace(projectID)
 	latestSHA1 := latestVersionSHA1(versions)
 	if projectID == "" || latestSHA1 == "" {
@@ -849,7 +665,7 @@ func associateEquivalentPlatformProject(platform, projectID string, versions []a
 	}
 }
 
-func latestVersionSHA1(versions []appstructs.ProjectVersionResult) string {
+func latestVersionSHA1(versions []models.ModVersion) string {
 	for _, version := range versions {
 		if sha1 := strings.ToLower(strings.TrimSpace(version.SHA1)); sha1 != "" {
 			return sha1
@@ -858,7 +674,7 @@ func latestVersionSHA1(versions []appstructs.ProjectVersionResult) string {
 	return ""
 }
 
-func getFreshProjectVersionsSnapshot(platform, projectID string, filter projectVersionFilter) ([]appstructs.ProjectVersionResult, bool) {
+func getFreshProjectVersionsSnapshot(platform, projectID string, filter projectVersionFilter) ([]models.ModVersion, bool) {
 	record, ok := getProjectSnapshotPlatform(platform, projectID)
 	if !ok {
 		return nil, false
@@ -887,7 +703,7 @@ func getFreshProjectVersionsSnapshot(platform, projectID string, filter projectV
 	return versions, true
 }
 
-func getProjectVersionsSnapshot(platform, projectID string, filter projectVersionFilter) ([]appstructs.ProjectVersionResult, bool) {
+func getProjectVersionsSnapshot(platform, projectID string, filter projectVersionFilter) ([]models.ModVersion, bool) {
 	record, ok := getProjectSnapshotPlatform(platform, projectID)
 	if !ok {
 		return nil, false
@@ -913,7 +729,7 @@ func getProjectSnapshotPlatform(platform, projectIDOrSlug string) (models.ModPro
 	return database.GetModPlatformBySlug(platform, projectIDOrSlug)
 }
 
-func saveProjectVersionsSnapshot(platform, requestedProject string, projectID string, versions []appstructs.ProjectVersionResult, filter projectVersionFilter) error {
+func saveProjectVersionsSnapshot(platform, requestedProject string, projectID string, versions []models.ModVersion, filter projectVersionFilter) error {
 	projectID = strings.TrimSpace(projectID)
 	if projectID == "" {
 		return nil
@@ -932,7 +748,7 @@ func saveProjectVersionsSnapshot(platform, requestedProject string, projectID st
 	return database.SetPlatformVersionSnapshot(platform, projectID, versions, time.Now().Unix(), projectVersionSnapshotScopes(filter))
 }
 
-func projectIDFromVersions(versions []appstructs.ProjectVersionResult, fallback string) string {
+func projectIDFromVersions(versions []models.ModVersion, fallback string) string {
 	for _, version := range versions {
 		if strings.TrimSpace(version.ProjectID) != "" {
 			return strings.TrimSpace(version.ProjectID)
@@ -944,10 +760,10 @@ func projectIDFromVersions(versions []appstructs.ProjectVersionResult, fallback 
 // --- Conversion methods (SDK → Unified Model) ---
 
 // CurseForge SDK → ModProject
-func (p curseForgeProvider) modToModProject(mod cfSchema.Mod) ModProject {
+func (p curseForgeProvider) modToModProject(mod cfSchema.Mod) models.ModProject {
 	id := strconv.Itoa(int(mod.ID))
-	return ModProject{
-		ID:          ProjectKey("curseforge", id),
+	return models.ModProject{
+		ID:          models.ProjectKey("curseforge", id),
 		Platform:    "CurseForge",
 		ProjectID:   id,
 		Slug:        mod.Slug,
@@ -961,8 +777,8 @@ func (p curseForgeProvider) modToModProject(mod cfSchema.Mod) ModProject {
 }
 
 // CurseForge SDK → ModVersion
-func (p curseForgeProvider) fileToModVersion(file cfSchema.File) ModVersion {
-	return ModVersion{
+func (p curseForgeProvider) fileToModVersion(file cfSchema.File) models.ModVersion {
+	return models.ModVersion{
 		ID:           strconv.Itoa(int(file.ID)),
 		Platform:     "CurseForge",
 		ProjectID:    strconv.Itoa(int(file.ModID)),
@@ -980,13 +796,13 @@ func (p curseForgeProvider) fileToModVersion(file cfSchema.File) ModVersion {
 	}
 }
 
-func (p curseForgeProvider) dependenciesFromFileToModDeps(deps []cfSchema.FileDependency) []ModDependency {
-	results := make([]ModDependency, 0, len(deps))
+func (p curseForgeProvider) dependenciesFromFileToModDeps(deps []cfSchema.FileDependency) []models.ModDependency {
+	results := make([]models.ModDependency, 0, len(deps))
 	for _, dep := range deps {
 		if dep.ModID == 0 {
 			continue
 		}
-		results = append(results, ModDependency{
+		results = append(results, models.ModDependency{
 			DependencyProjectID: strconv.Itoa(int(dep.ModID)),
 			DependencyVersionID: "",
 			DependencyType:      curseForgeRelationType(dep.RelationType),
@@ -996,13 +812,13 @@ func (p curseForgeProvider) dependenciesFromFileToModDeps(deps []cfSchema.FileDe
 }
 
 // Modrinth SDK → ModProject (from SearchResult)
-func (p modrinthProvider) searchHitToModProject(hit *modrinth.SearchResult) ModProject {
-	project := ModProject{
+func (p modrinthProvider) searchHitToModProject(hit *modrinth.SearchResult) models.ModProject {
+	project := models.ModProject{
 		Platform: "Modrinth",
 		Icon:     "mdi-leaf",
 	}
 	if hit.ProjectID != nil {
-		project.ID = ProjectKey("modrinth", *hit.ProjectID)
+		project.ID = models.ProjectKey("modrinth", *hit.ProjectID)
 		project.ProjectID = *hit.ProjectID
 	}
 	if hit.Title != nil {
@@ -1024,13 +840,13 @@ func (p modrinthProvider) searchHitToModProject(hit *modrinth.SearchResult) ModP
 }
 
 // Modrinth SDK → ModProject (from Project)
-func (p modrinthProvider) projectToModProject(project *modrinth.Project) ModProject {
-	result := ModProject{
+func (p modrinthProvider) projectToModProject(project *modrinth.Project) models.ModProject {
+	result := models.ModProject{
 		Platform: "Modrinth",
 		Icon:     "mdi-leaf",
 	}
 	if project.ID != nil {
-		result.ID = ProjectKey("modrinth", *project.ID)
+		result.ID = models.ProjectKey("modrinth", *project.ID)
 		result.ProjectID = *project.ID
 	}
 	if project.Title != nil {
@@ -1052,8 +868,8 @@ func (p modrinthProvider) projectToModProject(project *modrinth.Project) ModProj
 }
 
 // Modrinth SDK → ModVersion
-func (p modrinthProvider) versionToModVersion(version *modrinth.Version) ModVersion {
-	result := ModVersion{Platform: "Modrinth"}
+func (p modrinthProvider) versionToModVersion(version *modrinth.Version) models.ModVersion {
+	result := models.ModVersion{Platform: "Modrinth"}
 	if version == nil {
 		return result
 	}
@@ -1095,7 +911,7 @@ func (p modrinthProvider) versionToModVersion(version *modrinth.Version) ModVers
 	return result
 }
 
-func (p modrinthProvider) setModVersionFileFields(result *ModVersion, file *modrinth.File) {
+func (p modrinthProvider) setModVersionFileFields(result *models.ModVersion, file *modrinth.File) {
 	if file == nil {
 		return
 	}
@@ -1110,8 +926,8 @@ func (p modrinthProvider) setModVersionFileFields(result *ModVersion, file *modr
 	}
 }
 
-func (p modrinthProvider) dependenciesFromVersionToModDeps(deps []*modrinth.Dependency) []ModDependency {
-	results := make([]ModDependency, 0, len(deps))
+func (p modrinthProvider) dependenciesFromVersionToModDeps(deps []*modrinth.Dependency) []models.ModDependency {
+	results := make([]models.ModDependency, 0, len(deps))
 	for _, dep := range deps {
 		if dep == nil {
 			continue
@@ -1131,7 +947,7 @@ func (p modrinthProvider) dependenciesFromVersionToModDeps(deps []*modrinth.Depe
 		if dep.DependencyType != nil {
 			depType = strings.ToLower(strings.TrimSpace(*dep.DependencyType))
 		}
-		results = append(results, ModDependency{
+		results = append(results, models.ModDependency{
 			DependencyProjectID: projectID,
 			DependencyVersionID: versionID,
 			DependencyType:      depType,

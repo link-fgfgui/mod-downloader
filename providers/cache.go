@@ -7,22 +7,22 @@ import (
 	"strings"
 )
 
-func GetProjectByID(id string) (ModProject, bool) {
-	platform, projectID := ParseProjectKey(id)
+func GetProjectByID(id string) (models.ModProject, bool) {
+	platform, projectID := models.ParseProjectKey(id)
 	if platform == "" || projectID == "" {
 		logging.Debug("invalid project ID format", "id", id)
-		return ModProject{}, false
+		return models.ModProject{}, false
 	}
 
 	return database.GetModPlatform(platform, projectID)
 }
 
-func GetProjectsByIDs(ids []string) []ModProject {
+func GetProjectsByIDs(ids []string) []models.ModProject {
 	if len(ids) == 0 {
 		return nil
 	}
 
-	results := make([]ModProject, 0, len(ids))
+	results := make([]models.ModProject, 0, len(ids))
 	for _, id := range ids {
 		if project, ok := GetProjectByID(id); ok {
 			results = append(results, project)
@@ -31,18 +31,18 @@ func GetProjectsByIDs(ids []string) []ModProject {
 	return results
 }
 
-func GetVersionByID(platform, projectID, versionID string) (ModVersion, bool) {
+func GetVersionByID(platform, projectID, versionID string) (models.ModVersion, bool) {
 	platform = strings.TrimSpace(platform)
 	projectID = strings.TrimSpace(projectID)
 	versionID = strings.TrimSpace(versionID)
 
 	if platform == "" || projectID == "" || versionID == "" {
-		return ModVersion{}, false
+		return models.ModVersion{}, false
 	}
 
 	versions, err := database.GetPlatformVersions(platform, projectID)
 	if err != nil || len(versions) == 0 {
-		return ModVersion{}, false
+		return models.ModVersion{}, false
 	}
 
 	for _, v := range versions {
@@ -51,10 +51,10 @@ func GetVersionByID(platform, projectID, versionID string) (ModVersion, bool) {
 		}
 	}
 
-	return ModVersion{}, false
+	return models.ModVersion{}, false
 }
 
-func GetVersionsByProject(platform, projectID string) []ModVersion {
+func GetVersionsByProject(platform, projectID string) []models.ModVersion {
 	platform = strings.TrimSpace(platform)
 	projectID = strings.TrimSpace(projectID)
 
@@ -70,11 +70,11 @@ func GetVersionsByProject(platform, projectID string) []ModVersion {
 	return versions
 }
 
-func StoreProject(project ModProject) error {
+func StoreProject(project models.ModProject) error {
 	return database.UpsertModPlatform(project)
 }
 
-func StoreVersion(version ModVersion) error {
+func StoreVersion(version models.ModVersion) error {
 	platform := strings.TrimSpace(version.Platform)
 	projectID := strings.TrimSpace(version.ProjectID)
 
@@ -85,7 +85,7 @@ func StoreVersion(version ModVersion) error {
 	return database.SetPlatformVersions(platform, projectID, []models.ModVersion{version})
 }
 
-func StoreVersions(platform, projectID string, versions []ModVersion) error {
+func StoreVersions(platform, projectID string, versions []models.ModVersion) error {
 	platform = strings.TrimSpace(platform)
 	projectID = strings.TrimSpace(projectID)
 

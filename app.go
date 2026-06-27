@@ -14,6 +14,7 @@ import (
 	"mod-downloader/global"
 	"mod-downloader/logging"
 	"mod-downloader/minecraft"
+	"mod-downloader/models"
 	"mod-downloader/providers"
 	appstructs "mod-downloader/structs"
 	structs "mod-downloader/structs/minecraft"
@@ -79,7 +80,7 @@ func (a *App) SearchMods(req appstructs.SearchModsRequest) {
 	})
 }
 
-func (a *App) ListMatchingProjectVersions(result appstructs.SearchModResult, minecraftVersion string, modLoader string) []appstructs.ProjectVersionResult {
+func (a *App) ListMatchingProjectVersions(result models.ModProject, minecraftVersion string, modLoader string) []models.ModVersion {
 	return providers.ListMatchingProjectVersions(result, minecraftVersion, modLoader)
 }
 

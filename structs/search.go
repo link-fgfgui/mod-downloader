@@ -12,20 +12,11 @@ type SearchModsRequest struct {
 }
 
 type SearchModsUpdate struct {
-	RequestID string            `json:"requestId"`
-	Results   []SearchModResult `json:"results"`
-	Loading   bool              `json:"loading"`
-	Append    bool              `json:"append"`
+	RequestID string              `json:"requestId"`
+	Results   []models.ModProject `json:"results"`
+	Loading   bool                `json:"loading"`
+	Append    bool                `json:"append"`
 }
-
-// SearchModResult is now an alias to the unified ModProject type
-type SearchModResult = models.ModProject
-
-// ProjectVersionResult is now an alias to the unified ModVersion type
-type ProjectVersionResult = models.ModVersion
-
-// ProjectDependency is now an alias to the unified ModDependency type
-type ProjectDependency = models.ModDependency
 
 type ModVersionPinRequest struct {
 	Platform         string `json:"platform"`
@@ -36,10 +27,10 @@ type ModVersionPinRequest struct {
 }
 
 type ModDownloadRequest struct {
-	ProjectID        string          `json:"projectId"`
-	Result           SearchModResult `json:"result"`
-	MinecraftVersion string          `json:"minecraftVersion"`
-	ModLoader        string          `json:"modLoader"`
+	ProjectID        string            `json:"projectId"`
+	Result           models.ModProject `json:"result"`
+	MinecraftVersion string            `json:"minecraftVersion"`
+	ModLoader        string            `json:"modLoader"`
 }
 
 type ModDownloadResult struct {
@@ -76,9 +67,9 @@ type DownloadFailedEvent struct {
 }
 
 type DownloadStatesRequest struct {
-	Results          []SearchModResult `json:"results"`
-	MinecraftVersion string            `json:"minecraftVersion"`
-	ModLoader        string            `json:"modLoader"`
+	Results          []models.ModProject `json:"results"`
+	MinecraftVersion string              `json:"minecraftVersion"`
+	ModLoader        string              `json:"modLoader"`
 }
 
 type ModDownloadButtonState struct {

@@ -14,6 +14,7 @@ import (
 	"mod-downloader/global"
 	"mod-downloader/logging"
 	"mod-downloader/minecraft"
+	"mod-downloader/models"
 	"mod-downloader/providers"
 	appstructs "mod-downloader/structs"
 	mcstructs "mod-downloader/structs/minecraft"
@@ -35,8 +36,8 @@ const (
 
 type downloadJob struct {
 	ID               string
-	Version          appstructs.ProjectVersionResult
-	Result           appstructs.SearchModResult
+	Version          models.ModVersion
+	Result           models.ModProject
 	TargetDir        string
 	InstanceID       string
 	MinecraftVersion string
@@ -200,7 +201,7 @@ func GetDownloadStates(req appstructs.DownloadStatesRequest) []appstructs.ModDow
 	return states
 }
 
-func defaultDownloadButtonState(result appstructs.SearchModResult) appstructs.ModDownloadButtonState {
+func defaultDownloadButtonState(result models.ModProject) appstructs.ModDownloadButtonState {
 	return appstructs.ModDownloadButtonState{Key: providers.ProjectReferenceFromSearchResult(result), Status: btnStatusNew, Icon: "mdi-download", Color: "primary"}
 }
 
@@ -324,7 +325,7 @@ func localModButtonStatusPrecise(req appstructs.ModDownloadRequest) string {
 	return btnStatusConflict
 }
 
-func projectVersionSHA1Set(versions []appstructs.ProjectVersionResult) map[string]bool {
+func projectVersionSHA1Set(versions []models.ModVersion) map[string]bool {
 	out := make(map[string]bool, len(versions))
 	for _, version := range versions {
 		if sha1 := strings.ToLower(strings.TrimSpace(version.SHA1)); sha1 != "" {
@@ -350,15 +351,15 @@ func localModPathsForMods(mods []mcstructs.ModInfo, instanceID string) []global.
 	return out
 }
 
-func downloadVersionForRequest(req appstructs.ModDownloadRequest) (appstructs.ProjectVersionResult, bool) {
+func downloadVersionForRequest(req appstructs.ModDownloadRequest) (models.ModVersion, bool) {
 	versions := downloadVersionsForRequest(req)
 	if len(versions) == 0 {
-		return appstructs.ProjectVersionResult{}, false
+		return models.ModVersion{}, false
 	}
 	return versions[0], true
 }
 
-func downloadVersionsForRequest(req appstructs.ModDownloadRequest) []appstructs.ProjectVersionResult {
+func downloadVersionsForRequest(req appstructs.ModDownloadRequest) []models.ModVersion {
 	platform := strings.ToLower(strings.TrimSpace(req.Result.Platform))
 	projectID := strings.TrimSpace(req.ProjectID)
 	if platform == "" {
@@ -370,7 +371,7 @@ func downloadVersionsForRequest(req appstructs.ModDownloadRequest) []appstructs.
 
 	if pin, ok := database.GetPinnedMod(platform, projectID, req.MinecraftVersion, req.ModLoader); ok {
 		if version, found := findProjectVersionByID(providers.ListMatchingProjectVersions(req.Result, req.MinecraftVersion, req.ModLoader), pin.VersionID); found {
-			return []appstructs.ProjectVersionResult{version}
+			return []models.ModVersion{version}
 		}
 	}
 
@@ -378,17 +379,17 @@ func downloadVersionsForRequest(req appstructs.ModDownloadRequest) []appstructs.
 	return versions
 }
 
-func findProjectVersionByID(versions []appstructs.ProjectVersionResult, versionID string) (appstructs.ProjectVersionResult, bool) {
+func findProjectVersionByID(versions []models.ModVersion, versionID string) (models.ModVersion, bool) {
 	versionID = strings.TrimSpace(versionID)
 	if versionID == "" {
-		return appstructs.ProjectVersionResult{}, false
+		return models.ModVersion{}, false
 	}
 	for _, version := range versions {
 		if version.ID == versionID {
 			return version, true
 		}
 	}
-	return appstructs.ProjectVersionResult{}, false
+	return models.ModVersion{}, false
 }
 
 func selectedVersionModsDir(selected mcstructs.VersionInfo) string {
@@ -407,7 +408,7 @@ func versionInstanceID(version mcstructs.VersionInfo) string {
 	return strings.TrimSpace(version.Name)
 }
 
-func queueMissingRequiredDependencies(ctx context.Context, req appstructs.ModDownloadRequest, version appstructs.ProjectVersionResult, instanceID string, visited map[string]bool) {
+func queueMissingRequiredDependencies(ctx context.Context, req appstructs.ModDownloadRequest, version models.ModVersion, instanceID string, visited map[string]bool) {
 	for _, dep := range version.Dependencies {
 		if !isRequiredDependency(dep) {
 			continue
@@ -429,7 +430,7 @@ func queueMissingRequiredDependencies(ctx context.Context, req appstructs.ModDow
 	}
 }
 
-func hydrateRequiredDependencies(req appstructs.ModDownloadRequest, version appstructs.ProjectVersionResult) appstructs.ProjectVersionResult {
+func hydrateRequiredDependencies(req appstructs.ModDownloadRequest, version models.ModVersion) models.ModVersion {
 	if hasRequiredDependency(version.Dependencies) {
 		return version
 	}
@@ -441,7 +442,7 @@ func hydrateRequiredDependencies(req appstructs.ModDownloadRequest, version apps
 	return version
 }
 
-func hasRequiredDependency(deps []appstructs.ProjectDependency) bool {
+func hasRequiredDependency(deps []models.ModDependency) bool {
 	for _, dep := range deps {
 		if isRequiredDependency(dep) {
 			return true
@@ -450,11 +451,11 @@ func hasRequiredDependency(deps []appstructs.ProjectDependency) bool {
 	return false
 }
 
-func isRequiredDependency(dep appstructs.ProjectDependency) bool {
+func isRequiredDependency(dep models.ModDependency) bool {
 	return strings.EqualFold(strings.TrimSpace(dep.DependencyType), "required")
 }
 
-func dependencyDownloadRequest(platform string, dep appstructs.ProjectDependency, parent appstructs.ModDownloadRequest) (appstructs.ModDownloadRequest, bool) {
+func dependencyDownloadRequest(platform string, dep models.ModDependency, parent appstructs.ModDownloadRequest) (appstructs.ModDownloadRequest, bool) {
 	projectID := strings.TrimSpace(dep.DependencyProjectID)
 	platform = strings.ToLower(strings.TrimSpace(platform))
 	if projectID == "" || (platform != "curseforge" && platform != "modrinth") {
@@ -464,7 +465,7 @@ func dependencyDownloadRequest(platform string, dep appstructs.ProjectDependency
 	ref := platform + ":" + projectID
 	return appstructs.ModDownloadRequest{
 		ProjectID: ref,
-		Result: appstructs.SearchModResult{
+		Result: models.ModProject{
 			ID:       ref,
 			Platform: platform,
 		},
@@ -473,7 +474,7 @@ func dependencyDownloadRequest(platform string, dep appstructs.ProjectDependency
 	}, true
 }
 
-func projectVersionJobKey(version appstructs.ProjectVersionResult) string {
+func projectVersionJobKey(version models.ModVersion) string {
 	platform := strings.ToLower(strings.TrimSpace(version.Platform))
 	projectID := strings.TrimSpace(version.ProjectID)
 	versionID := strings.TrimSpace(version.ID)
@@ -608,11 +609,11 @@ func nextOldJarPath(path string) string {
 	}
 }
 
-func metadataForProjectVersion(version appstructs.ProjectVersionResult, modLoader string) ([]mcstructs.ModInfo, bool) {
-	return metadataForProjectVersionWithResult(version, appstructs.SearchModResult{}, modLoader)
+func metadataForProjectVersion(version models.ModVersion, modLoader string) ([]mcstructs.ModInfo, bool) {
+	return metadataForProjectVersionWithResult(version, models.ModProject{}, modLoader)
 }
 
-func metadataForProjectVersionWithResult(version appstructs.ProjectVersionResult, result appstructs.SearchModResult, modLoader string) ([]mcstructs.ModInfo, bool) {
+func metadataForProjectVersionWithResult(version models.ModVersion, result models.ModProject, modLoader string) ([]mcstructs.ModInfo, bool) {
 	if mods, ok := database.GetJarMetadata(version.SHA1); ok {
 		return applyPlatformMetadata(mods, version, result), true
 	}
@@ -626,7 +627,7 @@ func metadataForProjectVersionWithResult(version appstructs.ProjectVersionResult
 	return mods, true
 }
 
-func applyPlatformMetadata(mods []mcstructs.ModInfo, version appstructs.ProjectVersionResult, result appstructs.SearchModResult) []mcstructs.ModInfo {
+func applyPlatformMetadata(mods []mcstructs.ModInfo, version models.ModVersion, result models.ModProject) []mcstructs.ModInfo {
 	if len(mods) == 0 {
 		return mods
 	}

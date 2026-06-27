@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"mod-downloader/global"
+	"mod-downloader/models"
 	appstructs "mod-downloader/structs"
 	mcstructs "mod-downloader/structs/minecraft"
 )
@@ -27,7 +28,7 @@ func TestGetDownloadStatesReturnsDefaultWhenSelectedInstanceHasNoLocalMods(t *te
 	states := GetDownloadStates(appstructs.DownloadStatesRequest{
 		MinecraftVersion: "1.21.1",
 		ModLoader:        "NeoForge",
-		Results: []appstructs.SearchModResult{{
+		Results: []models.ModProject{{
 			ID:       "modrinth:sodium",
 			Platform: "Modrinth",
 			Slug:     "sodium",
@@ -43,7 +44,7 @@ func TestGetDownloadStatesReturnsDefaultWhenSelectedInstanceHasNoLocalMods(t *te
 }
 
 func TestProjectVersionSHA1Set(t *testing.T) {
-	set := projectVersionSHA1Set([]appstructs.ProjectVersionResult{
+	set := projectVersionSHA1Set([]models.ModVersion{
 		{SHA1: " ABC "},
 		{SHA1: ""},
 		{SHA1: "def"},
