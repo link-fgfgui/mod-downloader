@@ -378,11 +378,11 @@ func LocalModPathsForModIDs(modIDs []string, instanceID string) []global.LocalMo
 
 func selectedVersionModsDir(selected mcstructs.VersionInfo) string {
 	mcDir := global.GetMinecraftDir()
-	versionDirName := versionInstanceID(selected)
-	if strings.TrimSpace(mcDir) == "" || strings.TrimSpace(versionDirName) == "" {
+	versionDir := minecraft.VersionDirPath(mcDir, selected)
+	if versionDir == "" {
 		return ""
 	}
-	return filepath.Join(mcDir, "versions", versionDirName, "mods")
+	return filepath.Join(versionDir, "mods")
 }
 
 func versionInstanceID(version mcstructs.VersionInfo) string {
