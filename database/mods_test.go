@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"mod-downloader/models"
 	structs "mod-downloader/structs/minecraft"
 )
 
@@ -45,15 +46,15 @@ func reopenTestDB(t *testing.T, path string) {
 func TestCachePlatformVersionsAndDependencies(t *testing.T) {
 	path := openTestDB(t)
 
-	if err := UpsertModPlatform(ModPlatform{
+	if err := UpsertModPlatform(models.ModProject{
 		Platform:  "Modrinth",
 		ProjectID: "sodium",
 		Slug:      "sodium-slug",
-		Name:      "Sodium",
+		Title:     "Sodium",
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := SetPlatformVersionSnapshot("Modrinth", "sodium", []ModPlatformVersion{
+	if err := SetPlatformVersionSnapshot("Modrinth", "sodium", []models.ModVersion{
 		{
 			VersionID:    "v1",
 			Name:         "1.0",
@@ -61,7 +62,7 @@ func TestCachePlatformVersionsAndDependencies(t *testing.T) {
 			PublishedAt:  10,
 			GameVersions: []string{"1.21.1"},
 			Loaders:      []string{"neoforge"},
-			Dependencies: []ModDependency{{
+			Dependencies: []models.ModDependency{{
 				DependencyProjectID: "fabric-api",
 				DependencyType:      "required",
 			}},

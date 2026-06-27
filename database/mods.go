@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"mod-downloader/logging"
+	"mod-downloader/models"
 	structs "mod-downloader/structs/minecraft"
 )
 
@@ -12,45 +13,10 @@ const jarMetadataVersion = "recursive-jar-mod-id-v5"
 
 // --- record types ---
 
-type ModPlatform struct {
-	Platform    string `json:"platform"`
-	ProjectID   string `json:"projectId"`
-	Slug        string `json:"slug,omitempty"`
-	Name        string `json:"name,omitempty"`
-	Description string `json:"description,omitempty"`
-	McmodURL    string `json:"mcmodUrl,omitempty"`
-	UpdatedAt   int64  `json:"updatedAt"`
-}
-
 type PlatformAssociation struct {
 	ID                  string `json:"id"`
 	CurseForgeProjectID string `json:"curseforgeProjectId,omitempty"`
 	ModrinthProjectID   string `json:"modrinthProjectId,omitempty"`
-}
-
-type ModPlatformVersion struct {
-	ID           string          `json:"id"`
-	Platform     string          `json:"platform"`
-	ProjectID    string          `json:"projectId"`
-	VersionID    string          `json:"versionId"`
-	Name         string          `json:"name,omitempty"`
-	Version      string          `json:"version,omitempty"`
-	FileName     string          `json:"fileName,omitempty"`
-	DownloadURL  string          `json:"downloadUrl,omitempty"`
-	SHA1         string          `json:"sha1,omitempty"`
-	PublishedAt  int64           `json:"publishedAt,omitempty"`
-	Downloads    int64           `json:"downloads"`
-	GameVersions []string        `json:"gameVersions,omitempty"`
-	Loaders      []string        `json:"loaders,omitempty"`
-	Dependencies []ModDependency `json:"dependencies,omitempty"`
-}
-
-type ModDependency struct {
-	ID                  string `json:"id"`
-	PlatformVersionID   string `json:"platformVersionId"`
-	DependencyProjectID string `json:"dependencyProjectId"`
-	DependencyVersionID string `json:"dependencyVersionId,omitempty"`
-	DependencyType      string `json:"dependencyType,omitempty"`
 }
 
 type PinnedMod struct {
@@ -60,14 +26,6 @@ type PinnedMod struct {
 	VersionID        string `json:"versionId"`
 	MinecraftVersion string `json:"minecraftVersion"`
 	ModLoader        string `json:"modLoader"`
-}
-
-type ModJarMetadata struct {
-	SHA1        string `json:"sha1"`
-	ModID       string `json:"modId"`
-	Name        string `json:"name,omitempty"`
-	Version     string `json:"version,omitempty"`
-	Description string `json:"description,omitempty"`
 }
 
 type ModPlatformVersionScope struct {
@@ -120,7 +78,7 @@ func makeVersionScopeKey(platform, projectID string, scope ModPlatformVersionSco
 
 // --- mod platforms ---
 
-func UpsertModPlatform(p ModPlatform) error {
+func UpsertModPlatform(p models.ModProject) error {
 	d, err := readyDB()
 	if err != nil {
 		return err
@@ -150,17 +108,17 @@ func UpsertModPlatform(p ModPlatform) error {
 	return nil
 }
 
-func GetModPlatform(platform, projectID string) (ModPlatform, bool) {
+func GetModPlatform(platform, projectID string) (models.ModProject, bool) {
 	d, err := readyDB()
 	if err != nil {
-		return ModPlatform{}, false
+		return models.ModProject{}, false
 	}
 	key := makePlatformKey(platform, projectID)
 	if key.Platform == "" || key.ProjectID == "" {
-		return ModPlatform{}, false
+		return models.ModProject{}, false
 	}
 
-	var p ModPlatform
+	var p models.ModProject
 	found := false
 	err = d.view(func(state *cacheState) error {
 		p, found = state.ModPlatforms[key]
@@ -168,24 +126,24 @@ func GetModPlatform(platform, projectID string) (ModPlatform, bool) {
 	})
 	if err != nil || !found {
 		logging.Debug("mod platform cache miss", "platform", key.Platform, "projectID", key.ProjectID)
-		return ModPlatform{}, false
+		return models.ModProject{}, false
 	}
 	logging.Debug("mod platform cache hit", "platform", key.Platform, "projectID", key.ProjectID, "updatedAt", p.UpdatedAt)
 	return p, true
 }
 
-func GetModPlatformBySlug(platform, slug string) (ModPlatform, bool) {
+func GetModPlatformBySlug(platform, slug string) (models.ModProject, bool) {
 	d, err := readyDB()
 	if err != nil {
-		return ModPlatform{}, false
+		return models.ModProject{}, false
 	}
 	platform = strings.TrimSpace(platform)
 	slug = strings.TrimSpace(slug)
 	if platform == "" || slug == "" {
-		return ModPlatform{}, false
+		return models.ModProject{}, false
 	}
 
-	var p ModPlatform
+	var p models.ModProject
 	found := false
 	err = d.view(func(state *cacheState) error {
 		for key, candidate := range state.ModPlatforms {
@@ -199,7 +157,7 @@ func GetModPlatformBySlug(platform, slug string) (ModPlatform, bool) {
 	})
 	if err != nil || !found {
 		logging.Debug("mod platform slug cache miss", "platform", platform, "slug", slug)
-		return ModPlatform{}, false
+		return models.ModProject{}, false
 	}
 	logging.Debug("mod platform slug cache hit", "platform", platform, "slug", slug, "projectID", p.ProjectID, "updatedAt", p.UpdatedAt)
 	return p, true
@@ -335,21 +293,21 @@ func getAssociationBy(match func(PlatformAssociation) bool, logKey string, logVa
 	return out, true
 }
 
-func GetLatestProjectBySHA1(platform, sha1 string) (ModPlatformVersion, bool) {
+func GetLatestProjectBySHA1(platform, sha1 string) (models.ModVersion, bool) {
 	d, err := readyDB()
 	if err != nil {
-		return ModPlatformVersion{}, false
+		return models.ModVersion{}, false
 	}
 	platform = strings.TrimSpace(platform)
 	sha1 = strings.ToLower(strings.TrimSpace(sha1))
 	if platform == "" || sha1 == "" {
-		return ModPlatformVersion{}, false
+		return models.ModVersion{}, false
 	}
 
-	var best ModPlatformVersion
+	var best models.ModVersion
 	found := false
 	err = d.view(func(state *cacheState) error {
-		latestByProject := make(map[string]ModPlatformVersion)
+		latestByProject := make(map[string]models.ModVersion)
 		for key, v := range state.PlatformVersions {
 			if key.Platform != platform {
 				continue
@@ -370,12 +328,12 @@ func GetLatestProjectBySHA1(platform, sha1 string) (ModPlatformVersion, bool) {
 		return nil
 	})
 	if err != nil || !found {
-		return ModPlatformVersion{}, false
+		return models.ModVersion{}, false
 	}
 	return best, true
 }
 
-func newerProjectVersion(left, right ModPlatformVersion) bool {
+func newerProjectVersion(left, right models.ModVersion) bool {
 	if left.PublishedAt != right.PublishedAt {
 		return left.PublishedAt > right.PublishedAt
 	}
@@ -384,7 +342,7 @@ func newerProjectVersion(left, right ModPlatformVersion) bool {
 
 // --- mod platform versions ---
 
-func SetPlatformVersions(platform, projectID string, versions []ModPlatformVersion) error {
+func SetPlatformVersions(platform, projectID string, versions []models.ModVersion) error {
 	d, err := readyDB()
 	if err != nil {
 		return err
@@ -411,7 +369,7 @@ func SetPlatformVersions(platform, projectID string, versions []ModPlatformVersi
 	return nil
 }
 
-func SetPlatformVersionSnapshot(platform, projectID string, versions []ModPlatformVersion, updatedAt int64, scopes []ModPlatformVersionScope) error {
+func SetPlatformVersionSnapshot(platform, projectID string, versions []models.ModVersion, updatedAt int64, scopes []ModPlatformVersionScope) error {
 	d, err := readyDB()
 	if err != nil {
 		return err
@@ -485,18 +443,18 @@ func normalizePlatformVersionScopes(scopes []ModPlatformVersionScope) []ModPlatf
 }
 
 func deleteProjectVersions(state *cacheState, platform, projectID string) {
-	deleteMatchingVersions(state, func(key versionKey, v ModPlatformVersion) bool {
+	deleteMatchingVersions(state, func(key versionKey, v models.ModVersion) bool {
 		return key.Platform == platform && key.ProjectID == projectID
 	})
 }
 
 func deletePlatformVersionSnapshotScopes(state *cacheState, platform, projectID string, scopes []ModPlatformVersionScope) {
-	deleteMatchingVersions(state, func(key versionKey, v ModPlatformVersion) bool {
+	deleteMatchingVersions(state, func(key versionKey, v models.ModVersion) bool {
 		return key.Platform == platform && key.ProjectID == projectID && platformVersionMatchesAnyScope(v.GameVersions, v.Loaders, scopes)
 	})
 }
 
-func deleteMatchingVersions(state *cacheState, shouldDelete func(versionKey, ModPlatformVersion) bool) {
+func deleteMatchingVersions(state *cacheState, shouldDelete func(versionKey, models.ModVersion) bool) {
 	for key, v := range state.PlatformVersions {
 		if shouldDelete(key, v) {
 			delete(state.PlatformVersions, key)
@@ -529,7 +487,7 @@ func containsFoldDB(values []string, expected string) bool {
 	return false
 }
 
-func savePlatformVersion(state *cacheState, platform, projectID string, v ModPlatformVersion) {
+func savePlatformVersion(state *cacheState, platform, projectID string, v models.ModVersion) {
 	v = copyVersion(v)
 	v.Platform = platform
 	v.ProjectID = projectID
@@ -547,8 +505,8 @@ func savePlatformVersion(state *cacheState, platform, projectID string, v ModPla
 	state.PlatformVersionKeyByID[v.ID] = key
 }
 
-func normalizeDependencies(platformVersionID string, deps []ModDependency) []ModDependency {
-	out := make([]ModDependency, 0, len(deps))
+func normalizeDependencies(platformVersionID string, deps []models.ModDependency) []models.ModDependency {
+	out := make([]models.ModDependency, 0, len(deps))
 	for _, dep := range deps {
 		projectID := strings.TrimSpace(dep.DependencyProjectID)
 		versionID := strings.TrimSpace(dep.DependencyVersionID)
@@ -592,7 +550,7 @@ func GetPlatformVersionScopeUpdatedAt(platform, projectID string, scope ModPlatf
 	return rec.UpdatedAt, true
 }
 
-func GetPlatformVersions(platform, projectID string) ([]ModPlatformVersion, error) {
+func GetPlatformVersions(platform, projectID string) ([]models.ModVersion, error) {
 	d, err := readyDB()
 	if err != nil {
 		return nil, err
@@ -603,7 +561,7 @@ func GetPlatformVersions(platform, projectID string) ([]ModPlatformVersion, erro
 		return nil, nil
 	}
 
-	versions := make([]ModPlatformVersion, 0)
+	versions := make([]models.ModVersion, 0)
 	err = d.view(func(state *cacheState) error {
 		for key, v := range state.PlatformVersions {
 			if key.Platform == platform && key.ProjectID == projectID {
@@ -625,7 +583,7 @@ func GetPlatformVersions(platform, projectID string) ([]ModPlatformVersion, erro
 
 // --- mod dependencies ---
 
-func SetVersionDependencies(platformVersionID string, deps []ModDependency) error {
+func SetVersionDependencies(platformVersionID string, deps []models.ModDependency) error {
 	d, err := readyDB()
 	if err != nil {
 		return err
@@ -657,7 +615,7 @@ func SetVersionDependencies(platformVersionID string, deps []ModDependency) erro
 	return nil
 }
 
-func GetVersionDependencies(platformVersionID string) ([]ModDependency, error) {
+func GetVersionDependencies(platformVersionID string) ([]models.ModDependency, error) {
 	d, err := readyDB()
 	if err != nil {
 		return nil, err
@@ -667,7 +625,7 @@ func GetVersionDependencies(platformVersionID string) ([]ModDependency, error) {
 		return nil, nil
 	}
 
-	var deps []ModDependency
+	var deps []models.ModDependency
 	err = d.view(func(state *cacheState) error {
 		key, ok := state.PlatformVersionKeyByID[platformVersionID]
 		if !ok {

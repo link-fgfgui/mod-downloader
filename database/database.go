@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"mod-downloader/logging"
+	"mod-downloader/models"
 	structs "mod-downloader/structs/minecraft"
 
 	"github.com/klauspost/compress/zstd"
@@ -17,7 +18,7 @@ import (
 
 const (
 	databaseFileName = "mods.gob.zst"
-	cacheVersion     = 1
+	cacheVersion     = 2
 )
 
 var (
@@ -36,9 +37,9 @@ type cacheDB struct {
 type cacheState struct {
 	Version                int
 	JarMetadataVersion     string
-	ModPlatforms           map[platformKey]ModPlatform
+	ModPlatforms           map[platformKey]models.ModProject
 	PlatformAssociations   map[string]PlatformAssociation
-	PlatformVersions       map[versionKey]ModPlatformVersion
+	PlatformVersions       map[versionKey]models.ModVersion
 	PlatformVersionScopes  map[versionScopeKey]storedVersionScope
 	PinnedMods             map[pinnedModKey]PinnedMod
 	JarMetadata            map[string][]structs.ModInfo
@@ -155,6 +156,10 @@ func loadCacheState(path string) (cacheState, error) {
 	if state.Version == 0 {
 		state.Version = cacheVersion
 	}
+	if state.Version < cacheVersion {
+		logging.Info("cache version outdated, discarding", "fileVersion", state.Version, "currentVersion", cacheVersion)
+		return newCacheState(), nil
+	}
 	return state, nil
 }
 
@@ -169,13 +174,13 @@ func (s *cacheState) normalize() {
 		s.Version = cacheVersion
 	}
 	if s.ModPlatforms == nil {
-		s.ModPlatforms = make(map[platformKey]ModPlatform)
+		s.ModPlatforms = make(map[platformKey]models.ModProject)
 	}
 	if s.PlatformAssociations == nil {
 		s.PlatformAssociations = make(map[string]PlatformAssociation)
 	}
 	if s.PlatformVersions == nil {
-		s.PlatformVersions = make(map[versionKey]ModPlatformVersion)
+		s.PlatformVersions = make(map[versionKey]models.ModVersion)
 	}
 	if s.PlatformVersionScopes == nil {
 		s.PlatformVersionScopes = make(map[versionScopeKey]storedVersionScope)
@@ -272,11 +277,11 @@ func copyStringSlice(values []string) []string {
 	return out
 }
 
-func copyDependencies(deps []ModDependency) []ModDependency {
+func copyDependencies(deps []models.ModDependency) []models.ModDependency {
 	if len(deps) == 0 {
 		return nil
 	}
-	out := make([]ModDependency, len(deps))
+	out := make([]models.ModDependency, len(deps))
 	copy(out, deps)
 	return out
 }
@@ -290,7 +295,7 @@ func copyModInfos(mods []structs.ModInfo) []structs.ModInfo {
 	return out
 }
 
-func copyVersion(v ModPlatformVersion) ModPlatformVersion {
+func copyVersion(v models.ModVersion) models.ModVersion {
 	v.GameVersions = copyStringSlice(v.GameVersions)
 	v.Loaders = copyStringSlice(v.Loaders)
 	v.Dependencies = copyDependencies(v.Dependencies)

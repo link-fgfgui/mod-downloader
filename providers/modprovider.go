@@ -10,6 +10,7 @@ import (
 	"mod-downloader/database"
 	"mod-downloader/global"
 	"mod-downloader/logging"
+	"mod-downloader/models"
 	appstructs "mod-downloader/structs"
 
 	modrinth "codeberg.org/jmansfield/go-modrinth/modrinth"
@@ -883,7 +884,7 @@ func getFreshProjectVersionsSnapshot(platform, projectID string, filter projectV
 		}
 		return nil, false
 	}
-	return dbProjectVersionsToResults(versions), true
+	return versions, true
 }
 
 func getProjectVersionsSnapshot(platform, projectID string, filter projectVersionFilter) ([]appstructs.ProjectVersionResult, bool) {
@@ -898,13 +899,13 @@ func getProjectVersionsSnapshot(platform, projectID string, filter projectVersio
 		}
 		return nil, false
 	}
-	return dbProjectVersionsToResults(versions), true
+	return versions, true
 }
 
-func getProjectSnapshotPlatform(platform, projectIDOrSlug string) (database.ModPlatform, bool) {
+func getProjectSnapshotPlatform(platform, projectIDOrSlug string) (models.ModProject, bool) {
 	projectIDOrSlug = strings.TrimSpace(projectIDOrSlug)
 	if projectIDOrSlug == "" {
-		return database.ModPlatform{}, false
+		return models.ModProject{}, false
 	}
 	if record, ok := database.GetModPlatform(platform, projectIDOrSlug); ok {
 		return record, true
@@ -918,7 +919,7 @@ func saveProjectVersionsSnapshot(platform, requestedProject string, projectID st
 		return nil
 	}
 	requestedProject = strings.TrimSpace(requestedProject)
-	meta := database.ModPlatform{
+	meta := models.ModProject{
 		Platform:  platform,
 		ProjectID: projectID,
 	}
@@ -928,7 +929,7 @@ func saveProjectVersionsSnapshot(platform, requestedProject string, projectID st
 	if err := database.UpsertModPlatform(meta); err != nil {
 		return err
 	}
-	return database.SetPlatformVersionSnapshot(platform, projectID, projectVersionResultsToDB(platform, projectID, versions), time.Now().Unix(), projectVersionSnapshotScopes(filter))
+	return database.SetPlatformVersionSnapshot(platform, projectID, versions, time.Now().Unix(), projectVersionSnapshotScopes(filter))
 }
 
 func projectIDFromVersions(versions []appstructs.ProjectVersionResult, fallback string) string {
@@ -940,82 +941,7 @@ func projectIDFromVersions(versions []appstructs.ProjectVersionResult, fallback 
 	return strings.TrimSpace(fallback)
 }
 
-func projectVersionResultsToDB(platform, projectID string, versions []appstructs.ProjectVersionResult) []database.ModPlatformVersion {
-	results := make([]database.ModPlatformVersion, 0, len(versions))
-	for _, version := range versions {
-		versionID := version.ID
-		if versionID == "" {
-			versionID = version.Version
-		}
-		results = append(results, database.ModPlatformVersion{
-			Platform:     platform,
-			ProjectID:    projectID,
-			VersionID:    versionID,
-			Name:         version.Name,
-			Version:      version.Version,
-			FileName:     version.FileName,
-			DownloadURL:  version.DownloadURL,
-			SHA1:         version.SHA1,
-			PublishedAt:  version.PublishedAt,
-			Downloads:    version.Downloads,
-			GameVersions: version.GameVersions,
-			Loaders:      version.Loaders,
-			Dependencies: projectDependenciesToDB(version.Dependencies),
-		})
-	}
-	return results
-}
-
-func projectDependenciesToDB(deps []appstructs.ProjectDependency) []database.ModDependency {
-	results := make([]database.ModDependency, 0, len(deps))
-	for _, dep := range deps {
-		if strings.TrimSpace(dep.DependencyProjectID) == "" && strings.TrimSpace(dep.DependencyVersionID) == "" {
-			continue
-		}
-		results = append(results, database.ModDependency{
-			DependencyProjectID: dep.DependencyProjectID,
-			DependencyVersionID: dep.DependencyVersionID,
-			DependencyType:      dep.DependencyType,
-		})
-	}
-	return results
-}
-
-func dbProjectVersionsToResults(versions []database.ModPlatformVersion) []appstructs.ProjectVersionResult {
-	results := make([]appstructs.ProjectVersionResult, 0, len(versions))
-	for _, version := range versions {
-		results = append(results, appstructs.ProjectVersionResult{
-			ID:           version.VersionID,
-			Platform:     version.Platform,
-			ProjectID:    version.ProjectID,
-			Name:         version.Name,
-			Version:      version.Version,
-			FileName:     version.FileName,
-			DownloadURL:  version.DownloadURL,
-			SHA1:         version.SHA1,
-			PublishedAt:  version.PublishedAt,
-			Downloads:    version.Downloads,
-			GameVersions: version.GameVersions,
-			Loaders:      version.Loaders,
-			Dependencies: dbDependenciesToResults(version.Dependencies),
-		})
-	}
-	return results
-}
-
-func dbDependenciesToResults(deps []database.ModDependency) []appstructs.ProjectDependency {
-	results := make([]appstructs.ProjectDependency, 0, len(deps))
-	for _, dep := range deps {
-		results = append(results, appstructs.ProjectDependency{
-			DependencyProjectID: dep.DependencyProjectID,
-			DependencyVersionID: dep.DependencyVersionID,
-			DependencyType:      dep.DependencyType,
-		})
-	}
-	return results
-}
-
-// --- New conversion methods (SDK → Unified Model) ---
+// --- Conversion methods (SDK → Unified Model) ---
 
 // CurseForge SDK → ModProject
 func (p curseForgeProvider) modToModProject(mod cfSchema.Mod) ModProject {
