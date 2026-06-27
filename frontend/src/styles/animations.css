@@ -1,0 +1,328 @@
+/* Global animation tokens and utilities for Mod Downloader */
+
+:root {
+  --md-transition-fast: 120ms;
+  --md-transition-normal: 220ms;
+  --md-transition-slow: 360ms;
+  --md-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --md-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --md-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --md-stagger-delay: 40ms;
+}
+
+/* --------------------------------------------------
+ * Keyframes
+ * -------------------------------------------------- */
+
+@keyframes md-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes md-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes md-fade-in-down {
+  from {
+    opacity: 0;
+    transform: translateY(-18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes md-fade-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes md-fade-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes md-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes md-slide-in-bottom {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes md-pulse-soft {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@keyframes md-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes md-shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  20%, 60% {
+    transform: translateX(-6px);
+  }
+  40%, 80% {
+    transform: translateX(6px);
+  }
+}
+
+@keyframes md-skeleton {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes md-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+/* --------------------------------------------------
+ * Utility classes
+ * -------------------------------------------------- */
+
+.md-animate-fade {
+  animation: md-fade-in var(--md-transition-normal) var(--md-ease-out) both;
+}
+
+.md-animate-fade-up {
+  animation: md-fade-in-up var(--md-transition-slow) var(--md-ease-out) both;
+}
+
+.md-animate-fade-down {
+  animation: md-fade-in-down var(--md-transition-slow) var(--md-ease-out) both;
+}
+
+.md-animate-fade-left {
+  animation: md-fade-in-left var(--md-transition-slow) var(--md-ease-out) both;
+}
+
+.md-animate-fade-right {
+  animation: md-fade-in-right var(--md-transition-slow) var(--md-ease-out) both;
+}
+
+.md-animate-scale {
+  animation: md-scale-in var(--md-transition-slow) var(--md-ease-spring) both;
+}
+
+.md-animate-slide-up {
+  animation: md-slide-in-bottom var(--md-transition-slow) var(--md-ease-out) both;
+}
+
+.md-animate-pulse {
+  animation: md-pulse-soft 1.6s var(--md-ease-in-out) infinite;
+}
+
+.md-animate-shake {
+  animation: md-shake 0.4s var(--md-ease-in-out) both;
+}
+
+.md-animate-float {
+  animation: md-float 3s var(--md-ease-in-out) infinite;
+}
+
+.md-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(var(--v-theme-surface-variant), 0.3) 25%,
+    rgba(var(--v-theme-surface-variant), 0.5) 50%,
+    rgba(var(--v-theme-surface-variant), 0.3) 75%
+  );
+  background-size: 200% 100%;
+  animation: md-skeleton 1.5s linear infinite;
+  border-radius: 4px;
+}
+
+/* Stagger children animations */
+.md-stagger > * {
+  opacity: 0;
+  animation: md-fade-in-up var(--md-transition-slow) var(--md-ease-out) forwards;
+}
+
+.md-stagger > *:nth-child(1) { animation-delay: calc(var(--md-stagger-delay) * 1); }
+.md-stagger > *:nth-child(2) { animation-delay: calc(var(--md-stagger-delay) * 2); }
+.md-stagger > *:nth-child(3) { animation-delay: calc(var(--md-stagger-delay) * 3); }
+.md-stagger > *:nth-child(4) { animation-delay: calc(var(--md-stagger-delay) * 4); }
+.md-stagger > *:nth-child(5) { animation-delay: calc(var(--md-stagger-delay) * 5); }
+.md-stagger > *:nth-child(6) { animation-delay: calc(var(--md-stagger-delay) * 6); }
+.md-stagger > *:nth-child(7) { animation-delay: calc(var(--md-stagger-delay) * 7); }
+.md-stagger > *:nth-child(8) { animation-delay: calc(var(--md-stagger-delay) * 8); }
+.md-stagger > *:nth-child(9) { animation-delay: calc(var(--md-stagger-delay) * 9); }
+.md-stagger > *:nth-child(10) { animation-delay: calc(var(--md-stagger-delay) * 10); }
+.md-stagger > *:nth-child(11) { animation-delay: calc(var(--md-stagger-delay) * 11); }
+.md-stagger > *:nth-child(12) { animation-delay: calc(var(--md-stagger-delay) * 12); }
+
+/* Interactive hover lifts */
+.md-hover-lift {
+  transition: transform var(--md-transition-fast) var(--md-ease-out),
+    box-shadow var(--md-transition-fast) var(--md-ease-out);
+}
+
+.md-hover-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.md-hover-scale {
+  transition: transform var(--md-transition-fast) var(--md-ease-spring);
+}
+
+.md-hover-scale:hover {
+  transform: scale(1.04);
+}
+
+/* Button press feedback */
+.md-btn-press:active {
+  transform: scale(0.96);
+}
+
+/* Route transition: slide-fade */
+.slide-fade-enter-active,
+.slide-fade-leave-active {
+  transition: opacity var(--md-transition-normal) var(--md-ease-out),
+    transform var(--md-transition-normal) var(--md-ease-out);
+}
+
+.slide-fade-enter-from {
+  opacity: 0;
+  transform: translateY(12px);
+}
+
+.slide-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+/* Route transition: scale-fade ( dialogs / overlays ) */
+.scale-fade-enter-active,
+.scale-fade-leave-active {
+  transition: opacity var(--md-transition-normal) var(--md-ease-out),
+    transform var(--md-transition-normal) var(--md-ease-spring);
+}
+
+.scale-fade-enter-from,
+.scale-fade-leave-to {
+  opacity: 0;
+  transform: scale(0.96);
+}
+
+/* List item slide-in (used by JS/composables) */
+.md-list-item-enter {
+  opacity: 0;
+  transform: translateY(16px);
+}
+
+.md-list-item-enter-active {
+  transition: opacity var(--md-transition-normal) var(--md-ease-out),
+    transform var(--md-transition-normal) var(--md-ease-out);
+}
+
+.md-list-item-enter-to {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Expand/collapse helpers */
+.md-expand-enter-active,
+.md-expand-leave-active {
+  transition: max-height var(--md-transition-slow) var(--md-ease-out),
+    opacity var(--md-transition-normal) var(--md-ease-out);
+  overflow: hidden;
+}
+
+.md-expand-enter-from,
+.md-expand-leave-to {
+  max-height: 0;
+  opacity: 0;
+}
+
+/* Floating action button bounce */
+.md-fab-enter-active {
+  animation: md-scale-in var(--md-transition-slow) var(--md-ease-spring) both;
+}
+
+.md-fab-leave-active {
+  transition: opacity var(--md-transition-fast) var(--md-ease-out),
+    transform var(--md-transition-fast) var(--md-ease-out);
+}
+
+.md-fab-leave-to {
+  opacity: 0;
+  transform: scale(0.8);
+}
+
+/* Page container baseline */
+.md-page {
+  animation: md-fade-in-up var(--md-transition-slow) var(--md-ease-out) both;
+}
+
+/* Reduced motion respect */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
