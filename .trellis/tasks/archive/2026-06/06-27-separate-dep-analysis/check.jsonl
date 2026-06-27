@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Check sub-agent verifies go build/vet/test pass, gofmt-clean, no forbidden patterns (aliases, re-exports, parallel conversions)."}
+{"file": ".trellis/spec/backend/directory-structure.md", "reason": "Confirm minecraft/ and providers/ don't import each other; modbridge is the sole convergence point; dependency direction is unidirectional."}
+{"file": "database/mods_test.go", "reason": "TestCachePinnedModsAndJarMetadata must be rewritten to remove JarMetadata assertions; SetVersionModIDs needs test coverage."}
+{"file": "minecraft/modparser_test.go", "reason": "Confirm parser tests still pass after switching from database to global JAR cache."}

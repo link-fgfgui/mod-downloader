@@ -1,0 +1,10 @@
+{"file": ".trellis/spec/backend/directory-structure.md", "reason": "Extracting modbridge/ and relocating JAR metadata to global/ changes package boundaries; confirms naming conventions and layered data flow rules."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Moving functions across packages must avoid forbidden patterns (type aliases, parallel conversion paths); confirms code review checklist applies."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "modbridge touches models/database/global/minecraft/providers/downloader layers — cross-layer data flow and boundary guidance directly applies."}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Deduplicating button status logic, version resolution, and JAR metadata caching is a code-reuse exercise."}
+{"file": "downloader/download.go", "reason": "Source of all functions to migrate to modbridge (localModButtonStatus*, downloadVersionsForRequest, applySelectedInstance, GetDownloadStates, parseRemoteModJar, applyPlatformMetadata); largest change surface."}
+{"file": "database/database.go", "reason": "cacheState struct, JarMetadata removal, cacheVersion bump, gob serialization change."}
+{"file": "database/mods.go", "reason": "GetJarMetadata/SetJarMetadata deletion; new SetVersionModIDs; copyModInfos cleanup."}
+{"file": "global/localmods.go", "reason": "New in-memory jarCache (GetJarMetadata/SetJarMetadata) lands here or in new jarcache.go."}
+{"file": "minecraft/modparser.go", "reason": "Switch from database.GetJarMetadata to global.GetJarMetadata; add JAR dependency TODO placeholder."}
+{"file": "models/models.go", "reason": "ModVersion gets new ModIDs []string field."}
