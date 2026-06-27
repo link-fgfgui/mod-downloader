@@ -52,6 +52,12 @@ func ResolveVersions(req appstructs.ModDownloadRequest) []models.ModVersion {
 		projectID = project
 	}
 
+	if versionID := strings.TrimSpace(req.VersionID); versionID != "" {
+		if version, found := FindVersionByID(providers.ListMatchingProjectVersions(req.Result, req.MinecraftVersion, req.ModLoader), versionID); found {
+			return []models.ModVersion{version}
+		}
+	}
+
 	if pin, ok := database.GetPinnedMod(platform, projectID, req.MinecraftVersion, req.ModLoader); ok {
 		if version, found := FindVersionByID(providers.ListMatchingProjectVersions(req.Result, req.MinecraftVersion, req.ModLoader), pin.VersionID); found {
 			return []models.ModVersion{version}
