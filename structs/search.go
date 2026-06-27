@@ -31,6 +31,7 @@ type ModDownloadRequest struct {
 	Result           models.ModProject `json:"result"`
 	MinecraftVersion string            `json:"minecraftVersion"`
 	ModLoader        string            `json:"modLoader"`
+	VersionID        string            `json:"versionId,omitempty"` // explicit platform version ID; empty means "best match"
 }
 
 type ModDownloadResult struct {

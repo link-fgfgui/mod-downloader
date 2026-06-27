@@ -12,6 +12,7 @@ import (
 	"mod-downloader/database"
 	"mod-downloader/downloader"
 	"mod-downloader/global"
+	"mod-downloader/httpserver"
 	"mod-downloader/logging"
 	"mod-downloader/minecraft"
 	"mod-downloader/models"
@@ -33,6 +34,7 @@ const searchModsUpdatedEvent = "search-mods-updated"
 type App struct {
 	ctx    context.Context
 	config *configs.Config
+	server *httpserver.Server
 }
 
 type AppPreferences struct {
@@ -72,6 +74,11 @@ func (a *App) startup(ctx context.Context) {
 		return
 	}
 	global.SetMinecraftReleaseVersions(releaseVersions)
+
+	a.server = httpserver.New(ctx, httpserver.DefaultAddr)
+	if err := a.server.Start(); err != nil {
+		logging.Error("start http server failed", "error", err)
+	}
 }
 
 func (a *App) SearchMods(req appstructs.SearchModsRequest) {
@@ -149,6 +156,9 @@ func (a *App) GetDownloadStates(req appstructs.DownloadStatesRequest) []appstruc
 }
 
 func (a *App) shutdown(ctx context.Context) {
+	if a.server != nil {
+		a.server.Stop()
+	}
 	if a.config == nil {
 		a.config = &configs.Config{}
 	}
