@@ -1,9 +1,6 @@
 build/bin
 node_modules
 frontend/dist
-*.md
-!README.md
-!AGENTS.md
 mod-downloader.toml
 mods.db
 mods.db-shm
