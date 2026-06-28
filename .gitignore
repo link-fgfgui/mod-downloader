@@ -11,3 +11,4 @@ mods.db-wal
 exampleJars/
 dev.sh
 mods.gob.zst
+mods.gob.zst.*.tmp

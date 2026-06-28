@@ -1,8 +1,8 @@
 <template>
-    <v-virtual-scroll :items="virtualItems" class="search-result-scroll px-2" item-height="88">
+    <v-virtual-scroll ref="scrollRef" :items="virtualItems" class="search-result-scroll px-2" item-height="88">
         <template #default="{ item }">
             <v-list-item v-if="item.type === 'result'" :key="item.key" :title="item.result.title"
-                :subtitle="item.result.description" class="mb-2 border-b md-animate-fade-up md-hover-lift" bg-color="surface" rounded="xl" elevation="1"
+                :subtitle="item.result.description" class="mb-2 border-b md-animate-fade-y md-hover-lift" bg-color="surface" rounded="xl" elevation="1"
                 lines="two"
                 :style="itemEnterStyle(item.index)">
                 <template #prepend>
@@ -21,13 +21,14 @@
                             {{ item.result.platform }}
                         </v-chip>
 
-                        <v-btn class="md-btn-press md-hover-scale" variant="tonal" rounded="xl" size="small"
-                            :color="colorFor(item.index)"
-                            :icon="iconFor(item.index)"
-                            :loading="loadingFor(item.index)"
-                            :disabled="disabledFor(item.index)"
-                            @click="onInstall(item.index, true)"
-                            @contextmenu.prevent="onInstall(item.index, false)"/>
+                        <v-btn class="md-btn-press md-hover-scale transition-btn" icon variant="tonal" rounded="xl"
+                            size="small" :color="colorFor(item.index)" :loading="loadingFor(item.index)"
+                            :disabled="disabledFor(item.index)" @click="onInstall(item.index, true)"
+                            @contextmenu.prevent="onInstall(item.index, false)">
+                            <Transition name="icon-fade" mode="out-in">
+                                <v-icon :key="iconFor(item.index)" :icon="iconFor(item.index)"></v-icon>
+                            </Transition>
+                        </v-btn>
                     </div>
                 </template>
             </v-list-item>
@@ -71,6 +72,28 @@ const emit = defineEmits(["install", "load-more", "show-versions"]);
 const loadMoreTarget = ref(null);
 let observer = null;
 let lastLoadMoreResultCount = 0;
+
+// Virtual scroll enter-animation direction.
+// Scrolling down → items enter from below (translateY positive).
+// Scrolling up → items enter from above (translateY negative).
+// Updated directly on the DOM (non-reactive) to avoid triggering
+// Vue re-renders of the v-virtual-scroll slot on direction change.
+const scrollRef = ref(null);
+let lastScrollTop = 0;
+let currentDirection = "down";
+
+const handleScroll = (e) => {
+    const el = e.currentTarget;
+    const currentScrollTop = el.scrollTop;
+    if (currentScrollTop > lastScrollTop && currentDirection !== "down") {
+        currentDirection = "down";
+        el.style.setProperty("--md-fade-y-offset", "18px");
+    } else if (currentScrollTop < lastScrollTop && currentDirection !== "up") {
+        currentDirection = "up";
+        el.style.setProperty("--md-fade-y-offset", "-18px");
+    }
+    lastScrollTop = currentScrollTop;
+};
 
 const virtualItems = computed(() => {
     const items = props.results.map((result, index) => ({
@@ -117,7 +140,7 @@ const loadingFor = (index) => {
 const disabledFor = (index) => Boolean(stateFor(index)?.disabled);
 
 const itemEnterStyle = (index) => ({
-    animationDelay: `${Math.min(index, 15) * 40}ms`,
+    animationDelay: `${Math.min(index, 5) * 40}ms`,
 });
 
 const setLoadMoreTarget = (element) => {
@@ -145,9 +168,20 @@ onMounted(() => {
     if (loadMoreTarget.value) {
         observer.observe(loadMoreTarget.value);
     }
+
+    const scrollEl = scrollRef.value?.$el;
+    if (scrollEl) {
+        lastScrollTop = scrollEl.scrollTop;
+        scrollEl.style.setProperty("--md-fade-y-offset", "18px");
+        scrollEl.addEventListener("scroll", handleScroll, { passive: true });
+    }
 });
 
 onUnmounted(() => {
+    const scrollEl = scrollRef.value?.$el;
+    if (scrollEl) {
+        scrollEl.removeEventListener("scroll", handleScroll);
+    }
     observer?.disconnect();
     observer = null;
 });
@@ -165,8 +199,23 @@ watch(() => props.results.length, (next, previous) => {
 }
 
 .search-result-scroll {
-    height: calc(100vh - 236px);
-    min-height: 320px;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.transition-btn {
+    transition: transform 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+}
+
+.icon-fade-enter-active,
+.icon-fade-leave-active {
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.icon-fade-enter-from,
+.icon-fade-leave-to {
+    opacity: 0;
+    transform: scale(0.8);
 }
 
 .load-more-target {

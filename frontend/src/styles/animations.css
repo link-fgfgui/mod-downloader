@@ -45,6 +45,20 @@
   }
 }
 
+/* Directional fade-in driven by --md-fade-y-offset.
+ * Positive value (default 18px) → enter from below (scrolling down).
+ * Negative value → enter from above (scrolling up). */
+@keyframes md-fade-in-y {
+  from {
+    opacity: 0;
+    transform: translateY(var(--md-fade-y-offset, 18px));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @keyframes md-fade-in-left {
   from {
     opacity: 0;
@@ -151,6 +165,10 @@
 
 .md-animate-fade-down {
   animation: md-fade-in-down var(--md-transition-slow) var(--md-ease-out) both;
+}
+
+.md-animate-fade-y {
+  animation: md-fade-in-y var(--md-transition-slow) var(--md-ease-out) both;
 }
 
 .md-animate-fade-left {
