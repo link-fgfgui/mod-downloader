@@ -15,6 +15,7 @@ const searchModsUpdatedEvent = "search-mods-updated";
 const downloadQueueUpdatedEvent = "download-queue-updated";
 const downloadFailedEvent = "download-failed";
 const extensionModsAcceptedEvent = "extension-mods-accepted";
+const downloadStatesUpdatedEvent = "download-states-updated";
 
 const searchPageSize = 10;
 
@@ -61,6 +62,7 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
         stopListeningDownloadQueueUpdated: null as (() => void) | null,
         stopListeningDownloadFailed: null as (() => void) | null,
         stopListeningExtensionModsAccepted: null as (() => void) | null,
+        stopListeningDownloadStatesUpdated: null as (() => void) | null,
     }),
     getters: {
         confirmStatuses: () => new Set(["update", "conflict"]),
@@ -271,11 +273,14 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
             return version.fileName || version.name || version.version || version.id;
         },
         async start() {
-            if (this.stopListeningSearchModsUpdated || this.stopListeningDownloadQueueUpdated || this.stopListeningDownloadFailed || this.stopListeningExtensionModsAccepted) {
+            if (this.stopListeningSearchModsUpdated || this.stopListeningDownloadQueueUpdated || this.stopListeningDownloadFailed || this.stopListeningExtensionModsAccepted || this.stopListeningDownloadStatesUpdated) {
                 return;
             }
 
             this.stopListeningDownloadQueueUpdated = EventsOn(downloadQueueUpdatedEvent, () => {
+                void this.refreshDownloadStates();
+            });
+            this.stopListeningDownloadStatesUpdated = EventsOn(downloadStatesUpdatedEvent, () => {
                 void this.refreshDownloadStates();
             });
             this.stopListeningDownloadFailed = EventsOn(downloadFailedEvent, (event) => {
@@ -323,10 +328,12 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
             this.stopListeningDownloadQueueUpdated?.();
             this.stopListeningDownloadFailed?.();
             this.stopListeningExtensionModsAccepted?.();
+            this.stopListeningDownloadStatesUpdated?.();
             this.stopListeningSearchModsUpdated = null;
             this.stopListeningDownloadQueueUpdated = null;
             this.stopListeningDownloadFailed = null;
             this.stopListeningExtensionModsAccepted = null;
+            this.stopListeningDownloadStatesUpdated = null;
         },
     },
 });

@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/directory-structure.md", "reason": "Verify dependency direction (modbridge must NOT import downloader; app.go owns Wails event emission) and that new helpers reside in the correct package per the bridge-package contract."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Check new functions against forbidden patterns: no type aliases, no re-export files, no parallel converter paths, canonical-type naming (ModVersion, not aliases)."}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "Confirm R1/R3 do not bump cacheVersion and correctly use existing database.GetVersionModIDs/SetVersionModIDs rather than introducing a new persistence layer."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Cross-layer verification: modbridge→database (R1 read), modbridge→minecraft+global (R2 scan), app.go→frontend (R3 event channel) — ensure each layer interaction is audited."}

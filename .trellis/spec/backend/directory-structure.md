@@ -258,6 +258,47 @@ func (db *Database) SetVersionModIDs(platformVersionID string, modIDs []string) 
 
 **Why this works**: Local JAR scanning is real-time and cheap; platform API fetches are expensive and rate-limited. Match cache strategy to data source characteristics.
 
+### Decision: Upward Signaling via Callback (Layer Constraint Workaround)
+
+**Context**: `modbridge` sits below `app.go` in the dependency graph (`downloader → modbridge → {providers, database, global, minecraft}`). `modbridge` must NOT import `wails/runtime` (it would invert the dependency direction and couple a pure-logic package to the Wails runtime). But `modbridge.DownloadStates` sometimes needs to trigger a frontend refresh after an async backfill completes — and only `app.go` can emit Wails events because only it owns `a.ctx`.
+
+**Options Considered**:
+1. Let `modbridge` import `wails/runtime` and emit directly (breaks layering, couples logic to runtime)
+2. Have `modbridge` return a "needs refresh" flag and let `app.go` poll (brittle, races with async goroutine)
+3. Pass a `func()` callback from `app.go` through `downloader` into `modbridge`, invoked when async work finishes
+
+**Decision**: Option 3 (callback through the intermediate layer). `app.GetDownloadStates` creates a closure over `runtime.EventsEmit(a.ctx, ...)`, passes it as `onBackfillComplete func()` to `downloader.GetDownloadStates`, which transparently forwards it to `modbridge.DownloadStates`. `modbridge` invokes the callback once after all async backfill goroutines finish — never needing to know about Wails.
+
+**Implementation**:
+```go
+// app.go — owns ctx, creates the emitter closure
+func (a *App) GetDownloadStates(req appstructs.DownloadStatesRequest) []appstructs.ModDownloadButtonState {
+    return downloader.GetDownloadStates(req, func() {
+        runtime.EventsEmit(a.ctx, downloadStatesUpdatedEvent)
+    })
+}
+
+// downloader/download.go — pure passthrough
+func GetDownloadStates(req appstructs.DownloadStatesRequest, onBackfillComplete func()) []appstructs.ModDownloadButtonState {
+    return modbridge.DownloadStates(req, onBackfillComplete)
+}
+
+// modbridge/modbridge.go — invokes callback after async work, no wails import
+func DownloadStates(req appstructs.DownloadStatesRequest, onBackfillComplete func()) []appstructs.ModDownloadButtonState {
+    // ... sync status decisions ...
+    backfill := drainPendingBackfills()
+    if len(backfill) > 0 && onBackfillComplete != nil {
+        go func() {
+            for _, b := range backfill { backfillVersionModIDs(b.version, b.modLoader) }
+            onBackfillComplete()
+        }()
+    }
+    return states
+}
+```
+
+**When to apply**: Any time a lower-layer package (`modbridge`, `providers`, `database`) needs to signal the frontend after async work, but cannot import `wails/runtime` due to layering. Pass a `func()` callback from the layer that owns the Wails context (`app.go`) through any intermediate layers. The callback must be invoked exactly once after all async work completes; nil-check before invoking.
+
 ---
 
 ## Examples
