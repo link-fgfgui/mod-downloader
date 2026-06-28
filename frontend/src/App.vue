@@ -28,47 +28,15 @@
 <script setup lang="ts">
 import SideBar from "./components/SideBar/SideBar.vue";
 import { onMounted, onUnmounted } from "vue";
-import { useTheme } from "vuetify";
 import { GetPreferences } from "../wailsjs/go/main/App";
 import { useDownloadQueueStore } from "./stores/downloadQueue";
 import { useMinecraftStore } from "./stores/minecraft";
+import { applyVuetifyTheme, stopThemeListener } from "./composables/useTheme";
 
 const themeDark = "dark";
-const themeLight = "light";
-const themeSystem = "system";
 
-const vuetifyTheme = useTheme();
 const downloadQueueStore = useDownloadQueueStore();
 const minecraftStore = useMinecraftStore();
-
-let systemThemeQuery: MediaQueryList | null = null;
-let stopListeningSystemTheme: (() => void) | null = null;
-
-const applyVuetifyTheme = (theme: string) => {
-    stopListeningSystemTheme?.();
-    stopListeningSystemTheme = null;
-    systemThemeQuery = null;
-
-    const normalizedTheme = theme?.trim().toLowerCase();
-    if (normalizedTheme === themeLight) {
-        vuetifyTheme.global.name.value = "light";
-        return;
-    }
-    if (normalizedTheme !== themeSystem) {
-        vuetifyTheme.global.name.value = "dark";
-        return;
-    }
-
-    systemThemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const applySystemTheme = () => {
-        vuetifyTheme.global.name.value = systemThemeQuery?.matches ? "dark" : "light";
-    };
-    applySystemTheme();
-    systemThemeQuery.addEventListener("change", applySystemTheme);
-    stopListeningSystemTheme = () => {
-        systemThemeQuery?.removeEventListener("change", applySystemTheme);
-    };
-};
 
 onMounted(async () => {
     const preferences = await GetPreferences();
@@ -80,7 +48,7 @@ onMounted(async () => {
 onUnmounted(() => {
     downloadQueueStore.stop();
     minecraftStore.stop();
-    stopListeningSystemTheme?.();
+    stopThemeListener();
 });
 </script>
 

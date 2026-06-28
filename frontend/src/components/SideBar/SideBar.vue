@@ -16,6 +16,10 @@
                 <v-list-item prepend-icon="mdi-file-download" :title="$t('nav.download')" to="/download"></v-list-item>
 
                 <v-list-item prepend-icon="mdi-list-status" :title="$t('nav.manage')" to="/manage"></v-list-item>
+
+                <v-list-item prepend-icon="mdi-pin-off" :title="$t('nav.unpin')" to="/unpin"></v-list-item>
+
+                <v-list-item prepend-icon="mdi-cog" :title="$t('nav.settings')" to="/settings"></v-list-item>
             </v-list>
             <v-divider></v-divider>
         </div>

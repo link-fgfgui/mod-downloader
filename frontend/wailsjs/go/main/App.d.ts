@@ -23,9 +23,13 @@ export function GetPreferences():Promise<main.AppPreferences>;
 
 export function GetSelectedVersion():Promise<structs.VersionInfo>;
 
+export function GetSettings():Promise<main.SettingsView>;
+
 export function GetVersions():Promise<Array<structs.VersionInfo>>;
 
 export function ListMatchingProjectVersions(arg1:models.ModProject,arg2:string,arg3:string):Promise<Array<models.ModVersion>>;
+
+export function ListPinnedMods():Promise<Array<database.PinnedMod>>;
 
 export function PinModVersion(arg1:structs.ModVersionPinRequest):Promise<database.PinnedMod>;
 
@@ -35,8 +39,14 @@ export function RefreshSelectedVersionMods():Promise<structs.VersionInfo>;
 
 export function RefreshVersions():Promise<Array<structs.VersionInfo>>;
 
+export function SaveApiKeys(arg1:main.SaveApiKeysRequest):Promise<main.SettingsView>;
+
+export function SaveTheme(arg1:string):Promise<string>;
+
 export function SearchMods(arg1:structs.SearchModsRequest):Promise<void>;
 
 export function SelectVersion(arg1:string):Promise<structs.VersionInfo>;
+
+export function UnpinMod(arg1:string,arg2:string,arg3:string,arg4:string):Promise<boolean>;
 
 export function ValidateMinecraftDir():Promise<boolean>;

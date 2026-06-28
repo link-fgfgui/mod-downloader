@@ -693,6 +693,42 @@ func DeletePinnedMod(platform, modID, mcVersion, modLoader string) error {
 	return nil
 }
 
+// ListPinnedMods 返回所有 pinned mod 的快照，按 Platform -> ModID -> MinecraftVersion -> ModLoader 升序稳定排序。
+// 返回的是副本，调用方可安全修改。
+func ListPinnedMods() []PinnedMod {
+	d, err := readyDB()
+	if err != nil {
+		return nil
+	}
+
+	var pins []PinnedMod
+	err = d.view(func(state *cacheState) error {
+		pins = make([]PinnedMod, 0, len(state.PinnedMods))
+		for _, p := range state.PinnedMods {
+			pins = append(pins, p)
+		}
+		return nil
+	})
+	if err != nil {
+		logging.Error("list pinned mods failed", "error", err)
+		return nil
+	}
+
+	sort.SliceStable(pins, func(i, j int) bool {
+		if pins[i].Platform != pins[j].Platform {
+			return pins[i].Platform < pins[j].Platform
+		}
+		if pins[i].ModID != pins[j].ModID {
+			return pins[i].ModID < pins[j].ModID
+		}
+		if pins[i].MinecraftVersion != pins[j].MinecraftVersion {
+			return pins[i].MinecraftVersion < pins[j].MinecraftVersion
+		}
+		return pins[i].ModLoader < pins[j].ModLoader
+	})
+	return pins
+}
+
 // --- version mod IDs ---
 
 func SetVersionModIDs(platformVersionID string, modIDs []string) error {
