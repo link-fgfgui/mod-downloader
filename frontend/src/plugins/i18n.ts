@@ -54,6 +54,8 @@ const messages = {
       noMods: "当前实例没有可解析的 Mod。",
       enabled: "启用",
       disabled: "禁用",
+      copyNames: "复制名称",
+      copyIds: "复制 ID",
       columns: {
         mod: "Mod",
         version: "版本",
@@ -147,6 +149,8 @@ const messages = {
       noMods: "No parseable mods were found in the selected instance.",
       enabled: "Enabled",
       disabled: "Disabled",
+      copyNames: "Copy Names",
+      copyIds: "Copy IDs",
       columns: {
         mod: "Mod",
         version: "Version",
