@@ -70,10 +70,10 @@ func TestRootRejectsInvalidJSON(t *testing.T) {
 	}
 }
 
-func TestRootQueuesValidPayloadsAndSkipsInvalid(t *testing.T) {
-	// No selected Minecraft instance is configured, so valid payloads are
-	// skipped with "no selected version". This still exercises the full
-	// parse -> request construction -> downloader path.
+func TestRootResolvesValidPayloadsAndSkipsInvalid(t *testing.T) {
+	// No API clients are configured, so valid payloads are skipped with
+	// "project not found" (metadata resolution fails). This exercises the
+	// full parse → resolve → filter path.
 	s := New(context.Background(), "")
 
 	// 0: mr with explicit project id (preferred over slug)
@@ -103,11 +103,11 @@ func TestRootQueuesValidPayloadsAndSkipsInvalid(t *testing.T) {
 		t.Fatalf("results count = %d, want 5", len(results))
 	}
 
-	// 0 and 1: valid, skipped because no instance selected.
-	for i := 0; i < 2; i++ {
+	// 0, 1, 4: valid payloads, skipped because no API client → project not found.
+	for _, i := range []int{0, 1, 4} {
 		skipped, _ := results[i]["skipped"].(bool)
 		if !skipped {
-			t.Errorf("result[%d] skipped = false, want true (no instance)", i)
+			t.Errorf("result[%d] skipped = false, want true (project not found)", i)
 		}
 	}
 	// 2: invalid platform.
@@ -123,10 +123,6 @@ func TestRootQueuesValidPayloadsAndSkipsInvalid(t *testing.T) {
 	}
 	if reason, _ := results[3]["reason"].(string); !strings.Contains(reason, "empty project id and slug") {
 		t.Errorf("result[3] reason = %q", reason)
-	}
-	// 4: empty-string id falls back to slug, valid -> skipped (no instance).
-	if skipped, _ := results[4]["skipped"].(bool); !skipped {
-		t.Errorf("result[4] skipped = false, want true (no instance)")
 	}
 }
 

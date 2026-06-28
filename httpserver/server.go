@@ -1,10 +1,13 @@
 // Package httpserver exposes an HTTP endpoint that receives mod scan results
-// from the mod-downloader browser extension and queues them for download.
+// from the mod-downloader browser extension, resolves their metadata, and
+// displays them on the frontend download page.
 //
 // The extension (mod-downloader-chrome-plugin) POSTs a JSON array of payloads
 // shaped as {"p":"mr"|"cf","id":null,"slug":"...","file":"..."} to
-// http://127.0.0.1:18801. Each payload is converted into a ModDownloadRequest
-// and handed off to the downloader package.
+// http://127.0.0.1:18801. Each payload is resolved to full project metadata,
+// filtered by the current instance's version and mod loader, and emitted to
+// the frontend via a Wails event. Payloads carrying an explicit version ID
+// that matches the current filter are auto-pinned.
 package httpserver
 
 import (
@@ -19,10 +22,14 @@ import (
 	"sync"
 	"time"
 
-	"mod-downloader/downloader"
+	"mod-downloader/database"
+	"mod-downloader/global"
 	"mod-downloader/logging"
 	"mod-downloader/models"
+	"mod-downloader/providers"
 	appstructs "mod-downloader/structs"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // DefaultAddr is the address the browser extension expects (see its manifest
@@ -31,6 +38,8 @@ const DefaultAddr = "127.0.0.1:18801"
 
 // maxBodyBytes limits the request body size to guard against abusive payloads.
 const maxBodyBytes = 4 << 20 // 4 MiB
+
+const extensionModsAcceptedEvent = "extension-mods-accepted"
 
 // remotePayload mirrors the Chrome extension's RemotePayload struct.
 type remotePayload struct {
@@ -126,8 +135,28 @@ func (s *Server) Stop() {
 	}
 }
 
-// handleRoot accepts POST requests carrying the extension's scan payload and
-// queues each detected mod for download.
+// acceptedPayload holds a parsed and validated payload item ready for
+// concurrent metadata resolution.
+type acceptedPayload struct {
+	index     int
+	platform  string
+	idOrSlug  string
+	versionID string
+}
+
+// acceptResult is the per-item outcome of metadata resolution.
+type acceptResult struct {
+	index   int
+	project models.ModProject
+	pinned  bool
+	skipped bool
+	reason  string
+}
+
+// handleRoot accepts POST requests carrying the extension's scan payload,
+// resolves metadata for each item, filters by the current instance's version
+// and mod loader, emits matching projects to the frontend download page, and
+// auto-pins explicit versions that match the filter.
 func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", http.MethodPost)
@@ -148,58 +177,145 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	results := make([]appstructs.ModDownloadResult, 0, len(payloads))
+	selected := global.GetSelectedVersion()
+	mcVersion := strings.TrimSpace(selected.MinecraftVersion)
+	modLoader := strings.ToLower(strings.TrimSpace(selected.ModLoader))
+
+	// Phase 1: validate payloads and collect items for resolution.
+	results := make([]appstructs.ModDownloadResult, len(payloads))
+	var accepted []acceptedPayload
 	for i, p := range payloads {
 		platform, ok := platformFromCode(p.P)
 		if !ok {
-			results = append(results, appstructs.ModDownloadResult{
+			results[i] = appstructs.ModDownloadResult{
 				Skipped: true,
 				Reason:  fmt.Sprintf("payload[%d]: invalid platform %q", i, p.P),
-			})
+			}
 			continue
 		}
 
-		// Prefer the explicit project id; fall back to slug when id is null.
-		projectRef := ""
-		var projectSlug string
+		idOrSlug := ""
 		if p.ID != nil {
-			if id := strings.TrimSpace(*p.ID); id != "" {
-				projectRef = models.ProjectKey(platform, id)
-			}
+			idOrSlug = strings.TrimSpace(*p.ID)
 		}
-		if projectRef == "" {
-			slug := strings.TrimSpace(p.Slug)
-			if slug == "" {
-				results = append(results, appstructs.ModDownloadResult{
-					Skipped: true,
-					Reason:  fmt.Sprintf("payload[%d]: empty project id and slug", i),
-				})
-				continue
+		if idOrSlug == "" {
+			idOrSlug = strings.TrimSpace(p.Slug)
+		}
+		if idOrSlug == "" {
+			results[i] = appstructs.ModDownloadResult{
+				Skipped: true,
+				Reason:  fmt.Sprintf("payload[%d]: empty project id and slug", i),
 			}
-			projectRef = models.ProjectKey(platform, slug)
-			projectSlug = slug
+			continue
 		}
 
-		versionID := strings.TrimSpace(p.File)
-		req := appstructs.ModDownloadRequest{
-			ProjectID: projectRef,
-			Result: models.ModProject{
-				ID:       projectRef,
-				Platform: platform,
-				Slug:     projectSlug,
-			},
-			VersionID: versionID,
+		accepted = append(accepted, acceptedPayload{
+			index:     i,
+			platform:  platform,
+			idOrSlug:  idOrSlug,
+			versionID: strings.TrimSpace(p.File),
+		})
+	}
+
+	// Phase 2: resolve metadata concurrently.
+	resolved := make([]acceptResult, len(accepted))
+	var wg sync.WaitGroup
+	for j, ap := range accepted {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			resolved[j] = s.resolveAcceptedPayload(ap, mcVersion, modLoader)
+		}()
+	}
+	wg.Wait()
+
+	// Phase 3: collect filtered projects, build HTTP response.
+	var filteredProjects []models.ModProject
+	seen := make(map[string]bool)
+	for _, ar := range resolved {
+		results[ar.index] = appstructs.ModDownloadResult{
+			Skipped: ar.skipped,
+			Reason:  ar.reason,
+			Queued:  !ar.skipped,
 		}
-		result := downloader.QueueModDownload(s.ctx, req)
-		logging.Info("http server queued mod",
-			"platform", platform, "projectId", projectRef, "versionId", versionID,
-			"queued", result.Queued, "skipped", result.Skipped, "reason", result.Reason)
-		results = append(results, result)
+		if ar.skipped || ar.project.ID == "" {
+			continue
+		}
+		if seen[ar.project.ID] {
+			continue
+		}
+		seen[ar.project.ID] = true
+		filteredProjects = append(filteredProjects, ar.project)
+	}
+
+	// Phase 4: emit to frontend.
+	if len(filteredProjects) > 0 && s.ctx != nil {
+		runtime.EventsEmit(s.ctx, extensionModsAcceptedEvent, appstructs.SearchModsUpdate{
+			Results: filteredProjects,
+			Loading: false,
+		})
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(results)
+}
+
+// resolveAcceptedPayload fetches metadata for a single payload item, checks
+// version filter match, and auto-pins if the payload carries a matching
+// explicit version.
+func (s *Server) resolveAcceptedPayload(ap acceptedPayload, mcVersion, modLoader string) acceptResult {
+	project, ok := providers.LookupProjectByPlatform(ap.platform, ap.idOrSlug, mcVersion, modLoader)
+	if !ok {
+		logging.Warn("http server project lookup failed", "platform", ap.platform, "idOrSlug", ap.idOrSlug)
+		return acceptResult{index: ap.index, skipped: true, reason: "project not found"}
+	}
+
+	versions := providers.ListMatchingProjectVersions(project, mcVersion, modLoader)
+	if len(versions) == 0 {
+		logging.Info("http server project has no matching versions", "platform", ap.platform, "idOrSlug", ap.idOrSlug, "mcVersion", mcVersion, "modLoader", modLoader)
+		return acceptResult{index: ap.index, skipped: true, reason: "no matching version"}
+	}
+
+	ar := acceptResult{index: ap.index, project: project}
+
+	if ap.versionID != "" && mcVersion != "" && modLoader != "" {
+		for _, v := range versions {
+			if v.ID == ap.versionID {
+				modID := extractModID(project)
+				if modID != "" {
+					if err := database.UpsertPinnedMod(database.PinnedMod{
+						Platform:         strings.ToLower(strings.TrimSpace(project.Platform)),
+						ModID:            modID,
+						VersionID:        ap.versionID,
+						MinecraftVersion: mcVersion,
+						ModLoader:        modLoader,
+					}); err != nil {
+						logging.Error("http server auto-pin failed", "platform", project.Platform, "modID", modID, "versionID", ap.versionID, "error", err)
+					} else {
+						ar.pinned = true
+						logging.Info("http server auto-pinned version", "platform", project.Platform, "modID", modID, "versionID", ap.versionID)
+					}
+				}
+				break
+			}
+		}
+	}
+
+	return ar
+}
+
+// extractModID returns the platform-specific project ID from a ModProject,
+// stripping the "platform:" prefix from the composite ID.
+func extractModID(project models.ModProject) string {
+	if project.ProjectID != "" {
+		return strings.ToLower(strings.TrimSpace(project.ProjectID))
+	}
+	id := project.ID
+	if idx := strings.Index(id, ":"); idx >= 0 {
+		return strings.ToLower(strings.TrimSpace(id[idx+1:]))
+	}
+	return strings.ToLower(strings.TrimSpace(id))
 }
 
 // handleHealth is a lightweight liveness probe for the extension / user.

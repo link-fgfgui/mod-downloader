@@ -151,6 +151,32 @@ func RefreshMatchingProjectVersions(result models.ModProject, minecraftVersion s
 	return filterProjectVersionsForFilter(versions, filter)
 }
 
+func LookupProjectByPlatform(platform, idOrSlug, mcVersion, modLoader string) (models.ModProject, bool) {
+	provider := providerByPlatform(platform)
+	if provider == nil {
+		return models.ModProject{}, false
+	}
+	results, err := provider.ExactSearch(appstructs.SearchModsRequest{
+		Query:     idOrSlug,
+		Version:   strings.TrimSpace(mcVersion),
+		ModLoader: strings.ToLower(strings.TrimSpace(modLoader)),
+	})
+	if err != nil || len(results) == 0 {
+		return models.ModProject{}, false
+	}
+	return results[0], true
+}
+
+func providerByPlatform(platform string) modProvider {
+	switch strings.ToLower(strings.TrimSpace(platform)) {
+	case "curseforge":
+		return curseForgeProvider{}
+	case "modrinth":
+		return modrinthProvider{}
+	}
+	return nil
+}
+
 func ProjectReferenceFromSearchResult(result models.ModProject) string {
 	if result.ID != "" {
 		return result.ID

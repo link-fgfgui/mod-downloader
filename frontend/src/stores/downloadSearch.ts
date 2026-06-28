@@ -14,6 +14,7 @@ import type { structs, models } from "../../wailsjs/go/models";
 const searchModsUpdatedEvent = "search-mods-updated";
 const downloadQueueUpdatedEvent = "download-queue-updated";
 const downloadFailedEvent = "download-failed";
+const extensionModsAcceptedEvent = "extension-mods-accepted";
 
 const searchPageSize = 10;
 
@@ -59,6 +60,7 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
         stopListeningSearchModsUpdated: null as (() => void) | null,
         stopListeningDownloadQueueUpdated: null as (() => void) | null,
         stopListeningDownloadFailed: null as (() => void) | null,
+        stopListeningExtensionModsAccepted: null as (() => void) | null,
     }),
     getters: {
         confirmStatuses: () => new Set(["update", "conflict"]),
@@ -269,7 +271,7 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
             return version.fileName || version.name || version.version || version.id;
         },
         async start() {
-            if (this.stopListeningSearchModsUpdated || this.stopListeningDownloadQueueUpdated || this.stopListeningDownloadFailed) {
+            if (this.stopListeningSearchModsUpdated || this.stopListeningDownloadQueueUpdated || this.stopListeningDownloadFailed || this.stopListeningExtensionModsAccepted) {
                 return;
             }
 
@@ -302,14 +304,29 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
                     void this.refreshDownloadStates();
                 }
             });
+            this.stopListeningExtensionModsAccepted = EventsOn(extensionModsAcceptedEvent, (update) => {
+                const results = update?.results || update?.Results || [];
+                if (results.length === 0) {
+                    return;
+                }
+                this.searchResults = results;
+                this.appendBaseResults = [];
+                this.hasMoreResults = false;
+                this.isSearching = false;
+                this.isLoadingMore = false;
+                this.activeSearchRequestID = "";
+                void this.refreshDownloadStates();
+            });
         },
         stop() {
             this.stopListeningSearchModsUpdated?.();
             this.stopListeningDownloadQueueUpdated?.();
             this.stopListeningDownloadFailed?.();
+            this.stopListeningExtensionModsAccepted?.();
             this.stopListeningSearchModsUpdated = null;
             this.stopListeningDownloadQueueUpdated = null;
             this.stopListeningDownloadFailed = null;
+            this.stopListeningExtensionModsAccepted = null;
         },
     },
 });
