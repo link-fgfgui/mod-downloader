@@ -532,8 +532,8 @@ func LocalModPathsForModIDs(modIDs []string, instanceID string) []global.LocalMo
 	return out
 }
 
-// FilterFullyCoveredPaths 实现 jij 弱引用规则：仅保留那些 modID 集合被 newModIDs 完全覆盖的
-// 已有本地 mod 路径。如果已安装 mod 提供了 newModIDs 中不存在的 modID，则跳过替换。
+// FilterFullyCoveredPaths implements the jij weak reference rule: only keeps existing local mod paths
+// whose modID set is fully covered by newModIDs. If an installed mod provides a modID not in newModIDs, replacement is skipped.
 func FilterFullyCoveredPaths(newModIDs []string, existing []global.LocalModFilePath) []global.LocalModFilePath {
 	if len(existing) == 0 {
 		return existing

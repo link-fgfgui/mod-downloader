@@ -144,8 +144,8 @@ func LocalModPathsInInstance(instanceID string) []LocalModFilePath {
 	return out
 }
 
-// LocalModPathsInInstanceByModID 返回某实例内、所属 jar 的 ModID 匹配 modID 的本地文件路径记录。
-// 每条记录带有 FileSHA1(用于按 sha1 判定状态）与 Path（用于替换时删除磁盘文件）。
+// LocalModPathsInInstanceByModID returns local file path records within an instance whose jar's ModID matches modID.
+// Each record carries FileSHA1 (for status determination by sha1) and Path (for disk file deletion during replacement).
 func LocalModPathsInInstanceByModID(instanceID, modID string) []LocalModFilePath {
 	modID = strings.ToLower(strings.TrimSpace(modID))
 	instanceID = strings.TrimSpace(instanceID)
@@ -170,7 +170,7 @@ func LocalModPathsInInstanceByModID(instanceID, modID string) []LocalModFilePath
 	return out
 }
 
-// LocalModIDsBySHA1 返回某 SHA1 对应 JAR 的全部 ModID（小写、去重）。
+// LocalModIDsBySHA1 returns all ModIDs (lowercased, deduplicated) of the JAR corresponding to the given SHA1.
 func LocalModIDsBySHA1(sha1 string) []string {
 	sha1 = strings.TrimSpace(sha1)
 	if sha1 == "" {
@@ -191,7 +191,7 @@ func LocalModIDsBySHA1(sha1 string) []string {
 	return ids
 }
 
-// RemoveLocalModByPath 从内存表移除某个本地 mod 路径记录（替换旧版本时配合磁盘删除使用）。
+// RemoveLocalModByPath removes a local mod path record from the in-memory table (used in conjunction with disk deletion when replacing an old version).
 func RemoveLocalModByPath(path string) {
 	path = strings.TrimSpace(path)
 	if path == "" {

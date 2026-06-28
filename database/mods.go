@@ -693,8 +693,8 @@ func DeletePinnedMod(platform, modID, mcVersion, modLoader string) error {
 	return nil
 }
 
-// ListPinnedMods 返回所有 pinned mod 的快照，按 Platform -> ModID -> MinecraftVersion -> ModLoader 升序稳定排序。
-// 返回的是副本，调用方可安全修改。
+// ListPinnedMods returns a snapshot of all pinned mods, sorted in ascending stable order by Platform -> ModID -> MinecraftVersion -> ModLoader.
+// The returned value is a copy; callers may safely modify it.
 func ListPinnedMods() []PinnedMod {
 	d, err := readyDB()
 	if err != nil {

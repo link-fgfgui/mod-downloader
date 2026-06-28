@@ -162,28 +162,28 @@ func (a *App) GetPreferences() AppPreferences {
 	return AppPreferences{Theme: a.config.Prefers.Theme.Normalized().String()}
 }
 
-// SettingsView 是返回给前端的设置快照。API key 采用“是否存在 + 掩码”策略，
-// 不把原始密钥回传给前端，前端通过 SaveApiKeys 覆盖写。
+// SettingsView is a settings snapshot returned to the frontend. API keys use an "existence + mask" strategy,
+// not sending raw keys back to the frontend; the frontend overwrites via SaveApiKeys.
 type SettingsView struct {
 	Theme             string `json:"theme"`        // dark | light | system
-	MinecraftDir      string `json:"minecraftDir"` // 简化路径（含环境变量）
+	MinecraftDir      string `json:"minecraftDir"` // simplified path (with env vars)
 	HasCurseforgeKey  bool   `json:"hasCurseforgeKey"`
-	CurseforgeKeyMask string `json:"curseforgeKeyMask"` // 形如 "abcd****wxyz" 或 ""
+	CurseforgeKeyMask string `json:"curseforgeKeyMask"` // e.g. "abcd****wxyz" or ""
 	HasModrinthKey    bool   `json:"hasModrinthKey"`
 	ModrinthKeyMask   string `json:"modrinthKeyMask"`
 }
 
-// SaveApiKeysRequest 是前端保存 API key 的请求结构。
+// SaveApiKeysRequest is the request structure for the frontend to save API keys.
 type SaveApiKeysRequest struct {
 	CurseforgeApiKey string `json:"curseforgeApiKey"`
 	ModrinthApiKey   string `json:"modrinthApiKey"`
 }
 
-// 约定：字段值为字符串 "<keep>" 时表示不修改原值（因为前端拿不到明文）。
-// 空字符串 "" 表示清除。其他值表示覆盖。
+// Convention: a field value of "<keep>" means do not modify the original value (since the frontend cannot access plaintext).
+// An empty string "" means clear. Any other value means overwrite.
 const apiKeyKeepSentinel = "<keep>"
 
-// GetSettings 返回当前设置的只读视图。
+// GetSettings returns a read-only view of the current settings.
 func (a *App) GetSettings() SettingsView {
 	sv := SettingsView{Theme: configs.ThemeDark.String()}
 	if a.config != nil {
@@ -200,7 +200,7 @@ func (a *App) GetSettings() SettingsView {
 	return sv
 }
 
-// maskKey 保留前 4 与后 4 字符，中间以 **** 替换；过短则全掩。
+// maskKey keeps the first 4 and last 4 characters, replacing the middle with ****; fully masks if too short.
 func maskKey(s string) string {
 	s = strings.TrimSpace(s)
 	if s == "" {
@@ -212,8 +212,8 @@ func maskKey(s string) string {
 	return s[:4] + "****" + s[len(s)-4:]
 }
 
-// SaveTheme 更新主题偏好并立即持久化。返回更新后的主题字符串。
-// 非法值回退为 dark。
+// SaveTheme updates the theme preference and persists it immediately. Returns the updated theme string.
+// Invalid values fall back to dark.
 func (a *App) SaveTheme(theme string) string {
 	if a.config == nil {
 		a.config = &configs.Config{}
@@ -229,8 +229,8 @@ func (a *App) SaveTheme(theme string) string {
 	return parsed.String()
 }
 
-// SaveApiKeys 更新 API key 并立即持久化 + 重初始化客户端。
-// 传空字符串表示清除该 key；传特殊值（见上）表示保持不变。
+// SaveApiKeys updates API keys and persists them immediately + reinitializes clients.
+// An empty string means clear the key; the special value (see above) means keep unchanged.
 func (a *App) SaveApiKeys(req SaveApiKeysRequest) SettingsView {
 	if a.config == nil {
 		a.config = &configs.Config{}
@@ -244,13 +244,13 @@ func (a *App) SaveApiKeys(req SaveApiKeysRequest) SettingsView {
 	if err := configs.Save(a.config); err != nil {
 		logging.Error("save api keys failed", "error", err)
 	}
-	// 重初始化 CurseForge 客户端
+	// Reinitialize CurseForge client
 	if strings.TrimSpace(a.config.Keys.CurseforgeApiKey) != "" {
 		global.SetCurseForgeClient(curseforge.NewClient(a.config.Keys.CurseforgeApiKey))
 	} else {
 		global.SetCurseForgeClient(nil)
 	}
-	// Modrinth 当前不使用 key，保留字段供未来使用
+	// Modrinth currently does not use a key; field reserved for future use
 	return a.GetSettings()
 }
 
@@ -348,8 +348,8 @@ func (a *App) GetVersions() []structs.VersionInfo {
 	return loadVersionsFromDisk(mcDir)
 }
 
-// GetSelectedVersion 返回当前选中的实例（含 MinecraftVersion / ModLoader），
-// 供前端在挂载时主动拉取，避免错过 selected-version-changed 事件导致与实际选中实例不同步。
+// GetSelectedVersion returns the currently selected instance (including MinecraftVersion / ModLoader),
+// for the frontend to fetch on mount, avoiding missed selected-version-changed events that could cause desync.
 func (a *App) GetSelectedVersion() structs.VersionInfo {
 	return global.GetSelectedVersion()
 }
