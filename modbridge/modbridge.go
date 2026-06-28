@@ -146,13 +146,18 @@ func InstallStatus(req appstructs.ModDownloadRequest) string {
 		return BtnStatusUpdate
 	}
 
-	// Search-list rendering must not range-parse remote JARs; only use already persisted mod IDs.
-	if modIDs := normalizedModIDs(version.ModIDs); len(modIDs) > 0 {
+	// Search-list rendering reads memory + DB cache only (no remote JAR parse).
+	// On cache miss, marks the version for async backfill so a later refresh can
+	// resolve the correct state without blocking the initial render.
+	modIDs := resolveVersionModIDs(version)
+	if len(modIDs) > 0 {
 		for _, p := range LocalModPathsForModIDs(modIDs, instanceID) {
 			if strings.ToLower(strings.TrimSpace(p.FileSHA1)) != latestSHA1 {
 				return BtnStatusConflict
 			}
 		}
+	} else {
+		markBackfill(version, req.ModLoader)
 	}
 
 	return BtnStatusNew
@@ -204,13 +209,24 @@ func InstallStatusPrecise(req appstructs.ModDownloadRequest) string {
 }
 
 // DownloadStates returns button states for a list of search results.
-func DownloadStates(req appstructs.DownloadStatesRequest) []appstructs.ModDownloadButtonState {
+// onBackfillComplete, when non-nil, is invoked once after any async remote
+// mod-ID backfills triggered by cache misses finish; callers use it to notify
+// the frontend to re-fetch states so the now-populated DB cache takes effect.
+func DownloadStates(req appstructs.DownloadStatesRequest, onBackfillComplete func()) []appstructs.ModDownloadButtonState {
 	req.MinecraftVersion = strings.TrimSpace(req.MinecraftVersion)
 	req.ModLoader = strings.ToLower(strings.TrimSpace(req.ModLoader))
 
 	states := make([]appstructs.ModDownloadButtonState, len(req.Results))
 	selected := global.GetSelectedVersion()
 	instanceID := versionInstanceID(selected)
+
+	// R2: if the selected instance has never been scanned, scan it once now so
+	// status decisions aren't falsely reported as "new" just because the local
+	// mod index is empty. No TTL guard — already-scanned instances are skipped.
+	if instanceID != "" && !global.HasLocalModPathsInInstance(instanceID) {
+		ensureInstanceModsScanned(selected)
+	}
+
 	if instanceID == "" || !global.HasLocalModPathsInInstance(instanceID) {
 		for i := range req.Results {
 			states[i] = defaultDownloadButtonState(req.Results[i])
@@ -239,6 +255,19 @@ func DownloadStates(req appstructs.DownloadStatesRequest) []appstructs.ModDownlo
 		}(i)
 	}
 	wg.Wait()
+
+	// R3: drain versions whose mod IDs were unavailable during this render and
+	// backfill them asynchronously. The emitter fires once after all backfills
+	// complete so the frontend can re-fetch with the now-warmed DB cache.
+	backfill := drainPendingBackfills()
+	if len(backfill) > 0 && onBackfillComplete != nil {
+		go func() {
+			for _, b := range backfill {
+				backfillVersionModIDs(b.version, b.modLoader)
+			}
+			onBackfillComplete()
+		}()
+	}
 	return states
 }
 
@@ -295,6 +324,116 @@ func PersistVersionModIDs(platformVersionID string, modIDs []string) bool {
 		return false
 	}
 	return true
+}
+
+// resolveVersionModIDs returns version mod IDs using only synchronous sources:
+// the in-memory ModIDs field first, then the persisted DB cache. It never
+// triggers a remote JAR parse — use VersionModIDs for that. Intended for
+// search-list InstallStatus where remote parsing must be deferred to an
+// async backfill.
+func resolveVersionModIDs(version models.ModVersion) []string {
+	if modIDs := normalizedModIDs(version.ModIDs); len(modIDs) > 0 {
+		return modIDs
+	}
+	if version.ID == "" {
+		return nil
+	}
+	persisted, err := database.GetVersionModIDs(version.ID)
+	if err != nil {
+		logging.Warn("get version mod IDs from DB failed", "platformVersionID", version.ID, "error", err)
+		return nil
+	}
+	return normalizedModIDs(persisted)
+}
+
+// --- async mod-ID backfill (R3) ---
+
+// pendingBackfill records a version whose mod IDs were unavailable during a
+// search-list render and should be resolved asynchronously.
+type pendingBackfill struct {
+	version   models.ModVersion
+	modLoader string
+}
+
+var (
+	backfillMu       sync.Mutex
+	backfillInflight = make(map[string]struct{}) // key: version.ID — currently being parsed
+	pendingBackfills []pendingBackfill
+	pendingSet       = make(map[string]struct{}) // key: version.ID — already queued, not yet drained
+)
+
+// markBackfill queues a version for async mod-ID backfill. Deduplicates by
+// version.ID against both the pending queue and the in-flight set so
+// concurrent InstallStatus calls for the same version don't enqueue duplicate
+// work within a batch or while a prior backfill is still running.
+func markBackfill(version models.ModVersion, modLoader string) {
+	if strings.TrimSpace(version.ID) == "" {
+		return
+	}
+	backfillMu.Lock()
+	defer backfillMu.Unlock()
+	if _, queued := pendingSet[version.ID]; queued {
+		return
+	}
+	if _, inflight := backfillInflight[version.ID]; inflight {
+		return
+	}
+	pendingBackfills = append(pendingBackfills, pendingBackfill{version: version, modLoader: modLoader})
+	pendingSet[version.ID] = struct{}{}
+}
+
+// drainPendingBackfills returns and clears the queued backfills. Called once
+// per DownloadStates batch after all InstallStatus goroutines complete. The
+// pending-set is cleared so a later batch can re-queue if the DB write failed.
+func drainPendingBackfills() []pendingBackfill {
+	backfillMu.Lock()
+	defer backfillMu.Unlock()
+	out := pendingBackfills
+	pendingBackfills = nil
+	pendingSet = make(map[string]struct{})
+	return out
+}
+
+// backfillVersionModIDs resolves a version's mod IDs via VersionModIDs (which
+// may parse the remote JAR and writes the result back to the DB cache) under
+// an in-flight guard so the same version.ID is never parsed concurrently.
+func backfillVersionModIDs(version models.ModVersion, modLoader string) {
+	if strings.TrimSpace(version.ID) == "" {
+		return
+	}
+	backfillMu.Lock()
+	if _, inflight := backfillInflight[version.ID]; inflight {
+		backfillMu.Unlock()
+		return
+	}
+	backfillInflight[version.ID] = struct{}{}
+	backfillMu.Unlock()
+	defer func() {
+		backfillMu.Lock()
+		delete(backfillInflight, version.ID)
+		backfillMu.Unlock()
+	}()
+
+	_ = VersionModIDs(version, modLoader)
+}
+
+// --- local mod index refresh (R2) ---
+
+// ensureInstanceModsScanned scans the selected instance's mods directory when
+// its local mod index is empty, populating global.LocalModFilePaths so
+// InstallStatus has local data to compare against. Self-contained in
+// modbridge (does not touch app.go's version-list cache).
+func ensureInstanceModsScanned(selected mcstructs.VersionInfo) {
+	instanceID := versionInstanceID(selected)
+	if instanceID == "" {
+		return
+	}
+	mcDir := global.GetMinecraftDir()
+	versionDir := minecraft.VersionDirPath(mcDir, selected)
+	if versionDir == "" {
+		return
+	}
+	minecraft.ScanVersionMods(versionDir, instanceID, selected.MinecraftVersion, selected.ModLoader, mcDir)
 }
 
 // PlatformMetadataForSHA1 looks up a platform version by SHA1 and returns the associated

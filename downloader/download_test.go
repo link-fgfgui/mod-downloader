@@ -34,7 +34,7 @@ func TestGetDownloadStatesReturnsDefaultWhenSelectedInstanceHasNoLocalMods(t *te
 			Platform: "Modrinth",
 			Slug:     "sodium",
 		}},
-	})
+	}, nil)
 
 	if len(states) != 1 {
 		t.Fatalf("state count = %d, want 1", len(states))

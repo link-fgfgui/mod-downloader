@@ -29,6 +29,7 @@ import (
 const minecraftDirChangedEvent = "minecraft-dir-changed"
 const selectedVersionChangedEvent = "selected-version-changed"
 const searchModsUpdatedEvent = "search-mods-updated"
+const downloadStatesUpdatedEvent = "download-states-updated"
 
 // App struct
 type App struct {
@@ -266,7 +267,9 @@ func (a *App) CancelDownload(id string) bool {
 }
 
 func (a *App) GetDownloadStates(req appstructs.DownloadStatesRequest) []appstructs.ModDownloadButtonState {
-	return downloader.GetDownloadStates(req)
+	return downloader.GetDownloadStates(req, func() {
+		runtime.EventsEmit(a.ctx, downloadStatesUpdatedEvent)
+	})
 }
 
 func (a *App) shutdown(ctx context.Context) {

@@ -133,8 +133,8 @@ func CancelDownload(ctx context.Context, id string) bool {
 	return true
 }
 
-func GetDownloadStates(req appstructs.DownloadStatesRequest) []appstructs.ModDownloadButtonState {
-	return modbridge.DownloadStates(req)
+func GetDownloadStates(req appstructs.DownloadStatesRequest, onBackfillComplete func()) []appstructs.ModDownloadButtonState {
+	return modbridge.DownloadStates(req, onBackfillComplete)
 }
 
 func projectVersionJobKey(version models.ModVersion) string {
