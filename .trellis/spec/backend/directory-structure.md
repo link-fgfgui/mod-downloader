@@ -145,6 +145,60 @@ func InstallStatus(version models.ModVersion, instanceID string) string {
 
 **Extensibility**: Future cross-domain features (e.g., "find all platform mods for this local JAR", "suggest updates for local mods") go in `modbridge`.
 
+### Decision: Launcher Directory Layouts Live in `minecraft`
+
+**Context**: The app supports both a standard `.minecraft` directory and a
+Prism Launcher `instances/` directory. Both produce the same app-facing shape:
+`[]structs/minecraft.VersionInfo` plus a selected version directory whose
+`mods/` child is scanned or used as an install target.
+
+**Decision**: Launcher-specific directory detection, instance aggregation, and
+version-directory resolution belong in `mod-downloader/minecraft`. App-facing
+code calls `minecraft.LoadLauncherVersions` and `minecraft.VersionDirPath`
+instead of branching on launcher markers.
+
+**Signatures**:
+```go
+type GameDirVersionLoader func(gameDir string) []structs.VersionInfo
+
+func LoadLauncherVersions(root string, loadGameDir GameDirVersionLoader) []structs.VersionInfo
+func VersionDirPath(root string, version structs.VersionInfo) string
+```
+
+**Contracts**:
+- `LoadLauncherVersions` receives the user-selected root and a callback that
+  loads ordinary game directories containing `versions/`.
+- The callback owns manifest validation policy; launcher layouts only decide
+  which game directories should be passed to it.
+- Standard `.minecraft` is the fallback layout: load from `root`.
+- Prism `instances/` is selected when `root` contains a Prism-like child.
+- Prism entries keep the existing composite ID format
+  `<instanceName>/<versionFolder>` and display name `<instanceName>`.
+- `VersionDirPath` is the single resolver used by scanning, hardlink indexing,
+  and install-target lookup.
+
+**Validation & Error Matrix**:
+- Empty root or nil loader -> `nil` versions.
+- Root read failure in a launcher layout -> `nil` versions for that layout.
+- Empty version ID/name or unknown composite form -> empty version directory.
+- Invalid manifests are skipped by the game-dir loader, not by launcher layout
+  code.
+
+**Good/Base/Bad Cases**:
+- Good: add a new launcher by adding another layout implementation in
+  `minecraft`; callers stay launcher-agnostic.
+- Base: standard `.minecraft` with `versions/<id>/<id>.json` still works
+  through the fallback layout.
+- Bad: adding `if minecraft.IsSomeLauncherDir(...)` branches in `app.go`,
+  `modbridge`, or downloader code.
+
+**Tests Required**:
+- Standard fallback calls the game-dir loader exactly once with the selected
+  root.
+- Prism aggregation preserves composite IDs, instance display names, `.minecraft`
+  subfolder preference, and root fallback.
+- `VersionDirPath` resolves both standard IDs and Prism composite IDs.
+
 ### Decision: Memory Cache for High-Churn Data, Persistent Cache for Immutable Data
 
 **Context**: We had two types of cached metadata:

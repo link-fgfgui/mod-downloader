@@ -164,10 +164,10 @@ func (a *App) GetPreferences() AppPreferences {
 // SettingsView 是返回给前端的设置快照。API key 采用“是否存在 + 掩码”策略，
 // 不把原始密钥回传给前端，前端通过 SaveApiKeys 覆盖写。
 type SettingsView struct {
-	Theme             string `json:"theme"`              // dark | light | system
-	MinecraftDir      string `json:"minecraftDir"`       // 简化路径（含环境变量）
+	Theme             string `json:"theme"`        // dark | light | system
+	MinecraftDir      string `json:"minecraftDir"` // 简化路径（含环境变量）
 	HasCurseforgeKey  bool   `json:"hasCurseforgeKey"`
-	CurseforgeKeyMask string `json:"curseforgeKeyMask"`  // 形如 "abcd****wxyz" 或 ""
+	CurseforgeKeyMask string `json:"curseforgeKeyMask"` // 形如 "abcd****wxyz" 或 ""
 	HasModrinthKey    bool   `json:"hasModrinthKey"`
 	ModrinthKeyMask   string `json:"modrinthKeyMask"`
 }
@@ -372,13 +372,7 @@ func loadVersionsFromDisk(mcDir string) []structs.VersionInfo {
 		return nil
 	}
 
-	var infos []structs.VersionInfo
-	if minecraft.IsPrismInstancesDir(mcDir) {
-		infos = loadPrismInstancesVersions(mcDir)
-	} else {
-		infos = loadMinecraftDirVersions(mcDir)
-	}
-
+	infos := minecraft.LoadLauncherVersions(mcDir, loadMinecraftDirVersions)
 	global.SetVersionsForDir(mcDir, infos)
 	ensureSelectedVersion(infos)
 	generation := global.HardlinkIndexGeneration()
@@ -415,44 +409,6 @@ func loadMinecraftDirVersions(gameDir string) []structs.VersionInfo {
 			logging.Warn("skip invalid minecraft version", "versionID", versionID, "minecraftVersion", info.MinecraftVersion, "modLoader", info.ModLoader)
 			continue
 		}
-		infos = append(infos, info)
-	}
-	return infos
-}
-
-// loadPrismInstancesVersions scans a Prism Launcher "instances/" folder and
-// produces one VersionInfo entry per Prism instance — mirroring how the
-// original .minecraft logic produces one entry per version folder. The entry's
-// Name is the Prism instance name (shown in the sidebar, aligned with the
-// original showing the version folder name). The ID is the composite
-// "<instanceName>/<versionFolder>" so the version folder can be located on disk
-// via VersionDirPath; the instance name alone is not enough because a Prism
-// instance's versions/<folder> name is not predictable from the instance name.
-func loadPrismInstancesVersions(instancesDir string) []structs.VersionInfo {
-	entries, err := os.ReadDir(instancesDir)
-	if err != nil {
-		logging.Error("read prism instances dir failed", "instancesDir", instancesDir, "error", err)
-		return nil
-	}
-
-	var infos []structs.VersionInfo
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		instanceName := entry.Name()
-		instanceDir := filepath.Join(instancesDir, instanceName)
-		gameDir := minecraft.PrismInstanceGameDir(instanceDir)
-		instanceVersions := loadMinecraftDirVersions(gameDir)
-		if len(instanceVersions) == 0 {
-			continue
-		}
-		// One entry per Prism instance: take the first valid version folder.
-		// A Prism instance is conceptually one modpack, so multiple version
-		// folders inside one instance is an edge case we don't surface.
-		info := instanceVersions[0]
-		info.ID = minecraft.MakePrismVersionID(instanceName, info.ID)
-		info.Name = instanceName
 		infos = append(infos, info)
 	}
 	return infos
