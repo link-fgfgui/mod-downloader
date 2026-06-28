@@ -81,6 +81,8 @@
             @install="installMod"
             @load-more="loadMoreSearchResults"
             @show-versions="openVersionsOverlay"
+            @batch-download="batchDownload"
+            @batch-unpin="batchUnpin"
         ></SearchResultList>
 
         <v-overlay
@@ -284,6 +286,19 @@ const isPinningAnotherVersion = (version: models.ModVersion) =>
     downloadStore.isPinningAnotherVersion(version);
 const versionFileName = (version: models.ModVersion) =>
     downloadStore.versionFileName(version);
+
+const batchDownload = (results: models.ModProject[]) => {
+    for (const result of results) {
+        const index = searchResults.value.indexOf(result);
+        if (index === -1) continue;
+        const state = downloadStates.value[index];
+        installMod({ result, key: state?.key, status: state?.status, confirm: false });
+    }
+};
+
+const batchUnpin = (results: models.ModProject[]) => {
+    downloadStore.batchUnpin(results);
+};
 
 const checkMinecraftDir = async () => {
     showDirOverlay.value = !(await ValidateMinecraftDir());

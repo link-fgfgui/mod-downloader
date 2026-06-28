@@ -202,6 +202,22 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
                 this.downloadingKeys = next;
             }
         },
+        async batchUnpin(results: SearchModSnapshot[]) {
+            for (const result of results) {
+                const modId = this.modIDFromResult(result);
+                const pin = await GetPinnedModVersion(result.platform, modId, this.selectedVersion, this.selectedModLoader);
+                if (pin?.versionId) {
+                    await PinModVersion({
+                        platform: result.platform,
+                        modId,
+                        versionId: pin.versionId,
+                        minecraftVersion: this.selectedVersion,
+                        modLoader: this.selectedModLoader,
+                    } as structs.ModVersionPinRequest);
+                }
+            }
+            await this.refreshDownloadStates();
+        },
         async openVersionsOverlay(result: SearchModSnapshot) {
             this.selectedMod = result;
             this.matchingVersions = [];

@@ -32,6 +32,13 @@ const messages = {
       selectDirDesc: "当前目录为空或不可用，请先在左侧底部选择 .minecraft folder。",
       noMatchingVersions: "没有匹配当前 Minecraft 版本和 Mod Loader 的版本。",
       queued: "已加入下载队列",
+      selection: {
+        count: "已选 {n} 项",
+        downloadAll: "全部下载",
+        unpin: "取消固定",
+        copyNames: "复制名称",
+        deselectAll: "取消选择",
+      },
       confirmReplace: {
         updateTitle: "更新到最新版本？",
         updateBody: "将把已安装的旧版本 jar 重命名为 .old 后缀，并下载该项目的最新版本。提示：右键按钮可跳过此确认。",
@@ -86,6 +93,13 @@ const messages = {
       noMatchingVersions:
         "No versions match the current Minecraft version and Mod Loader.",
       queued: "Added to download queue",
+      selection: {
+        count: "{n} selected",
+        downloadAll: "Download All",
+        unpin: "Unpin",
+        copyNames: "Copy Names",
+        deselectAll: "Deselect All",
+      },
       confirmReplace: {
         updateTitle: "Update to latest version?",
         updateBody: "The installed older jar will be renamed with a .old suffix and the project's latest version downloaded. Tip: right-click the button to skip this confirmation.",
