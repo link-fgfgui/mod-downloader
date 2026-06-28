@@ -206,3 +206,36 @@ Replaced httpserver auto-download with metadata resolution and display flow: res
 ### Next Steps
 
 - None - task complete
+
+
+## Session 7: Abstract launcher instance layouts
+
+**Date**: 2026-06-28
+**Task**: Abstract launcher instance layouts
+**Branch**: `abs-mc-dir`
+
+### Summary
+
+Refactored standard .minecraft and Prism instance folder handling behind a minecraft package launcher layout abstraction, preserved existing Prism composite ID behavior, added abstraction tests, and documented the launcher layout convention.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c4ebf81` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
