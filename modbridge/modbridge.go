@@ -243,11 +243,22 @@ func DownloadStates(req appstructs.DownloadStatesRequest) []appstructs.ModDownlo
 }
 
 // VersionModIDs returns the mod IDs for a platform version.
-// It reads from the persisted ModIDs field first; if empty, parses the remote JAR
-// and persists the result for future use.
+// It reads from the in-memory ModIDs field first, then the persisted DB cache,
+// and only falls back to parsing the remote JAR (HTTP range requests) when both
+// are empty. The DB read-back is what prevents duplicate range fetches when the
+// same version struct is reused across calls (e.g. tryHardlinkInstall + downloadModJob).
 func VersionModIDs(version models.ModVersion, modLoader string) []string {
 	if modIDs := normalizedModIDs(version.ModIDs); len(modIDs) > 0 {
 		return modIDs
+	}
+	if version.ID != "" {
+		if persisted, err := database.GetVersionModIDs(version.ID); err == nil {
+			if modIDs := normalizedModIDs(persisted); len(modIDs) > 0 {
+				return modIDs
+			}
+		} else {
+			logging.Warn("get version mod IDs from DB failed", "platformVersionID", version.ID, "error", err)
+		}
 	}
 
 	mods, err := parseRemoteModJar(version.DownloadURL, modLoader)

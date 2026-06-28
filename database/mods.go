@@ -739,3 +739,35 @@ func SetVersionModIDs(platformVersionID string, modIDs []string) error {
 	logging.Info("version mod IDs set", "platformVersionID", platformVersionID, "modIDCount", len(modIDs))
 	return nil
 }
+
+// GetVersionModIDs returns the persisted mod IDs for a platform version ID.
+// Returns nil (no error) when the version is unknown or has no persisted IDs;
+// callers should treat nil as a cache miss.
+func GetVersionModIDs(platformVersionID string) ([]string, error) {
+	d, err := readyDB()
+	if err != nil {
+		return nil, err
+	}
+	platformVersionID = strings.TrimSpace(platformVersionID)
+	if platformVersionID == "" {
+		return nil, nil
+	}
+
+	var modIDs []string
+	err = d.view(func(state *cacheState) error {
+		key, ok := state.PlatformVersionKeyByID[platformVersionID]
+		if !ok {
+			return nil
+		}
+		if v, ok := state.PlatformVersions[key]; ok {
+			modIDs = copyStringSlice(v.ModIDs)
+		}
+		return nil
+	})
+	if err != nil {
+		logging.Error("get version mod IDs failed", "platformVersionID", platformVersionID, "error", err)
+		return nil, err
+	}
+	logging.Debug("version mod IDs loaded", "platformVersionID", platformVersionID, "modIDCount", len(modIDs))
+	return modIDs, nil
+}

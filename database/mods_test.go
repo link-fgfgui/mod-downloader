@@ -203,6 +203,21 @@ func TestCacheVersionModIDs(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Direct read-back by version ID must reflect the persisted, deduplicated IDs.
+	direct, err := GetVersionModIDs(versions[0].ID)
+	if err != nil {
+		t.Fatalf("GetVersionModIDs error: %v", err)
+	}
+	if len(direct) != 2 || direct[0] != "sodium" || direct[1] != "other" {
+		t.Fatalf("GetVersionModIDs = %#v", direct)
+	}
+
+	// Unknown version ID must return (nil, nil) — callers treat this as a cache miss.
+	miss, err := GetVersionModIDs("does-not-exist")
+	if err != nil || miss != nil {
+		t.Fatalf("GetVersionModIDs unknown = %#v, %v", miss, err)
+	}
+
 	reopenTestDB(t, path)
 
 	versions, err = GetPlatformVersions("Modrinth", "sodium")
@@ -212,5 +227,14 @@ func TestCacheVersionModIDs(t *testing.T) {
 	modIDs := versions[0].ModIDs
 	if len(modIDs) != 2 || modIDs[0] != "sodium" || modIDs[1] != "other" {
 		t.Fatalf("modIDs = %#v", modIDs)
+	}
+
+	// Direct read-back must survive reopen.
+	direct, err = GetVersionModIDs(versions[0].ID)
+	if err != nil {
+		t.Fatalf("GetVersionModIDs after reopen error: %v", err)
+	}
+	if len(direct) != 2 || direct[0] != "sodium" || direct[1] != "other" {
+		t.Fatalf("GetVersionModIDs after reopen = %#v", direct)
 	}
 }
