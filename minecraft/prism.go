@@ -130,14 +130,10 @@ func VersionDirPath(mcDir string, version structs.VersionInfo) string {
 	if mcDir == "" {
 		return ""
 	}
-	folder := VersionFolderName(version)
-	if folder == "" {
-		return ""
+	for _, layout := range launcherLayouts {
+		if versionDir := layout.VersionDir(mcDir, version); versionDir != "" {
+			return versionDir
+		}
 	}
-	if instanceName, _, ok := SplitPrismVersionID(version.ID); ok {
-		instanceDir := filepath.Join(mcDir, instanceName)
-		gameDir := PrismInstanceGameDir(instanceDir)
-		return filepath.Join(gameDir, "versions", folder)
-	}
-	return filepath.Join(mcDir, "versions", folder)
+	return ""
 }

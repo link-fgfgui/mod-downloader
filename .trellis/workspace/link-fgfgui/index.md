@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 6
+- **Total Sessions**: 7
 - **Last Active**: 2026-06-28
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~208 | Active |
+| `journal-1.md` | ~241 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 7 | 2026-06-28 | Abstract launcher instance layouts | `c4ebf81` | `abs-mc-dir` |
 | 6 | 2026-06-28 | HTTP server accept → display on download page | `87db898` | `master` |
 | 5 | 2026-06-28 | Add multi-select and floating action bar to SearchResultList | `9a36b2f` | `master` |
 | 4 | 2026-06-27 | Separate local and platform dependency analysis | `6932197` | `master` |
