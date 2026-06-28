@@ -39,6 +39,42 @@ export namespace main {
 	        this.theme = source["theme"];
 	    }
 	}
+	export class SaveApiKeysRequest {
+	    curseforgeApiKey: string;
+	    modrinthApiKey: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SaveApiKeysRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.curseforgeApiKey = source["curseforgeApiKey"];
+	        this.modrinthApiKey = source["modrinthApiKey"];
+	    }
+	}
+	export class SettingsView {
+	    theme: string;
+	    minecraftDir: string;
+	    hasCurseforgeKey: boolean;
+	    curseforgeKeyMask: string;
+	    hasModrinthKey: boolean;
+	    modrinthKeyMask: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SettingsView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.theme = source["theme"];
+	        this.minecraftDir = source["minecraftDir"];
+	        this.hasCurseforgeKey = source["hasCurseforgeKey"];
+	        this.curseforgeKeyMask = source["curseforgeKeyMask"];
+	        this.hasModrinthKey = source["hasModrinthKey"];
+	        this.modrinthKeyMask = source["modrinthKeyMask"];
+	    }
+	}
 
 }
 

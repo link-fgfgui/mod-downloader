@@ -128,6 +128,28 @@ func (a *App) PinModVersion(req appstructs.ModVersionPinRequest) database.Pinned
 	return pin
 }
 
+func (a *App) ListPinnedMods() []database.PinnedMod {
+	return database.ListPinnedMods()
+}
+
+func (a *App) UnpinMod(platform, modID, mcVersion, modLoader string) bool {
+	platform = strings.ToLower(strings.TrimSpace(platform))
+	modID = strings.ToLower(strings.TrimSpace(modID))
+	mcVersion = strings.TrimSpace(mcVersion)
+	modLoader = strings.ToLower(strings.TrimSpace(modLoader))
+	if platform == "" || modID == "" || mcVersion == "" || modLoader == "" {
+		return false
+	}
+	if _, found := database.GetPinnedMod(platform, modID, mcVersion, modLoader); !found {
+		return false
+	}
+	if err := database.DeletePinnedMod(platform, modID, mcVersion, modLoader); err != nil {
+		logging.Error("unpin mod failed", "platform", platform, "modID", modID, "minecraftVersion", mcVersion, "modLoader", modLoader, "error", err)
+		return false
+	}
+	return true
+}
+
 func (a *App) GetMinecraftReleaseVersions() []string {
 	return minecraft.GetMinecraftReleaseVersions()
 }
@@ -137,6 +159,98 @@ func (a *App) GetPreferences() AppPreferences {
 		return AppPreferences{Theme: configs.ThemeDark.String()}
 	}
 	return AppPreferences{Theme: a.config.Prefers.Theme.Normalized().String()}
+}
+
+// SettingsView 是返回给前端的设置快照。API key 采用“是否存在 + 掩码”策略，
+// 不把原始密钥回传给前端，前端通过 SaveApiKeys 覆盖写。
+type SettingsView struct {
+	Theme             string `json:"theme"`              // dark | light | system
+	MinecraftDir      string `json:"minecraftDir"`       // 简化路径（含环境变量）
+	HasCurseforgeKey  bool   `json:"hasCurseforgeKey"`
+	CurseforgeKeyMask string `json:"curseforgeKeyMask"`  // 形如 "abcd****wxyz" 或 ""
+	HasModrinthKey    bool   `json:"hasModrinthKey"`
+	ModrinthKeyMask   string `json:"modrinthKeyMask"`
+}
+
+// SaveApiKeysRequest 是前端保存 API key 的请求结构。
+type SaveApiKeysRequest struct {
+	CurseforgeApiKey string `json:"curseforgeApiKey"`
+	ModrinthApiKey   string `json:"modrinthApiKey"`
+}
+
+// 约定：字段值为字符串 "<keep>" 时表示不修改原值（因为前端拿不到明文）。
+// 空字符串 "" 表示清除。其他值表示覆盖。
+const apiKeyKeepSentinel = "<keep>"
+
+// GetSettings 返回当前设置的只读视图。
+func (a *App) GetSettings() SettingsView {
+	sv := SettingsView{Theme: configs.ThemeDark.String()}
+	if a.config != nil {
+		sv.Theme = a.config.Prefers.Theme.Normalized().String()
+		sv.MinecraftDir = minecraft.SimplifyPathWithEnv(a.config.Prefers.MinecraftDir)
+		sv.HasCurseforgeKey = strings.TrimSpace(a.config.Keys.CurseforgeApiKey) != ""
+		sv.CurseforgeKeyMask = maskKey(a.config.Keys.CurseforgeApiKey)
+		sv.HasModrinthKey = strings.TrimSpace(a.config.Keys.ModrinthApiKey) != ""
+		sv.ModrinthKeyMask = maskKey(a.config.Keys.ModrinthApiKey)
+	}
+	if sv.MinecraftDir == "" {
+		sv.MinecraftDir = minecraft.SimplifyPathWithEnv(global.GetMinecraftDir())
+	}
+	return sv
+}
+
+// maskKey 保留前 4 与后 4 字符，中间以 **** 替换；过短则全掩。
+func maskKey(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	if len(s) <= 8 {
+		return "****"
+	}
+	return s[:4] + "****" + s[len(s)-4:]
+}
+
+// SaveTheme 更新主题偏好并立即持久化。返回更新后的主题字符串。
+// 非法值回退为 dark。
+func (a *App) SaveTheme(theme string) string {
+	if a.config == nil {
+		a.config = &configs.Config{}
+	}
+	parsed := configs.ParseTheme(theme)
+	if parsed == "" {
+		parsed = configs.ThemeDark
+	}
+	a.config.Prefers.Theme = parsed
+	if err := configs.Save(a.config); err != nil {
+		logging.Error("save theme failed", "theme", parsed, "error", err)
+	}
+	return parsed.String()
+}
+
+// SaveApiKeys 更新 API key 并立即持久化 + 重初始化客户端。
+// 传空字符串表示清除该 key；传特殊值（见上）表示保持不变。
+func (a *App) SaveApiKeys(req SaveApiKeysRequest) SettingsView {
+	if a.config == nil {
+		a.config = &configs.Config{}
+	}
+	if req.CurseforgeApiKey != apiKeyKeepSentinel {
+		a.config.Keys.CurseforgeApiKey = strings.TrimSpace(req.CurseforgeApiKey)
+	}
+	if req.ModrinthApiKey != apiKeyKeepSentinel {
+		a.config.Keys.ModrinthApiKey = strings.TrimSpace(req.ModrinthApiKey)
+	}
+	if err := configs.Save(a.config); err != nil {
+		logging.Error("save api keys failed", "error", err)
+	}
+	// 重初始化 CurseForge 客户端
+	if strings.TrimSpace(a.config.Keys.CurseforgeApiKey) != "" {
+		global.SetCurseForgeClient(curseforge.NewClient(a.config.Keys.CurseforgeApiKey))
+	} else {
+		global.SetCurseForgeClient(nil)
+	}
+	// Modrinth 当前不使用 key，保留字段供未来使用
+	return a.GetSettings()
 }
 
 func (a *App) QueueModDownload(req appstructs.ModDownloadRequest) appstructs.ModDownloadResult {

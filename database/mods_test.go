@@ -167,6 +167,52 @@ func TestCachePinnedMods(t *testing.T) {
 	}
 }
 
+func TestListPinnedMods(t *testing.T) {
+	path := openTestDB(t)
+
+	if pins := ListPinnedMods(); len(pins) != 0 {
+		t.Fatalf("empty list = %#v, want empty", pins)
+	}
+
+	inserts := []PinnedMod{
+		{Platform: "CurseForge", ModID: "jei", VersionID: "v3", MinecraftVersion: "1.20.1", ModLoader: "forge"},
+		{Platform: "Modrinth", ModID: "sodium", VersionID: "v1", MinecraftVersion: "1.21.1", ModLoader: "fabric"},
+		{Platform: "Modrinth", ModID: "sodium", VersionID: "v2", MinecraftVersion: "1.21.1", ModLoader: "neoforge"},
+	}
+	for _, p := range inserts {
+		if err := UpsertPinnedMod(p); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	pins := ListPinnedMods()
+	if len(pins) != 3 {
+		t.Fatalf("len = %d, want 3", len(pins))
+	}
+
+	want := []PinnedMod{
+		{Platform: "curseforge", ModID: "jei", VersionID: "v3", MinecraftVersion: "1.20.1", ModLoader: "forge"},
+		{Platform: "modrinth", ModID: "sodium", VersionID: "v1", MinecraftVersion: "1.21.1", ModLoader: "fabric"},
+		{Platform: "modrinth", ModID: "sodium", VersionID: "v2", MinecraftVersion: "1.21.1", ModLoader: "neoforge"},
+	}
+	for i, p := range pins {
+		if p.Platform != want[i].Platform || p.ModID != want[i].ModID || p.VersionID != want[i].VersionID || p.MinecraftVersion != want[i].MinecraftVersion || p.ModLoader != want[i].ModLoader {
+			t.Fatalf("pin[%d] = %#v, want %#v", i, p, want[i])
+		}
+	}
+
+	pins[0].VersionID = "mutated"
+	if got, ok := GetPinnedMod("curseforge", "jei", "1.20.1", "forge"); !ok || got.VersionID != "v3" {
+		t.Fatalf("returned value was not a copy: %#v", got)
+	}
+
+	reopenTestDB(t, path)
+
+	if len(ListPinnedMods()) != 3 {
+		t.Fatalf("after reopen len = %d, want 3", len(ListPinnedMods()))
+	}
+}
+
 func TestCacheVersionModIDs(t *testing.T) {
 	path := openTestDB(t)
 

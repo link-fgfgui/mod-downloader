@@ -38,12 +38,20 @@ export function GetSelectedVersion() {
   return window['go']['main']['App']['GetSelectedVersion']();
 }
 
+export function GetSettings() {
+  return window['go']['main']['App']['GetSettings']();
+}
+
 export function GetVersions() {
   return window['go']['main']['App']['GetVersions']();
 }
 
 export function ListMatchingProjectVersions(arg1, arg2, arg3) {
   return window['go']['main']['App']['ListMatchingProjectVersions'](arg1, arg2, arg3);
+}
+
+export function ListPinnedMods() {
+  return window['go']['main']['App']['ListPinnedMods']();
 }
 
 export function PinModVersion(arg1) {
@@ -62,12 +70,24 @@ export function RefreshVersions() {
   return window['go']['main']['App']['RefreshVersions']();
 }
 
+export function SaveApiKeys(arg1) {
+  return window['go']['main']['App']['SaveApiKeys'](arg1);
+}
+
+export function SaveTheme(arg1) {
+  return window['go']['main']['App']['SaveTheme'](arg1);
+}
+
 export function SearchMods(arg1) {
   return window['go']['main']['App']['SearchMods'](arg1);
 }
 
 export function SelectVersion(arg1) {
   return window['go']['main']['App']['SelectVersion'](arg1);
+}
+
+export function UnpinMod(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['UnpinMod'](arg1, arg2, arg3, arg4);
 }
 
 export function ValidateMinecraftDir() {

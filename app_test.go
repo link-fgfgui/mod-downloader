@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"mod-downloader/configs"
+	"mod-downloader/database"
 	"mod-downloader/global"
 	structs "mod-downloader/structs/minecraft"
 )
@@ -229,5 +231,167 @@ func writeMarkerFile(t *testing.T, path string) {
 	}
 	if err := os.WriteFile(path, []byte("{}"), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestMaskKey(t *testing.T) {
+	cases := []struct {
+		input string
+		want  string
+	}{
+		{"", ""},
+		{"   ", ""},
+		{"abc", "****"},
+		{"abcdefgh", "****"},
+		{"abcd1234wxyz", "abcd****wxyz"},
+		{"  abcd1234wxyz  ", "abcd****wxyz"},
+	}
+	for _, c := range cases {
+		if got := maskKey(c.input); got != c.want {
+			t.Errorf("maskKey(%q) = %q, want %q", c.input, got, c.want)
+		}
+	}
+}
+
+func TestGetSettingsMasksKeys(t *testing.T) {
+	app := &App{
+		config: &configs.Config{
+			Keys: configs.APIKeys{
+				CurseforgeApiKey: "abcd1234wxyz",
+			},
+			Prefers: configs.Preferences{Theme: configs.ThemeSystem},
+		},
+	}
+	sv := app.GetSettings()
+	if sv.Theme != "system" {
+		t.Fatalf("theme = %q, want system", sv.Theme)
+	}
+	if !sv.HasCurseforgeKey {
+		t.Fatal("HasCurseforgeKey = false, want true")
+	}
+	if sv.CurseforgeKeyMask != "abcd****wxyz" {
+		t.Fatalf("CurseforgeKeyMask = %q, want abcd****wxyz", sv.CurseforgeKeyMask)
+	}
+	if sv.HasModrinthKey {
+		t.Fatal("HasModrinthKey = true, want false")
+	}
+	if sv.ModrinthKeyMask != "" {
+		t.Fatalf("ModrinthKeyMask = %q, want empty", sv.ModrinthKeyMask)
+	}
+
+	appEmpty := &App{config: &configs.Config{}}
+	svEmpty := appEmpty.GetSettings()
+	if svEmpty.HasCurseforgeKey || svEmpty.CurseforgeKeyMask != "" {
+		t.Fatalf("empty key view = %#v", svEmpty)
+	}
+}
+
+func TestSaveThemePersistsAndNormalizes(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(oldwd); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	app := &App{config: &configs.Config{}}
+	if got := app.SaveTheme("2"); got != "system" {
+		t.Fatalf("SaveTheme(2) = %q, want system", got)
+	}
+
+	loaded, err := configs.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Prefers.Theme.String() != "system" {
+		t.Fatalf("persisted theme = %q, want system", loaded.Prefers.Theme.String())
+	}
+}
+
+func TestSaveApiKeysKeepSentinel(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(oldwd); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	app := &App{config: &configs.Config{
+		Keys: configs.APIKeys{CurseforgeApiKey: "secret-key-1234"},
+	}}
+
+	sv := app.SaveApiKeys(SaveApiKeysRequest{CurseforgeApiKey: apiKeyKeepSentinel})
+	if !sv.HasCurseforgeKey {
+		t.Fatal("keep sentinel should preserve key")
+	}
+	if app.config.Keys.CurseforgeApiKey != "secret-key-1234" {
+		t.Fatalf("key changed unexpectedly: %q", app.config.Keys.CurseforgeApiKey)
+	}
+
+	sv = app.SaveApiKeys(SaveApiKeysRequest{CurseforgeApiKey: ""})
+	if sv.HasCurseforgeKey {
+		t.Fatal("empty key should clear")
+	}
+	if app.config.Keys.CurseforgeApiKey != "" {
+		t.Fatalf("key not cleared: %q", app.config.Keys.CurseforgeApiKey)
+	}
+}
+
+func TestUnpinMod(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		database.Close()
+		if err := os.Chdir(oldwd); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if err := database.Open(); err != nil {
+		t.Fatal(err)
+	}
+
+	pin := database.PinnedMod{
+		Platform:         "modrinth",
+		ModID:            "sodium",
+		VersionID:        "v1",
+		MinecraftVersion: "1.21.1",
+		ModLoader:        "fabric",
+	}
+	if err := database.UpsertPinnedMod(pin); err != nil {
+		t.Fatal(err)
+	}
+
+	app := &App{}
+	if !app.UnpinMod("Modrinth", "Sodium", "1.21.1", "Fabric") {
+		t.Fatal("UnpinMod returned false for existing pin")
+	}
+	if _, ok := database.GetPinnedMod("modrinth", "sodium", "1.21.1", "fabric"); ok {
+		t.Fatal("pin still exists after unpin")
+	}
+	if app.UnpinMod("modrinth", "sodium", "1.21.1", "fabric") {
+		t.Fatal("UnpinMod returned true for missing pin")
+	}
+	if app.UnpinMod("", "sodium", "1.21.1", "fabric") {
+		t.Fatal("UnpinMod returned true for empty platform")
 	}
 }
