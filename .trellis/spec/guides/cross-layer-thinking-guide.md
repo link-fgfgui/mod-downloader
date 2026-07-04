@@ -328,17 +328,14 @@ projection, and make `reduceThreads` the only thread replay reducer.
 
 ---
 
-## ModInfo Strength Classification Boundary (`minecraft` → `modbridge` / `downloader`)
+## ModInfo JIJ Metadata Boundary (`minecraft` → `modbridge` / `downloader`)
 
-When `ParseModZipReader` results flow from `minecraft` into `modbridge` or `downloader`, the list contains **two semantically different entry types**:
-- **Strong references** (`IsJij==false`): top-level `mods.toml` / `fabric.mod.json` declarations — participate in conflict detection, version persistence, archive logic.
-- **Weak references** (`IsJij==true`): nested jar / JIJ child declarations — informational only.
+When `ParseModZipReader` results flow from `minecraft` into `modbridge` or `downloader`, the returned list contains only top-level `mods.toml` / `fabric.mod.json` declarations. Nested jar / JIJ declarations are informational metadata attached to each returned `ModInfo` as `JijMods`.
 
 ### Checklist: When Consuming `ParseModZipReader` / `ParseModJarWithSHA1` Results
 
 - [ ] Use `minecraft.PrimaryModIDs(mods)` instead of a manual ID-extraction loop to get the strong-reference set
-- [ ] Guard every `UpsertLocalMod` call with `if mods[i].IsJij { continue }` — never write JIJ entries to the local index
-- [ ] Pass `FilterFullyCoveredPaths` output to `archiveSupersededModJars`, never the raw `LocalModPathsForModIDs` result
-- [ ] Never persist JIJ modIDs to the version modID DB cache (`SetVersionModIDs`)
+- [ ] Never expand `ModInfo.JijMods` into the local mod index, install-status checks, conflict detection, archive logic, or `SetVersionModIDs`
+- [ ] Archive candidates should come from `LocalModPathsForModIDs(primaryModIDs, instanceID)` without an extra coverage filter; partial top-level modID overlap is a real conflict after user confirmation
 
-See `directory-structure.md` → "Decision: Strong vs Weak ModID References" for full contracts, cases, and the `PrimaryModIDs` signature.
+See `directory-structure.md` → "Decision: Host-Owned JIJ Metadata" for full contracts, cases, and the `PrimaryModIDs` signature.

@@ -94,6 +94,32 @@ func TestLocalModPathsForModIDsDeduplicatesByPath(t *testing.T) {
 	}
 }
 
+func TestLocalModPathsForModIDsIncludesMultiModJarOnPartialTopLevelMatch(t *testing.T) {
+	global.ClearLocalMods()
+	t.Cleanup(global.ClearLocalMods)
+
+	base := mcstructs.ModInfo{
+		FileName: "bundle",
+		Path:     "versions/test/mods/bundle.jar",
+		SHA1:     "same-sha1",
+		Enabled:  true,
+	}
+	first := base
+	first.ID = "tmrv"
+	second := base
+	second.ID = "jei"
+	global.UpsertLocalMod(first, "test-instance", "1.20.1", "forge")
+	global.UpsertLocalMod(second, "test-instance", "1.20.1", "forge")
+
+	paths := LocalModPathsForModIDs([]string{"jei"}, "test-instance")
+	if len(paths) != 1 {
+		t.Fatalf("LocalModPathsForModIDs() returned %d paths, want 1", len(paths))
+	}
+	if paths[0].Path != base.Path {
+		t.Fatalf("LocalModPathsForModIDs() path = %q, want %q", paths[0].Path, base.Path)
+	}
+}
+
 func TestResolveVersionModIDsReadsMemoryField(t *testing.T) {
 	version := models.ModVersion{ID: "v-mem", ModIDs: []string{"Sodium ", "sodium", "Lithium"}}
 	got := resolveVersionModIDs(version)
