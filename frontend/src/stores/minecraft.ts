@@ -28,6 +28,7 @@ export const useMinecraftStore = defineStore("minecraft", {
         releaseVersions: [] as string[],
         minecraftDir: "",
         isRefreshing: false,
+        isLoading: false,
         stopListeningMinecraftDirChanged: null as (() => void) | null,
         stopListeningSelectedVersionChanged: null as (() => void) | null,
     }),
@@ -60,13 +61,23 @@ export const useMinecraftStore = defineStore("minecraft", {
             this.selectedVersion = await RefreshSelectedVersionMods();
         },
         async selectVersion(version: string) {
-            this.selectedVersion = await SelectVersion(version);
+            this.isLoading = true;
+            try {
+                this.selectedVersion = await SelectVersion(version);
+            } finally {
+                this.isLoading = false;
+            }
         },
         async chooseMinecraftDir() {
             const result = await ChooseMinecraftDir();
             if (result) {
                 this.minecraftDir = result;
-                await this.refreshVersions(true);
+                this.isLoading = true;
+                try {
+                    await this.refreshVersions(true);
+                } finally {
+                    this.isLoading = false;
+                }
             }
             return result;
         },

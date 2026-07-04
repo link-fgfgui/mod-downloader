@@ -11,6 +11,13 @@
                     </transition>
                 </router-view>
             </v-container>
+            <v-overlay
+                v-model="minecraftStore.isLoading"
+                contained
+                persistent
+                scrim="transparent"
+                class="main-loading-overlay"
+            />
         </v-main>
         <transition name="md-fab">
             <div v-if="downloadQueueStore.queue.active" class="download-fab">
@@ -60,5 +67,9 @@ onUnmounted(() => {
     position: fixed;
     right: 24px;
     z-index: 1000;
+}
+
+.main-loading-overlay {
+    cursor: not-allowed;
 }
 </style>

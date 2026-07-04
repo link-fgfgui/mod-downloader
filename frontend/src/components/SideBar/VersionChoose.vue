@@ -1,6 +1,6 @@
 <template>
     <v-divider></v-divider>
-    <div class="pa-2">
+    <div class="pa-2 position-relative">
         <transition name="md-expand">
             <div v-show="isExpanded" class="md-animate-fade-up">
                 <div class="d-flex align-center" style="gap: 8px">
@@ -17,7 +17,7 @@
                         class="md-btn-press md-hover-scale"
                         icon="mdi-refresh"
                         variant="text"
-                        :disabled="isRefreshing"
+                        :disabled="isRefreshing || isLoading"
                         density="compact"
                         size="small"
                         @click="refreshSelectedMods"
@@ -42,6 +42,15 @@
         >
             {{ selectedVersionName }}
         </span>
+        <v-overlay
+            v-model="isLoading"
+            contained
+            persistent
+            class="align-center justify-center"
+            scrim="rgba(var(--v-theme-surface), 0.7)"
+        >
+            <v-progress-circular indeterminate color="primary" />
+        </v-overlay>
     </div>
 </template>
 <script setup lang="ts">
@@ -60,7 +69,7 @@ const props = defineProps({
 void props;
 
 const minecraftStore = useMinecraftStore();
-const { minecraftDir: downloadFolder, isRefreshing } = storeToRefs(minecraftStore);
+const { minecraftDir: downloadFolder, isRefreshing, isLoading } = storeToRefs(minecraftStore);
 
 const versionList = computed(() =>
     minecraftStore.versions
