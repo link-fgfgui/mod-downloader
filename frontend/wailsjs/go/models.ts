@@ -296,11 +296,11 @@ export namespace structs {
 	export class JijModInfo {
 	    id: string;
 	    name: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new JijModInfo(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -311,6 +311,7 @@ export namespace structs {
 	    key: string;
 	    status: string;
 	    disabled: boolean;
+	    loading: boolean;
 	    icon: string;
 	    color: string;
 	
@@ -323,6 +324,7 @@ export namespace structs {
 	        this.key = source["key"];
 	        this.status = source["status"];
 	        this.disabled = source["disabled"];
+	        this.loading = source["loading"];
 	        this.icon = source["icon"];
 	        this.color = source["color"];
 	    }
@@ -412,7 +414,7 @@ export namespace structs {
 	        this.enabled = source["enabled"];
 	        this.jijMods = this.convertValues(source["jijMods"], JijModInfo);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -513,3 +515,4 @@ export namespace structs {
 	}
 
 }
+

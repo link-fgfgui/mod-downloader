@@ -123,7 +123,7 @@ const colorFor = (index) => stateFor(index)?.color || "primary";
 const loadingFor = (index) => {
     const state = stateFor(index);
     if (!state) return true;
-    return Boolean(props.downloadingKeys[state.key]);
+    return Boolean(state.loading || props.downloadingKeys[state.key]);
 };
 
 const disabledFor = (index) => Boolean(stateFor(index)?.disabled);

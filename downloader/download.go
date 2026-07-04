@@ -136,7 +136,33 @@ func CancelDownload(ctx context.Context, id string) bool {
 }
 
 func GetDownloadStates(req appstructs.DownloadStatesRequest, onBackfillComplete func()) []appstructs.ModDownloadButtonState {
-	return modbridge.DownloadStates(req, onBackfillComplete)
+	states := modbridge.DownloadStates(req, onBackfillComplete)
+	queued := queuedProjectKeys()
+	for i := range states {
+		if queued[states[i].Key] {
+			states[i].Loading = true
+		}
+	}
+	return states
+}
+
+// queuedProjectKeys returns the set of project reference keys for all jobs
+// currently in the download queue (both pending and running).
+func queuedProjectKeys() map[string]bool {
+	downloadQueue.Lock()
+	defer downloadQueue.Unlock()
+	keys := make(map[string]bool, len(downloadQueue.pending)+1)
+	if downloadQueue.current != nil {
+		if k := providers.ProjectReferenceFromSearchResult(downloadQueue.current.Result); k != "" {
+			keys[k] = true
+		}
+	}
+	for _, job := range downloadQueue.pending {
+		if k := providers.ProjectReferenceFromSearchResult(job.Result); k != "" {
+			keys[k] = true
+		}
+	}
+	return keys
 }
 
 func projectVersionJobKey(version models.ModVersion) string {
