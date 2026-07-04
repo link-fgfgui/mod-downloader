@@ -10,16 +10,16 @@
             </v-list>
 
             <v-divider></v-divider>
-            <v-list density="compact" nav>
-                <v-list-item prepend-icon="mdi-home" :title="$t('nav.home')" to="/"></v-list-item>
+            <v-list density="compact" nav :selected="activeNav">
+                <v-list-item value="/" prepend-icon="mdi-home" :title="$t('nav.home')" to="/"></v-list-item>
 
-                <v-list-item prepend-icon="mdi-file-download" :title="$t('nav.download')" to="/download"></v-list-item>
+                <v-list-item value="/download" prepend-icon="mdi-file-download" :title="$t('nav.download')" to="/download"></v-list-item>
 
-                <v-list-item prepend-icon="mdi-list-status" :title="$t('nav.manage')" to="/manage"></v-list-item>
+                <v-list-item value="/manage" prepend-icon="mdi-list-status" :title="$t('nav.manage')" to="/manage"></v-list-item>
 
-                <v-list-item prepend-icon="mdi-pin-off" :title="$t('nav.unpin')" to="/unpin"></v-list-item>
+                <v-list-item value="/unpin" prepend-icon="mdi-pin-off" :title="$t('nav.unpin')" to="/unpin"></v-list-item>
 
-                <v-list-item prepend-icon="mdi-cog" :title="$t('nav.settings')" to="/settings"></v-list-item>
+                <v-list-item value="/settings" prepend-icon="mdi-cog" :title="$t('nav.settings')" to="/settings"></v-list-item>
             </v-list>
             <v-divider></v-divider>
         </div>
@@ -30,10 +30,13 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { computed, ref } from "vue";
+import { useRoute } from "vue-router";
 import VersionChoose from "./VersionChoose.vue";
+
 const isPinned = ref(true);
 const isHovered = ref(false);
-
+const route = useRoute();
+const activeNav = computed(() => [route.path]);
 </script>
 <style scoped></style>
