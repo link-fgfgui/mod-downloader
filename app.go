@@ -256,7 +256,7 @@ func (a *App) SaveApiKeys(req SaveApiKeysRequest) SettingsView {
 }
 
 func (a *App) QueueModDownload(req appstructs.ModDownloadRequest) appstructs.ModDownloadResult {
-	return downloader.QueueModDownload(a.ctx, req)
+	return downloader.QueueModDownload(a.ctx, req, a.config.Keys.CurseforgeApiKey)
 }
 
 func (a *App) GetDownloadQueueState() appstructs.DownloadQueueState {

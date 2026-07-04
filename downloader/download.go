@@ -33,6 +33,7 @@ type downloadJob struct {
 	InstanceID       string
 	MinecraftVersion string
 	ModLoader        string
+	CurseForgeAPIKey string
 	cancel           context.CancelFunc
 }
 
@@ -44,11 +45,11 @@ var downloadQueue = struct {
 	current *downloadJob
 }{}
 
-func QueueModDownload(ctx context.Context, req appstructs.ModDownloadRequest) appstructs.ModDownloadResult {
-	return queueModDownload(ctx, req, make(map[string]bool))
+func QueueModDownload(ctx context.Context, req appstructs.ModDownloadRequest, curseForgeAPIKey string) appstructs.ModDownloadResult {
+	return queueModDownload(ctx, req, curseForgeAPIKey, make(map[string]bool))
 }
 
-func queueModDownload(ctx context.Context, req appstructs.ModDownloadRequest, visited map[string]bool) appstructs.ModDownloadResult {
+func queueModDownload(ctx context.Context, req appstructs.ModDownloadRequest, curseForgeAPIKey string, visited map[string]bool) appstructs.ModDownloadResult {
 	req.MinecraftVersion = strings.TrimSpace(req.MinecraftVersion)
 	req.ModLoader = strings.ToLower(strings.TrimSpace(req.ModLoader))
 	req.ProjectID = strings.TrimSpace(req.ProjectID)
@@ -82,7 +83,7 @@ func queueModDownload(ctx context.Context, req appstructs.ModDownloadRequest, vi
 		visited[key] = true
 	}
 
-	queueMissingRequiredDependencies(ctx, req, version, instanceID, visited)
+	queueMissingRequiredDependencies(ctx, req, version, instanceID, curseForgeAPIKey, visited)
 	enqueueDownload(ctx, downloadJob{
 		Version:          version,
 		Result:           req.Result,
@@ -90,6 +91,7 @@ func queueModDownload(ctx context.Context, req appstructs.ModDownloadRequest, vi
 		InstanceID:       instanceID,
 		MinecraftVersion: req.MinecraftVersion,
 		ModLoader:        req.ModLoader,
+		CurseForgeAPIKey: curseForgeAPIKey,
 	})
 	return appstructs.ModDownloadResult{
 		Queued:    true,
@@ -276,7 +278,7 @@ func tryHardlinkInstall(job downloadJob) bool {
 			return false
 		}
 		logging.Info("mod installed via hardlink/copy", "src", srcPath, "dst", finalPath, "versionID", job.Version.ID)
-		go DiscardFetchFromNetwork(job.Version.DownloadURL)
+		go DiscardFetchFromNetwork(job.Version.DownloadURL, job.CurseForgeAPIKey)
 		upsertDownloadedMod(finalPath, job)
 		return true
 	}
@@ -328,7 +330,7 @@ func tryHardlinkInstall(job downloadJob) bool {
 		return false
 	}
 	logging.Info("mod installed via hardlink (local parse path)", "src", srcPath, "dst", finalPath, "versionID", job.Version.ID)
-	go DiscardFetchFromNetwork(job.Version.DownloadURL)
+	go DiscardFetchFromNetwork(job.Version.DownloadURL, job.CurseForgeAPIKey)
 	upsertDownloadedMod(finalPath, job)
 	return true
 }
@@ -378,7 +380,7 @@ func nextOldJarPath(path string) string {
 	}
 }
 
-func queueMissingRequiredDependencies(ctx context.Context, req appstructs.ModDownloadRequest, version models.ModVersion, instanceID string, visited map[string]bool) {
+func queueMissingRequiredDependencies(ctx context.Context, req appstructs.ModDownloadRequest, version models.ModVersion, instanceID string, curseForgeAPIKey string, visited map[string]bool) {
 	for _, dep := range version.Dependencies {
 		if !isRequiredDependency(dep) {
 			continue
@@ -393,7 +395,7 @@ func queueMissingRequiredDependencies(ctx context.Context, req appstructs.ModDow
 		if modbridge.InstallStatusPrecise(depReq) != modbridge.BtnStatusNew {
 			continue
 		}
-		result := queueModDownload(ctx, depReq, visited)
+		result := queueModDownload(ctx, depReq, curseForgeAPIKey, visited)
 		if result.Skipped {
 			logging.Warn("required dependency queue skipped", "platform", depReq.Result.Platform, "projectID", depReq.ProjectID, "versionID", dep.DependencyVersionID, "reason", result.Reason)
 		}
@@ -460,6 +462,7 @@ func downloadModToTarget(ctx context.Context, job downloadJob, existing []global
 		req.Filename = filepath.Join(tempDir, job.Version.FileName)
 	}
 	req = req.WithContext(ctx)
+	setCurseForgeAPIKeyHeader(req, job)
 
 	resp := client.Do(req)
 	if err := resp.Err(); err != nil {
@@ -503,6 +506,7 @@ func downloadModWithLocalParse(ctx context.Context, job downloadJob) error {
 		req.Filename = filepath.Join(tempDir, job.Version.FileName)
 	}
 	req = req.WithContext(ctx)
+	setCurseForgeAPIKeyHeader(req, job)
 
 	resp := client.Do(req)
 	if err := resp.Err(); err != nil {
@@ -560,6 +564,17 @@ func downloadTargetExists(path string) bool {
 		logging.Warn("download target stat failed", "path", path, "error", err)
 	}
 	return false
+}
+
+// isCurseForgeCDNURL checks if the URL is a CurseForge CDN download URL.
+func isCurseForgeCDNURL(url string) bool {
+	return strings.HasPrefix(url, "https://edge.forgecdn.net/files/")
+}
+
+func setCurseForgeAPIKeyHeader(req *grab.Request, job downloadJob) {
+	if job.CurseForgeAPIKey != "" && isCurseForgeCDNURL(job.Version.DownloadURL) {
+		req.HTTPRequest.Header.Set("x-api-key", job.CurseForgeAPIKey)
+	}
 }
 
 func pathInLocalModPaths(path string, paths []global.LocalModFilePath) bool {

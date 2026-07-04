@@ -12,7 +12,7 @@ import (
 
 const discardBufferSize = 32 * 1024
 
-func DiscardFetchFromNetwork(downloadURL string) {
+func DiscardFetchFromNetwork(downloadURL string, curseForgeAPIKey string) {
 	downloadURL = strings.TrimSpace(downloadURL)
 	if downloadURL == "" {
 		return
@@ -27,6 +27,10 @@ func DiscardFetchFromNetwork(downloadURL string) {
 		return
 	}
 	req.Header.Set("User-Agent", "mod-downloader")
+
+	if curseForgeAPIKey != "" && isCurseForgeCDNURL(downloadURL) {
+		req.Header.Set("x-api-key", curseForgeAPIKey)
+	}
 
 	client := &http.Client{
 		Timeout: 60 * time.Second,
