@@ -49,8 +49,15 @@ const router = useRouter();
 const downloadQueueStore = useDownloadQueueStore();
 const minecraftStore = useMinecraftStore();
 
+const isEditableTarget = (target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) return false;
+    if (target.isContentEditable) return true;
+    return Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
+};
+
 const onGlobalEscape = (event: KeyboardEvent) => {
     if (event.key !== "Escape") return;
+    if (event.defaultPrevented || isEditableTarget(event.target)) return;
 
     const hasModal = document.querySelector(
         ".v-overlay--active:not(.v-overlay--contained):not(.v-snackbar):not(.v-tooltip)"
