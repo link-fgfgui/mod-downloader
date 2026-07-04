@@ -1,29 +1,35 @@
-import { useTheme } from "vuetify";
+import { useTheme as useVuetifyTheme } from "vuetify";
 
 const themeDark = "dark";
 const themeLight = "light";
 const themeSystem = "system";
 
+let cachedTheme: ReturnType<typeof useVuetifyTheme> | null = null;
 let stopListeningSystemTheme: (() => void) | null = null;
+
+export function initTheme() {
+    cachedTheme = useVuetifyTheme();
+}
 
 export function applyVuetifyTheme(theme: string) {
     stopListeningSystemTheme?.();
     stopListeningSystemTheme = null;
 
-    const vuetifyTheme = useTheme();
+    if (!cachedTheme) return;
+
     const normalized = (theme || "").trim().toLowerCase();
     if (normalized === themeLight) {
-        vuetifyTheme.global.name.value = "light";
+        cachedTheme.change("light");
         return;
     }
     if (normalized !== themeSystem) {
-        vuetifyTheme.global.name.value = "dark";
+        cachedTheme.change("dark");
         return;
     }
 
     const query = window.matchMedia("(prefers-color-scheme: dark)");
     const apply = () => {
-        vuetifyTheme.global.name.value = query.matches ? "dark" : "light";
+        cachedTheme!.change(query.matches ? "dark" : "light");
     };
     apply();
     query.addEventListener("change", apply);

@@ -31,9 +31,11 @@ import { onMounted, onUnmounted } from "vue";
 import { GetPreferences } from "../wailsjs/go/main/App";
 import { useDownloadQueueStore } from "./stores/downloadQueue";
 import { useMinecraftStore } from "./stores/minecraft";
-import { applyVuetifyTheme, stopThemeListener } from "./composables/useTheme";
+import { initTheme, applyVuetifyTheme, stopThemeListener } from "./composables/useTheme";
 
 const themeDark = "dark";
+
+initTheme();
 
 const downloadQueueStore = useDownloadQueueStore();
 const minecraftStore = useMinecraftStore();
