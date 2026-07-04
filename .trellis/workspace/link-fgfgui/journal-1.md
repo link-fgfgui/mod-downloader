@@ -272,3 +272,36 @@ Added IsJij bool to ModInfo to classify top-level mods.toml declarations (strong
 ### Next Steps
 
 - None - task complete
+
+
+## Session 9: Manage page mod icons via SHA1 lookup
+
+**Date**: 2026-07-05
+**Task**: Manage page mod icons via SHA1 lookup
+**Branch**: `master`
+
+### Summary
+
+Added mod icon display to the manage page by resolving SHA1 hashes against cached platform metadata (sync) and Modrinth API (async). Fixed cache lookup to match any version, not just latest. Cached API results (project + version) for stable subsequent loads.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `66f178d` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
