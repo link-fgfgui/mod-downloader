@@ -19,11 +19,12 @@ import (
 	appstructs "mod-downloader/structs"
 
 	"github.com/cavaliergopher/grab/v3"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-const downloadQueueUpdatedEvent = "download-queue-updated"
-const downloadFailedEvent = "download-failed"
+type Events struct {
+	OnQueueState     func(appstructs.DownloadQueueState)
+	OnDownloadFailed func(appstructs.DownloadFailedEvent)
+}
 
 type downloadJob struct {
 	ID               string
@@ -45,11 +46,11 @@ var downloadQueue = struct {
 	current *downloadJob
 }{}
 
-func QueueModDownload(ctx context.Context, req appstructs.ModDownloadRequest, curseForgeAPIKey string) appstructs.ModDownloadResult {
-	return queueModDownload(ctx, req, curseForgeAPIKey, make(map[string]bool))
+func QueueModDownload(ctx context.Context, req appstructs.ModDownloadRequest, curseForgeAPIKey string, events ...Events) appstructs.ModDownloadResult {
+	return queueModDownload(ctx, req, curseForgeAPIKey, make(map[string]bool), firstEvents(events))
 }
 
-func queueModDownload(ctx context.Context, req appstructs.ModDownloadRequest, curseForgeAPIKey string, visited map[string]bool) appstructs.ModDownloadResult {
+func queueModDownload(ctx context.Context, req appstructs.ModDownloadRequest, curseForgeAPIKey string, visited map[string]bool, events Events) appstructs.ModDownloadResult {
 	req.MinecraftVersion = strings.TrimSpace(req.MinecraftVersion)
 	req.ModLoader = strings.ToLower(strings.TrimSpace(req.ModLoader))
 	req.ProjectID = strings.TrimSpace(req.ProjectID)
@@ -83,7 +84,7 @@ func queueModDownload(ctx context.Context, req appstructs.ModDownloadRequest, cu
 		visited[key] = true
 	}
 
-	queueMissingRequiredDependencies(ctx, req, version, instanceID, curseForgeAPIKey, visited)
+	queueMissingRequiredDependencies(ctx, req, version, instanceID, curseForgeAPIKey, visited, events)
 	enqueueDownload(ctx, downloadJob{
 		Version:          version,
 		Result:           req.Result,
@@ -92,7 +93,7 @@ func queueModDownload(ctx context.Context, req appstructs.ModDownloadRequest, cu
 		MinecraftVersion: req.MinecraftVersion,
 		ModLoader:        req.ModLoader,
 		CurseForgeAPIKey: curseForgeAPIKey,
-	})
+	}, events)
 	return appstructs.ModDownloadResult{
 		Queued:    true,
 		FileName:  version.FileName,
@@ -104,11 +105,12 @@ func GetDownloadQueueState() appstructs.DownloadQueueState {
 	return currentDownloadQueueState()
 }
 
-func CancelDownload(ctx context.Context, id string) bool {
+func CancelDownload(ctx context.Context, id string, events ...Events) bool {
 	id = strings.TrimSpace(id)
 	if id == "" {
 		return false
 	}
+	eventSink := firstEvents(events)
 
 	downloadQueue.Lock()
 	for i, job := range downloadQueue.pending {
@@ -117,7 +119,7 @@ func CancelDownload(ctx context.Context, id string) bool {
 		}
 		downloadQueue.pending = append(downloadQueue.pending[:i], downloadQueue.pending[i+1:]...)
 		downloadQueue.Unlock()
-		emitDownloadQueueState(ctx)
+		emitDownloadQueueState(eventSink)
 		return true
 	}
 
@@ -131,7 +133,7 @@ func CancelDownload(ctx context.Context, id string) bool {
 		return false
 	}
 	cancel()
-	emitDownloadQueueState(ctx)
+	emitDownloadQueueState(eventSink)
 	return true
 }
 
@@ -184,7 +186,7 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func enqueueDownload(ctx context.Context, job downloadJob) {
+func enqueueDownload(ctx context.Context, job downloadJob, events Events) {
 	downloadQueue.Lock()
 	downloadQueue.nextID++
 	job.ID = fmt.Sprintf("download-%d", downloadQueue.nextID)
@@ -195,13 +197,13 @@ func enqueueDownload(ctx context.Context, job downloadJob) {
 	}
 	downloadQueue.Unlock()
 
-	emitDownloadQueueState(ctx)
+	emitDownloadQueueState(events)
 	if shouldStart {
-		go runDownloadQueue(ctx)
+		go runDownloadQueue(ctx, events)
 	}
 }
 
-func runDownloadQueue(ctx context.Context) {
+func runDownloadQueue(ctx context.Context, events Events) {
 	parentCtx := ctx
 	if parentCtx == nil {
 		parentCtx = context.Background()
@@ -211,7 +213,7 @@ func runDownloadQueue(ctx context.Context) {
 		if len(downloadQueue.pending) == 0 {
 			downloadQueue.running = false
 			downloadQueue.Unlock()
-			emitDownloadQueueState(ctx)
+			emitDownloadQueueState(events)
 			return
 		}
 		job := downloadQueue.pending[0]
@@ -221,14 +223,14 @@ func runDownloadQueue(ctx context.Context) {
 		runningJob := job
 		downloadQueue.current = &runningJob
 		downloadQueue.Unlock()
-		emitDownloadQueueState(ctx)
+		emitDownloadQueueState(events)
 
 		if err := downloadModJob(jobCtx, job); err != nil {
 			if errors.Is(err, context.Canceled) {
 				logging.Info("download mod canceled", "fileName", job.Version.FileName, "versionID", job.Version.ID, "targetDir", job.TargetDir)
 			} else {
 				logging.Error("download mod failed", "fileName", job.Version.FileName, "versionID", job.Version.ID, "targetDir", job.TargetDir, "error", err)
-				emitDownloadFailed(ctx, job, err)
+				emitDownloadFailed(events, job, err)
 			}
 		}
 		cancel()
@@ -237,7 +239,7 @@ func runDownloadQueue(ctx context.Context) {
 			downloadQueue.current = nil
 		}
 		downloadQueue.Unlock()
-		emitDownloadQueueState(ctx)
+		emitDownloadQueueState(events)
 	}
 }
 
@@ -400,7 +402,7 @@ func nextOldJarPath(path string) string {
 	}
 }
 
-func queueMissingRequiredDependencies(ctx context.Context, req appstructs.ModDownloadRequest, version models.ModVersion, instanceID string, curseForgeAPIKey string, visited map[string]bool) {
+func queueMissingRequiredDependencies(ctx context.Context, req appstructs.ModDownloadRequest, version models.ModVersion, instanceID string, curseForgeAPIKey string, visited map[string]bool, events Events) {
 	for _, dep := range version.Dependencies {
 		if !isRequiredDependency(dep) {
 			continue
@@ -415,7 +417,7 @@ func queueMissingRequiredDependencies(ctx context.Context, req appstructs.ModDow
 		if modbridge.InstallStatusPrecise(depReq) != modbridge.BtnStatusNew {
 			continue
 		}
-		result := queueModDownload(ctx, depReq, curseForgeAPIKey, visited)
+		result := queueModDownload(ctx, depReq, curseForgeAPIKey, visited, events)
 		if result.Skipped {
 			logging.Warn("required dependency queue skipped", "platform", depReq.Result.Platform, "projectID", depReq.ProjectID, "versionID", dep.DependencyVersionID, "reason", result.Reason)
 		}
@@ -690,18 +692,25 @@ func downloadQueueItemFromJob(job downloadJob, status string, cancelable bool) a
 	}
 }
 
-func emitDownloadQueueState(ctx context.Context) {
-	if ctx == nil {
-		return
+func firstEvents(events []Events) Events {
+	if len(events) == 0 {
+		return Events{}
 	}
-	runtime.EventsEmit(ctx, downloadQueueUpdatedEvent, currentDownloadQueueState())
+	return events[0]
 }
 
-func emitDownloadFailed(ctx context.Context, job downloadJob, err error) {
-	if ctx == nil || err == nil {
+func emitDownloadQueueState(events Events) {
+	if events.OnQueueState == nil {
 		return
 	}
-	runtime.EventsEmit(ctx, downloadFailedEvent, appstructs.DownloadFailedEvent{
+	events.OnQueueState(currentDownloadQueueState())
+}
+
+func emitDownloadFailed(events Events, job downloadJob, err error) {
+	if events.OnDownloadFailed == nil || err == nil {
+		return
+	}
+	events.OnDownloadFailed(appstructs.DownloadFailedEvent{
 		FileName:  job.Version.FileName,
 		VersionID: job.Version.ID,
 		Reason:    err.Error(),

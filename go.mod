@@ -9,6 +9,7 @@ require (
 	github.com/ilyakaznacheev/cleanenv v1.5.0
 	github.com/klauspost/compress v1.18.6
 	github.com/sjet47/go-curseforge v0.6.0
+	github.com/urfave/cli/v2 v2.27.7
 	github.com/wailsapp/wails/v2 v2.12.0
 )
 
@@ -48,7 +49,6 @@ require (
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/spf13/cast v1.7.0 // indirect
 	github.com/tkrajina/go-reflector v0.5.8 // indirect
-	github.com/urfave/cli/v2 v2.27.7 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/wailsapp/go-webview2 v1.0.22 // indirect

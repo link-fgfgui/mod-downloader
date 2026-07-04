@@ -80,6 +80,18 @@ Build a production binary:
 wails build
 ```
 
+Build the CLI binary:
+
+```bash
+go build ./cmd/mod-downloader-cli
+```
+
+Run the CLI during development:
+
+```bash
+go run ./cmd/mod-downloader-cli --help
+```
+
 Run tests:
 
 ```bash
@@ -98,3 +110,20 @@ The app stores local runtime data in the working directory:
 
 - `mod-downloader.toml` for configuration
 - `mods.gob.zst` for cached mod platform and jar metadata
+
+## CLI
+
+The CLI reuses the same backend logic as the desktop app. It reads
+`mod-downloader.toml` and the same environment variables as the UI. Global
+flags such as `--minecraft-dir`, `--curseforge-api-key`, and
+`--modrinth-api-key` override config for the current command.
+
+Commands:
+
+```bash
+go run ./cmd/mod-downloader-cli config --json
+go run ./cmd/mod-downloader-cli --minecraft-dir /path/to/.minecraft versions
+go run ./cmd/mod-downloader-cli search sodium --version 1.21.1 --loader fabric
+go run ./cmd/mod-downloader-cli install --instance fabric-loader-1.21.1 --project modrinth:sodium
+go run ./cmd/mod-downloader-cli mods --instance fabric-loader-1.21.1 --json
+```
