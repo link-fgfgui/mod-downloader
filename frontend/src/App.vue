@@ -35,6 +35,7 @@
 <script setup lang="ts">
 import SideBar from "./components/SideBar/SideBar.vue";
 import { onMounted, onUnmounted } from "vue";
+import { useRouter } from "vue-router";
 import { GetPreferences } from "../wailsjs/go/main/App";
 import { useDownloadQueueStore } from "./stores/downloadQueue";
 import { useMinecraftStore } from "./stores/minecraft";
@@ -44,10 +45,25 @@ const themeDark = "dark";
 
 initTheme();
 
+const router = useRouter();
 const downloadQueueStore = useDownloadQueueStore();
 const minecraftStore = useMinecraftStore();
 
+const onGlobalEscape = (event: KeyboardEvent) => {
+    if (event.key !== "Escape") return;
+
+    const hasModal = document.querySelector(
+        ".v-overlay--active:not(.v-overlay--contained):not(.v-snackbar):not(.v-tooltip)"
+    );
+    if (hasModal) return;
+
+    if (router.currentRoute.value.path === "/") return;
+
+    router.back();
+};
+
 onMounted(async () => {
+    document.addEventListener("keydown", onGlobalEscape);
     const preferences = await GetPreferences();
     applyVuetifyTheme(preferences?.theme ?? themeDark);
     void downloadQueueStore.start();
@@ -55,6 +71,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+    document.removeEventListener("keydown", onGlobalEscape);
     downloadQueueStore.stop();
     minecraftStore.stop();
     stopThemeListener();

@@ -158,7 +158,10 @@ const onKeydown = (event) => {
         event.preventDefault();
         selectAll();
     } else if (event.key === "Escape") {
-        clearSelection();
+        if (selectedIndices.size > 0) {
+            clearSelection();
+            event.stopPropagation();
+        }
     }
 };
 
