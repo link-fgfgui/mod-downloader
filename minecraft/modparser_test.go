@@ -40,10 +40,17 @@ func TestParseFabricNestedJarsRecursively(t *testing.T) {
 		"META-INF/jars/child.jar": child,
 	})
 
-	got := modIDs(ParseModZipReader(testZipReader(t, top), "top.jar", "fabric"))
-	want := []string{"top-fabric", "child-fabric", "grand-child"}
+	mods := ParseModZipReader(testZipReader(t, top), "top.jar", "fabric")
+	got := modIDs(mods)
+	want := []string{"top-fabric"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ParseModZipReader() ids = %#v, want %#v", got, want)
+	}
+
+	gotJij := jijModIDs(mods[0].JijMods)
+	wantJij := []string{"child-fabric", "grand-child"}
+	if !reflect.DeepEqual(gotJij, wantJij) {
+		t.Fatalf("ParseModZipReader() JijMods ids = %#v, want %#v", gotJij, wantJij)
 	}
 }
 
@@ -87,19 +94,25 @@ mandatory=true
 		"META-INF/jarjar/child.jar": child,
 	})
 
-	got := modIDs(ParseModZipReader(testZipReader(t, top), "top.jar", "forge"))
-	want := []string{"topforge", "jei", "childforge"}
+	mods := ParseModZipReader(testZipReader(t, top), "top.jar", "forge")
+	got := modIDs(mods)
+	want := []string{"topforge", "jei"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ParseModZipReader() ids = %#v, want %#v", got, want)
 	}
+
+	gotJij := jijModIDs(mods[0].JijMods)
+	wantJij := []string{"childforge"}
+	if !reflect.DeepEqual(gotJij, wantJij) {
+		t.Fatalf("ParseModZipReader() JijMods ids = %#v, want %#v", gotJij, wantJij)
+	}
 }
 
-// TestForgeModIDStrengthClassification verifies that mods.toml top-level [[mods]]
-// entries are marked as strong references (IsJij==false) and nested jar / JIJ
-// entries are marked as weak references (IsJij==true), and that PrimaryModIDs
-// returns only the strong set.
-func TestForgeModIDStrengthClassification(t *testing.T) {
-	// child JAR: declare two mods — only reachable as a JIJ from the host.
+// TestForgeJijModsAreAttachedToTopLevelMods verifies that top-level [[mods]]
+// entries stay in the returned ModInfo list while nested jar / JIJ entries are
+// attached to each top-level entry as JijMods.
+func TestForgeJijModsAreAttachedToTopLevelMods(t *testing.T) {
+	// child JAR: declare two mods, only reachable as a JIJ from the host.
 	child := testJar(t, map[string][]byte{
 		"META-INF/mods.toml": []byte(`
 license="MIT"
@@ -137,24 +150,18 @@ displayName="Extra Mod declared in same mods.toml"
 
 	mods := ParseModZipReader(testZipReader(t, top), "top.jar", "forge")
 
-	// Collect mods by IsJij flag.
-	var strongIDs, jijIDs []string
-	for _, m := range mods {
-		if m.IsJij {
-			jijIDs = append(jijIDs, m.ID)
-		} else {
-			strongIDs = append(strongIDs, m.ID)
-		}
-	}
-
 	wantStrong := []string{"topmod", "extramod"}
 	wantJij := []string{"childmod", "childmod-extra"}
 
+	strongIDs := modIDs(mods)
 	if !reflect.DeepEqual(strongIDs, wantStrong) {
 		t.Errorf("strong modIDs = %#v, want %#v", strongIDs, wantStrong)
 	}
-	if !reflect.DeepEqual(jijIDs, wantJij) {
-		t.Errorf("jij modIDs = %#v, want %#v", jijIDs, wantJij)
+	for _, mod := range mods {
+		jijIDs := jijModIDs(mod.JijMods)
+		if !reflect.DeepEqual(jijIDs, wantJij) {
+			t.Errorf("%s JijMods = %#v, want %#v", mod.ID, jijIDs, wantJij)
+		}
 	}
 
 	// PrimaryModIDs must return only the strong set.
@@ -168,7 +175,7 @@ displayName="Extra Mod declared in same mods.toml"
 	for _, id := range primary {
 		primarySet[id] = true
 	}
-	for _, id := range jijIDs {
+	for _, id := range wantJij {
 		if primarySet[id] {
 			t.Errorf("PrimaryModIDs() unexpectedly contains JIJ modID %q", id)
 		}
@@ -260,6 +267,14 @@ func TestCreateHardLinkOrCopyDoesNotOverwriteExistingTarget(t *testing.T) {
 }
 
 func modIDs(mods []structs.ModInfo) []string {
+	ids := make([]string, 0, len(mods))
+	for _, mod := range mods {
+		ids = append(ids, mod.ID)
+	}
+	return ids
+}
+
+func jijModIDs(mods []structs.JijModInfo) []string {
 	ids := make([]string, 0, len(mods))
 	for _, mod := range mods {
 		ids = append(ids, mod.ID)

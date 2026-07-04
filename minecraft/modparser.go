@@ -304,11 +304,6 @@ func ScanVersionMods(versionDir string, instanceID string, minecraftVersion stri
 		}
 
 		for i := range mods {
-			if mods[i].IsJij {
-				// JIJ weak references are informational only; they must not be
-				// written to the local mod index to avoid false conflict hits.
-				continue
-			}
 			mods[i].FileName = baseName
 			mods[i].Path = relPath
 			mods[i].SHA1 = hash
@@ -365,8 +360,15 @@ func (ctx modJarParseContext) parseZipReader(r *zip.Reader, sourceName string, d
 	mods := make([]structs.ModInfo, 0, len(metadata.Mods))
 	mods = append(mods, metadata.Mods...)
 
+	jijMods := make([]structs.JijModInfo, 0)
 	for _, nestedPath := range uniqueNestedJarPaths(metadata.NestedJars) {
-		mods = append(mods, ctx.parseNestedJar(r, nestedPath, sourceName, depth+1)...)
+		jijMods = append(jijMods, ctx.parseNestedJar(r, nestedPath, sourceName, depth+1)...)
+	}
+	jijMods = uniqueJijModsByID(jijMods)
+	if len(jijMods) > 0 {
+		for i := range mods {
+			mods[i].JijMods = append([]structs.JijModInfo(nil), jijMods...)
+		}
 	}
 	return mods
 }
@@ -408,7 +410,7 @@ func (ctx modJarParseContext) parsers() []ModMetadataParser {
 	return modMetadataParsers
 }
 
-func (ctx modJarParseContext) parseNestedJar(r *zip.Reader, nestedPath string, sourceName string, depth int) []structs.ModInfo {
+func (ctx modJarParseContext) parseNestedJar(r *zip.Reader, nestedPath string, sourceName string, depth int) []structs.JijModInfo {
 	data, err := readZipFile(r, nestedPath)
 	if err != nil {
 		logging.Warn("read nested mod jar failed", "sourceName", sourceName, "nestedPath", nestedPath, "error", err)
@@ -426,14 +428,18 @@ func (ctx modJarParseContext) parseNestedJar(r *zip.Reader, nestedPath string, s
 		logging.Warn("open nested mod jar failed", "sourceName", sourceName, "nestedPath", nestedPath, "error", err)
 		return nil
 	}
-	result := ctx.parseZipReader(zr, sourceName+" > "+nestedPath, depth)
-	// All mods originating from a nested jar are weak references. Mark them so
-	// callers can distinguish top-level mods.toml declarations (strong refs) from
-	// jar-in-jar / JIJ entries that merely express what the host bundles.
-	for i := range result {
-		result[i].IsJij = true
+	nestedMods := ctx.parseZipReader(zr, sourceName+" > "+nestedPath, depth)
+	result := make([]structs.JijModInfo, 0, len(nestedMods))
+	for _, mod := range nestedMods {
+		if id := declaredModID(mod.ID); id != "" {
+			result = append(result, structs.JijModInfo{
+				ID:   id,
+				Name: mod.Name,
+			})
+		}
+		result = append(result, mod.JijMods...)
 	}
-	return result
+	return uniqueJijModsByID(result)
 }
 
 func parseJarJarNestedPaths(r *zip.Reader) ([]string, error) {
@@ -525,19 +531,31 @@ func uniqueModsByID(mods []structs.ModInfo) []structs.ModInfo {
 	return out
 }
 
-// PrimaryModIDs returns the lowercased, deduplicated mod IDs from mods that are
-// strong references — those declared directly in the JAR's own mods.toml /
-// neoforge.mods.toml / fabric.mod.json (IsJij == false). Nested jar / JIJ
-// entries (IsJij == true) are excluded because they must not trigger install
-// conflicts or replacement-archive logic at the same priority as direct
-// declarations.
+func uniqueJijModsByID(mods []structs.JijModInfo) []structs.JijModInfo {
+	seen := make(map[string]struct{}, len(mods))
+	out := make([]structs.JijModInfo, 0, len(mods))
+	for _, mod := range mods {
+		mod.ID = declaredModID(mod.ID)
+		if mod.ID == "" {
+			continue
+		}
+		key := strings.ToLower(mod.ID)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, mod)
+	}
+	return out
+}
+
+// PrimaryModIDs returns lowercased, deduplicated mod IDs declared directly by
+// the JAR. JIJ entries are stored under ModInfo.JijMods and are intentionally
+// not included.
 func PrimaryModIDs(mods []structs.ModInfo) []string {
 	seen := make(map[string]struct{}, len(mods))
 	out := make([]string, 0, len(mods))
 	for _, m := range mods {
-		if m.IsJij {
-			continue
-		}
 		id := strings.ToLower(strings.TrimSpace(m.ID))
 		if id == "" {
 			continue

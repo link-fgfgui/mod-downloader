@@ -39,17 +39,17 @@
                     </template>
 
                     <v-list-item-title class="font-weight-medium">
-                        <v-tooltip v-if="group.jij.length" :text="jijTooltip(group)" location="top">
-                            <template #activator="{ props: tip }">
-                                <span v-bind="tip">{{ group.primary.name || group.primary.id }}
-                                    <v-icon icon="mdi-package-variant-closed-plus" size="14" class="ms-1 text-medium-emphasis"></v-icon>
-                                </span>
-                            </template>
+                            <v-tooltip v-if="hasGroupedDetails(group)" :text="groupTooltip(group)" location="top">
+                                <template #activator="{ props: tip }">
+                                    <span v-bind="tip">{{ group.primary.name || group.primary.id }}
+                                        <v-icon icon="mdi-package-variant-closed-plus" size="14" class="ms-1 text-medium-emphasis"></v-icon>
+                                    </span>
+                                </template>
                         </v-tooltip>
                         <span v-else>{{ group.primary.name || group.primary.id }}</span>
                     </v-list-item-title>
                     <v-list-item-subtitle class="text-caption text-medium-emphasis">
-                        {{ group.primary.id }}
+                        {{ strongModIds(group).join(", ") }}
                         <span v-if="group.primary.version"> · {{ group.primary.version }}</span>
                         <span v-if="group.primary.fileName || group.primary.path"> · {{ group.primary.fileName || group.primary.path }}</span>
                     </v-list-item-subtitle>
@@ -101,12 +101,16 @@ const groupedMods = computed(() => {
     for (const mod of raw) {
         const key = mod.fileName || mod.path || mod.id;
         if (!groups.has(key)) {
-            groups.set(key, { primary: mod, jij: [] });
-        } else {
-            groups.get(key).jij.push(mod);
+            groups.set(key, { primary: null, strong: [], jij: [] });
+        }
+        const group = groups.get(key);
+        group.strong.push(mod);
+        addJijMods(group, mod.jijMods || []);
+        if (!group.primary) {
+            group.primary = mod;
         }
     }
-    return [...groups.values()];
+    return [...groups.values()].filter((group) => group.primary);
 });
 
 const hasSelectedInstance = computed(() => {
@@ -122,8 +126,37 @@ const modRowKey = (group) => {
     return [mod.id, mod.sha1, mod.path, mod.fileName].filter(Boolean).join("|");
 };
 
-const jijTooltip = (group) => {
-    return group.jij.map((m) => m.name || m.id).join(", ");
+const strongModIds = (group) => {
+    return group.strong.map((m) => m.id).filter(Boolean);
+};
+
+const strongModNames = (group) => {
+    return group.strong.map((m) => m.name || m.id).filter(Boolean);
+};
+
+const addJijMods = (group, mods) => {
+    for (const mod of mods) {
+        const id = (mod.id || "").trim();
+        if (!id || group.jij.some((existing) => (existing.id || "").toLowerCase() === id.toLowerCase())) {
+            continue;
+        }
+        group.jij.push(mod);
+    }
+};
+
+const hasGroupedDetails = (group) => {
+    return group.strong.length > 1 || group.jij.length > 0;
+};
+
+const groupTooltip = (group) => {
+    const parts = [];
+    if (group.strong.length > 1) {
+        parts.push(`Declared mods: ${strongModNames(group).join(", ")}`);
+    }
+    if (group.jij.length) {
+        parts.push(`Bundled JiJ: ${group.jij.map((m) => m.name || m.id).filter(Boolean).join(", ")}`);
+    }
+    return parts.join("\n");
 };
 
 const refreshMods = async () => {
@@ -131,12 +164,12 @@ const refreshMods = async () => {
 };
 
 const copyModNames = async (groups) => {
-    const names = groups.map((g) => g.primary.name || g.primary.id).join("\n");
+    const names = groups.flatMap(strongModNames).join("\n");
     try { await navigator.clipboard.writeText(names); } catch {}
 };
 
 const copyModIds = async (groups) => {
-    const ids = groups.map((g) => g.primary.id).join("\n");
+    const ids = groups.flatMap(strongModIds).join("\n");
     try { await navigator.clipboard.writeText(ids); } catch {}
 };
 

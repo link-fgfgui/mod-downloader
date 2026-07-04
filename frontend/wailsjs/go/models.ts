@@ -293,6 +293,20 @@ export namespace structs {
 		    return a;
 		}
 	}
+	export class JijModInfo {
+	    id: string;
+	    name: string;
+
+	    static createFrom(source: any = {}) {
+	        return new JijModInfo(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	    }
+	}
 	export class ModDownloadButtonState {
 	    key: string;
 	    status: string;
@@ -380,6 +394,7 @@ export namespace structs {
 	    path: string;
 	    sha1?: string;
 	    enabled: boolean;
+	    jijMods?: JijModInfo[];
 	
 	    static createFrom(source: any = {}) {
 	        return new ModInfo(source);
@@ -395,7 +410,26 @@ export namespace structs {
 	        this.path = source["path"];
 	        this.sha1 = source["sha1"];
 	        this.enabled = source["enabled"];
+	        this.jijMods = this.convertValues(source["jijMods"], JijModInfo);
 	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class ModVersionPinRequest {
 	    platform: string;
@@ -479,4 +513,3 @@ export namespace structs {
 	}
 
 }
-

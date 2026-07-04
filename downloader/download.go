@@ -617,11 +617,6 @@ func upsertDownloadedMod(path string, job downloadJob) {
 	}
 	global.HardlinkIndexAdd(sha1, absPath)
 	for i := range mods {
-		if mods[i].IsJij {
-			// JIJ weak references are informational only; they must not be
-			// written to the local mod index to avoid false conflict hits.
-			continue
-		}
 		mods[i].FileName = fileName
 		mods[i].Path = relPath
 		mods[i].SHA1 = sha1
