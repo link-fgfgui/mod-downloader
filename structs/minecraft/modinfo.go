@@ -13,6 +13,7 @@ type ModInfo struct {
 	FileName    string       `json:"fileName"`
 	Path        string       `json:"path"`
 	SHA1        string       `json:"sha1,omitempty"`
+	IconURL     string       `json:"iconUrl,omitempty"`
 	Enabled     bool         `json:"enabled"`
 	JijMods     []JijModInfo `json:"jijMods,omitempty"`
 }

@@ -358,6 +358,42 @@ func newerProjectVersion(left, right models.ModVersion) bool {
 	return left.VersionID > right.VersionID
 }
 
+// GetVersionBySHA1 looks up any cached platform version whose SHA1 matches,
+// regardless of whether it is the latest version for its project.
+func GetVersionBySHA1(platform, sha1 string) (models.ModVersion, bool) {
+	d, err := readyDB()
+	if err != nil {
+		return models.ModVersion{}, false
+	}
+	platform = normalizePlatform(platform)
+	sha1 = strings.ToLower(strings.TrimSpace(sha1))
+	if platform == "" || sha1 == "" {
+		return models.ModVersion{}, false
+	}
+
+	var best models.ModVersion
+	found := false
+	err = d.view(func(state *cacheState) error {
+		for key, v := range state.PlatformVersions {
+			if key.Platform != platform {
+				continue
+			}
+			if strings.ToLower(strings.TrimSpace(v.SHA1)) != sha1 {
+				continue
+			}
+			if !found || v.PublishedAt > best.PublishedAt || (v.PublishedAt == best.PublishedAt && v.ProjectID < best.ProjectID) {
+				best = copyVersion(v)
+				found = true
+			}
+		}
+		return nil
+	})
+	if err != nil || !found {
+		return models.ModVersion{}, false
+	}
+	return best, true
+}
+
 // --- mod platform versions ---
 
 func SetPlatformVersions(platform, projectID string, versions []models.ModVersion) error {

@@ -15,6 +15,7 @@ import (
 	"mod-downloader/httpserver"
 	"mod-downloader/logging"
 	"mod-downloader/minecraft"
+	"mod-downloader/modbridge"
 	"mod-downloader/models"
 	"mod-downloader/providers"
 	appstructs "mod-downloader/structs"
@@ -365,8 +366,42 @@ func (a *App) RefreshSelectedVersionMods() structs.VersionInfo {
 		return structs.VersionInfo{}
 	}
 	refreshed := refreshVersionMods(selected, global.GetMinecraftDir())
+	enriched, missedSHA1s := enrichModIcons(refreshed.Mods)
+	refreshed.Mods = enriched
 	global.SetSelectedVersion(refreshed)
 	runtime.EventsEmit(a.ctx, selectedVersionChangedEvent, refreshed)
+
+	if len(missedSHA1s) > 0 {
+		go func() {
+			resolved := providers.ResolveProjectsByHashes(missedSHA1s)
+			if len(resolved) == 0 {
+				return
+			}
+			updated := global.GetSelectedVersion()
+			if updated.ID != refreshed.ID && updated.Name != refreshed.Name {
+				return
+			}
+			mods := make([]structs.ModInfo, len(updated.Mods))
+			copy(mods, updated.Mods)
+			changed := false
+			for i := range mods {
+				if mods[i].IconURL != "" || strings.TrimSpace(mods[i].SHA1) == "" {
+					continue
+				}
+				sha1 := strings.ToLower(strings.TrimSpace(mods[i].SHA1))
+				if project, ok := resolved[sha1]; ok && strings.TrimSpace(project.IconURL) != "" {
+					mods[i].IconURL = project.IconURL
+					changed = true
+				}
+			}
+			if !changed {
+				return
+			}
+			updated.Mods = mods
+			global.SetSelectedVersion(updated)
+			runtime.EventsEmit(a.ctx, selectedVersionChangedEvent, updated)
+		}()
+	}
 	return refreshed
 }
 
@@ -468,6 +503,25 @@ func scanVersionMods(version structs.VersionInfo, mcDir string) structs.VersionI
 	versionDir := minecraft.VersionDirPath(mcDir, version)
 	version.Mods = minecraft.ScanVersionMods(versionDir, versionDirName, version.MinecraftVersion, version.ModLoader, mcDir)
 	return version
+}
+
+func enrichModIcons(mods []structs.ModInfo) ([]structs.ModInfo, []string) {
+	enriched := make([]structs.ModInfo, len(mods))
+	copy(enriched, mods)
+	var missedSHA1s []string
+	for i := range enriched {
+		sha1 := strings.ToLower(strings.TrimSpace(enriched[i].SHA1))
+		if sha1 == "" {
+			continue
+		}
+		project, _, ok := modbridge.PlatformMetadataForSHA1(sha1)
+		if ok && strings.TrimSpace(project.IconURL) != "" {
+			enriched[i].IconURL = project.IconURL
+		} else {
+			missedSHA1s = append(missedSHA1s, sha1)
+		}
+	}
+	return enriched, missedSHA1s
 }
 
 func (a *App) SelectVersion(versionKey string) structs.VersionInfo {

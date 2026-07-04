@@ -342,6 +342,72 @@ func (p modrinthProvider) searchExactMod(req appstructs.SearchModsRequest) (mode
 	return p.projectToModProject(project), nil
 }
 
+type hashResolveResult struct {
+	projects map[string]models.ModProject // sha1 → ModProject
+	versions map[string]models.ModVersion // sha1 → ModVersion
+}
+
+func (p modrinthProvider) resolveProjectsByHashes(hashes []string) (hashResolveResult, error) {
+	client := global.GetModrinthClient()
+	if client == nil {
+		return hashResolveResult{}, nil
+	}
+
+	versionsByHash, err := client.VersionFiles.GetFromHashes(hashes, "sha1")
+	if err != nil {
+		return hashResolveResult{}, err
+	}
+	if len(versionsByHash) == 0 {
+		return hashResolveResult{}, nil
+	}
+
+	// Collect unique project IDs from the returned versions.
+	projectIDSet := make(map[string]struct{})
+	for _, version := range versionsByHash {
+		if version != nil && version.ProjectID != nil {
+			projectIDSet[*version.ProjectID] = struct{}{}
+		}
+	}
+	projectIDs := make([]string, 0, len(projectIDSet))
+	for id := range projectIDSet {
+		projectIDs = append(projectIDs, id)
+	}
+	if len(projectIDs) == 0 {
+		return hashResolveResult{}, nil
+	}
+
+	projects, err := client.Projects.GetMultiple(projectIDs)
+	if err != nil {
+		return hashResolveResult{}, err
+	}
+
+	// Index projects by ID for lookup.
+	projectByID := make(map[string]*modrinth.Project, len(projects))
+	for _, proj := range projects {
+		if proj != nil && proj.ID != nil {
+			projectByID[*proj.ID] = proj
+		}
+	}
+
+	// Build sha1-keyed mappings.
+	result := hashResolveResult{
+		projects: make(map[string]models.ModProject, len(versionsByHash)),
+		versions: make(map[string]models.ModVersion, len(versionsByHash)),
+	}
+	for hash, version := range versionsByHash {
+		if version == nil || version.ProjectID == nil {
+			continue
+		}
+		proj, ok := projectByID[*version.ProjectID]
+		if !ok {
+			continue
+		}
+		result.projects[hash] = p.projectToModProject(proj)
+		result.versions[hash] = p.versionToModVersion(version)
+	}
+	return result, nil
+}
+
 // --- Search result helpers ---
 
 func mergeProviderSearchResults(providerResults map[string][]models.ModProject) []models.ModProject {

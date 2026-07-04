@@ -101,6 +101,40 @@ func SearchMods(req appstructs.SearchModsRequest, emitUpdate func(appstructs.Sea
 	go cacheSearchResults(finalResults)
 }
 
+func ResolveProjectsByHashes(hashes []string) map[string]models.ModProject {
+	if len(hashes) == 0 {
+		return nil
+	}
+	resolved, err := modrinthProvider{}.resolveProjectsByHashes(hashes)
+	if err != nil {
+		logging.Error("resolve projects by hashes failed", "hashCount", len(hashes), "error", err)
+		return nil
+	}
+	// Cache projects to the database.
+	for _, project := range resolved.projects {
+		if strings.TrimSpace(project.Title) == "" {
+			continue
+		}
+		if err := database.UpsertModPlatform(project); err != nil {
+			logging.Error("cache resolved project failed", "platform", project.Platform, "projectID", project.ProjectID, "error", err)
+		}
+	}
+	// Cache versions so that GetVersionBySHA1 finds them on next sync pass.
+	versionsByProject := make(map[string][]models.ModVersion)
+	for _, v := range resolved.versions {
+		if v.ProjectID == "" {
+			continue
+		}
+		versionsByProject[v.ProjectID] = append(versionsByProject[v.ProjectID], v)
+	}
+	for projectID, versions := range versionsByProject {
+		if err := database.SetPlatformVersions("Modrinth", projectID, versions); err != nil {
+			logging.Error("cache resolved versions failed", "projectID", projectID, "error", err)
+		}
+	}
+	return resolved.projects
+}
+
 func cacheSearchResults(results []models.ModProject) {
 	for _, r := range results {
 		if strings.TrimSpace(r.Title) == "" {

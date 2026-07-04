@@ -441,11 +441,11 @@ func PlatformMetadataForSHA1(sha1 string) (models.ModProject, models.ModVersion,
 		return models.ModProject{}, models.ModVersion{}, false
 	}
 
-	// Try to find a platform version with this SHA1 from the database
+	// Try to find any cached platform version with this SHA1.
 	var version models.ModVersion
 	var ok bool
 	for _, platform := range []string{"curseforge", "modrinth"} {
-		if version, ok = database.GetLatestProjectBySHA1(platform, sha1); ok {
+		if version, ok = database.GetVersionBySHA1(platform, sha1); ok {
 			break
 		}
 	}

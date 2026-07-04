@@ -33,7 +33,8 @@
                     <template #prepend>
                         <div class="align-self-start pt-1 me-3">
                             <v-avatar color="surface-container-high" rounded="lg" size="48">
-                                <v-icon icon="mdi-package-variant" color="on-surface-variant"></v-icon>
+                                <v-img v-if="group.primary.iconUrl" :src="group.primary.iconUrl" :alt="group.primary.name"></v-img>
+                                <v-icon v-else icon="mdi-package-variant" color="on-surface-variant"></v-icon>
                             </v-avatar>
                         </div>
                     </template>

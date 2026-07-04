@@ -395,6 +395,7 @@ export namespace structs {
 	    fileName: string;
 	    path: string;
 	    sha1?: string;
+	    iconUrl?: string;
 	    enabled: boolean;
 	    jijMods?: JijModInfo[];
 	
@@ -411,6 +412,7 @@ export namespace structs {
 	        this.fileName = source["fileName"];
 	        this.path = source["path"];
 	        this.sha1 = source["sha1"];
+	        this.iconUrl = source["iconUrl"];
 	        this.enabled = source["enabled"];
 	        this.jijMods = this.convertValues(source["jijMods"], JijModInfo);
 	    }
