@@ -55,6 +55,7 @@ func (a *App) startup(ctx context.Context) {
 		logging.Error("load config failed", "error", err)
 		cfg = &configs.Config{}
 	}
+	cfg.Prefers.MinecraftDir = minecraft.ExpandPathWithEnv(cfg.Prefers.MinecraftDir)
 	a.config = cfg
 	global.SetMinecraftDir(cfg.Prefers.MinecraftDir)
 
@@ -188,7 +189,7 @@ func (a *App) GetSettings() SettingsView {
 	sv := SettingsView{Theme: configs.ThemeDark.String()}
 	if a.config != nil {
 		sv.Theme = a.config.Prefers.Theme.Normalized().String()
-		sv.MinecraftDir = minecraft.SimplifyPathWithEnv(a.config.Prefers.MinecraftDir)
+		sv.MinecraftDir = minecraft.SimplifyPathWithEnv(minecraft.ExpandPathWithEnv(a.config.Prefers.MinecraftDir))
 		sv.HasCurseforgeKey = strings.TrimSpace(a.config.Keys.CurseforgeApiKey) != ""
 		sv.CurseforgeKeyMask = maskKey(a.config.Keys.CurseforgeApiKey)
 		sv.HasModrinthKey = strings.TrimSpace(a.config.Keys.ModrinthApiKey) != ""

@@ -12,8 +12,81 @@ import (
 	structs "mod-downloader/structs/minecraft"
 )
 
+// ExpandPathWithEnv expands leading environment variables in user-facing paths.
+// It supports both Unix-style $VAR/${VAR} and Windows-style %VAR% syntax.
+func ExpandPathWithEnv(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return ""
+	}
+	path = expandWindowsEnv(path)
+	path = expandDollarEnv(path)
+	return filepath.Clean(normalizePathSeparators(path))
+}
+
+func expandWindowsEnv(path string) string {
+	if !strings.HasPrefix(path, "%") {
+		return path
+	}
+	end := strings.Index(path[1:], "%")
+	if end < 0 {
+		return path
+	}
+	end++
+	key := path[1:end]
+	val := os.Getenv(key)
+	if val == "" {
+		return path
+	}
+	return val + path[end+1:]
+}
+
+func expandDollarEnv(path string) string {
+	if strings.HasPrefix(path, "${") {
+		end := strings.Index(path[2:], "}")
+		if end < 0 {
+			return path
+		}
+		end += 2
+		key := path[2:end]
+		val, ok := os.LookupEnv(key)
+		if !ok || val == "" {
+			return path
+		}
+		return val + path[end+1:]
+	}
+	if !strings.HasPrefix(path, "$") {
+		return path
+	}
+	end := 1
+	for end < len(path) && isEnvNameChar(path[end]) {
+		end++
+	}
+	if end == 1 {
+		return path
+	}
+	key := path[1:end]
+	val, ok := os.LookupEnv(key)
+	if !ok || val == "" {
+		return path
+	}
+	return val + path[end:]
+}
+
+func isEnvNameChar(c byte) bool {
+	return c == '_' || c >= '0' && c <= '9' || c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z'
+}
+
+func normalizePathSeparators(path string) string {
+	if os.PathSeparator == '/' {
+		return strings.ReplaceAll(path, "\\", "/")
+	}
+	return strings.ReplaceAll(path, "/", string(os.PathSeparator))
+}
+
 // SimplifyPathWithEnv takes an absolute path and simplifies it using the longest-matching environment variable.
 func SimplifyPathWithEnv(dirPath2 string) string {
+	dirPath2 = ExpandPathWithEnv(dirPath2)
 	// 1. Clean the input path to ensure a canonical format (normalize extra slashes, etc.)
 	var dirPath = filepath.Clean(dirPath2)
 
