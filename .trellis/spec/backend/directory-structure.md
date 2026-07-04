@@ -16,6 +16,10 @@ mod-downloader is a Wails v2 desktop app (Go backend + Vue 3 frontend). The back
 mod-downloader/
 ├── main.go                      # Wails app bootstrap
 ├── app.go                       # Wails-exposed API methods (App struct)
+├── appcore/                     # UI-independent service boundary shared by Wails and CLI
+│   └── service.go               #   Service lifecycle, config, search, download, instance workflows
+├── cliapp/                      # CLI command definitions and output formatting
+├── cmd/mod-downloader-cli/       # CLI binary entrypoint
 ├── models/                      # Canonical data types (single source of truth)
 │   ├── models.go                #   ModProject, ModVersion, ModDependency + composite-key helpers
 │   └── models_test.go
@@ -51,7 +55,7 @@ mod-downloader/
                     ↓                                  ↑
               database (caches models.*)         structs (request/response; consumes models)
                     ↓                                  ↑
-              downloader (consumes models.*)      app.go (Wails API; consumes models + structs)
+              downloader (consumes models.*)      appcore (UI-independent service)
                     ↓
               modbridge (cross-domain: version resolution, install status, SHA1↔platform bridge)
                ↙       ↘
@@ -61,6 +65,134 @@ mod-downloader/
 ```
 
 **Boundary constraint**: `minecraft` (local analysis) and `providers` (platform analysis) must NOT import each other. Their convergence point is `modbridge`. Dependency direction is unidirectional: `downloader → modbridge → {providers, database, global, minecraft}`.
+
+### Scenario: UI-Independent Core Service And CLI Adapters
+
+#### 1. Scope / Trigger
+
+Use this pattern whenever a workflow must be available from both the Wails UI
+and a non-UI caller such as the CLI. The trigger is any app lifecycle, config,
+instance, search, pinning, download, or local-mod workflow that would otherwise
+be duplicated between `app.go` and command code.
+
+#### 2. Signatures
+
+Core service:
+
+```go
+svc := appcore.New(appcore.Options{
+    ConfigOverrides: appcore.ConfigOverrides{MinecraftDir: dir, HasMinecraftDir: true},
+    OnEvent: func(event appcore.Event) { ... },
+})
+err := svc.Startup(ctx)
+defer svc.Close()    // CLI / tests: close DB without saving transient overrides
+defer svc.Shutdown() // Wails: persist selected minecraft dir and close DB
+
+svc.SearchMods(req)
+update := svc.SearchModsCollect(req)
+result := svc.QueueModDownload(req)
+waited := svc.InstallModAndWait(ctx, req)
+versions := svc.GetVersions()
+mods, err := svc.LocalMods(instanceKey)
+```
+
+Adapters:
+
+```go
+// Wails adapter keeps frontend-facing method names stable.
+func (a *App) SearchMods(req structs.SearchModsRequest)
+func (a *App) QueueModDownload(req structs.ModDownloadRequest) structs.ModDownloadResult
+
+// CLI binary entrypoint.
+go run ./cmd/mod-downloader-cli <command> [flags]
+```
+
+#### 3. Contracts
+
+- `appcore` must not import `github.com/wailsapp/wails/v2/pkg/runtime`.
+- `cliapp` and `cmd/mod-downloader-cli` must not import Wails runtime.
+- Wails event names such as `search-mods-updated`,
+  `download-queue-updated`, and `selected-version-changed` belong in `app.go`
+  or another Wails adapter, not in `appcore`.
+- `appcore.Event.Kind` is an adapter-neutral signal. Wails maps it to runtime
+  events; CLI may ignore it or render progress.
+- CLI global overrides (`--minecraft-dir`, `--curseforge-api-key`,
+  `--modrinth-api-key`) apply to the current command only. Use `Service.Close`
+  for CLI cleanup so transient overrides are not written back on shutdown.
+- Persisting config from CLI must go through explicit config commands such as
+  `config --set-minecraft-dir`, `config --theme`, or API-key set/clear flags.
+- Shared data types remain in `models` and existing `structs` packages. Do not
+  add aliases or re-export files for CLI convenience.
+
+#### 4. Validation & Error Matrix
+
+- Empty CLI project without `--platform` and without `platform:project` prefix
+  -> command error.
+- Empty or missing CLI `--instance` for install -> command error.
+- Invalid selected instance key -> service returns an error; Wails may preserve
+  panic behavior only at the Wails adapter boundary for frontend compatibility.
+- Failed download -> `InstallModAndWait` returns failed events; CLI exits
+  non-zero with the failure reason.
+- Empty Minecraft root -> version discovery returns no versions, not a panic.
+- Wails startup failure while loading release versions -> Wails startup returns
+  before starting the extension HTTP server, preserving prior behavior.
+
+#### 5. Good/Base/Bad Cases
+
+- Good: `app.go` opens a Wails directory dialog, passes the chosen path to
+  `svc.SetMinecraftDir`, then maps `appcore.EventSelectedVersionChanged` to
+  `runtime.EventsEmit(ctx, "selected-version-changed", payload)`.
+- Base: `go run ./cmd/mod-downloader-cli --minecraft-dir /tmp/mc versions
+  --json` lists instances and then calls `svc.Close`; `/tmp/mc` is not
+  persisted.
+- Bad: `appcore` imports Wails runtime to emit frontend events directly.
+- Bad: CLI creates its own Modrinth/CurseForge converters instead of using
+  `providers` and `models`.
+- Bad: `cliapp` duplicates version-directory parsing instead of calling
+  `appcore.GetVersions` / `minecraft.LoadLauncherVersions`.
+
+#### 6. Tests Required
+
+- Dependency test: `go list -deps mod-downloader/appcore
+  mod-downloader/cliapp mod-downloader/cmd/mod-downloader-cli` must not include
+  `github.com/wailsapp/wails/v2/pkg/runtime`.
+- CLI JSON test: `config --json` decodes as `appcore.SettingsView` and masks
+  API keys.
+- CLI version discovery test: `versions --json` with `--minecraft-dir` override
+  returns the expected `[]structs/minecraft.VersionInfo`.
+- Existing Wails adapter tests must continue to pass without regenerated
+  frontend bindings when public method signatures are preserved.
+
+#### 7. Wrong vs Correct
+
+Wrong:
+
+```go
+// appcore/service.go
+import "github.com/wailsapp/wails/v2/pkg/runtime"
+
+func (s *Service) SearchMods(req structs.SearchModsRequest) {
+    providers.SearchMods(req, func(update structs.SearchModsUpdate) {
+        runtime.EventsEmit(s.ctx, "search-mods-updated", update)
+    })
+}
+```
+
+Correct:
+
+```go
+// appcore/service.go
+func (s *Service) SearchMods(req structs.SearchModsRequest) {
+    providers.SearchMods(req, func(update structs.SearchModsUpdate) {
+        s.emit(EventSearchModsUpdated, update)
+    })
+}
+
+// app.go
+func (a *App) emitCoreEvent(event appcore.Event) {
+    runtime.EventsEmit(a.ctx, searchModsUpdatedEvent, event.Payload)
+}
+```
 
 ### Convention: `models` is the single source of truth
 
