@@ -239,3 +239,36 @@ Refactored standard .minecraft and Prism instance folder handling behind a minec
 ### Next Steps
 
 - None - task complete
+
+
+## Session 8: Distinguish Forge/NeoForge strong vs weak modID references (JIJ priority)
+
+**Date**: 2026-07-04
+**Task**: Distinguish Forge/NeoForge strong vs weak modID references (JIJ priority)
+**Branch**: `master`
+
+### Summary
+
+Added IsJij bool to ModInfo to classify top-level mods.toml declarations (strong refs) vs nested jar/JIJ entries (weak refs). Added PrimaryModIDs helper. Guarded all UpsertLocalMod loops to skip JIJ entries. Updated downloadModWithLocalParse, tryHardlinkInstall, and VersionModIDs remote-parse path to use PrimaryModIDs. Fixed missing FilterFullyCoveredPaths in tryHardlinkInstall archive path. Added TestForgeModIDStrengthClassification. Updated directory-structure.md spec and cross-layer guide checklist.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `51ea9cc` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
