@@ -22,6 +22,7 @@ const messages = {
       unpinAll: "批量取消固定",
       empty: "当前没有已固定的 Mod 版本。",
       removed: "已取消固定",
+      removeFailed: "取消固定失败，列表已刷新",
       confirmAll: {
         title: "批量取消固定？",
         body: "将取消当前筛选范围内的全部固定版本，下次下载会重新使用最新版本。",
@@ -117,6 +118,7 @@ const messages = {
       unpinAll: "Unpin All",
       empty: "No pinned mod versions yet.",
       removed: "Unpinned",
+      removeFailed: "Could not unpin. The list has been refreshed.",
       confirmAll: {
         title: "Unpin all?",
         body: "This will unpin all versions in the current filtered range. Downloads will use the latest version next time.",

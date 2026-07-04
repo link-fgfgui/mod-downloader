@@ -53,6 +53,8 @@ export const usePinnedModsStore = defineStore("pinnedMods", {
                 const ok = await UnpinMod(pin.platform, pin.modId, pin.minecraftVersion, pin.modLoader);
                 if (ok) {
                     this.pins = this.pins.filter((p) => this.pinKey(p) !== key);
+                } else {
+                    await this.load();
                 }
                 return ok;
             } finally {

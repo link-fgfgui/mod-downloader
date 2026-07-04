@@ -84,9 +84,16 @@ onActivated(() => {
 });
 
 async function unpin(pin: database.PinnedMod) {
-    const ok = await pinnedModsStore.unpin(pin);
-    if (ok) {
-        snackbar.value = { show: true, message: t('unpin.removed'), color: "success" };
+    try {
+        const ok = await pinnedModsStore.unpin(pin);
+        if (ok) {
+            snackbar.value = { show: true, message: t('unpin.removed'), color: "success" };
+            return;
+        }
+        snackbar.value = { show: true, message: t('unpin.removeFailed'), color: "warning" };
+    } catch {
+        await pinnedModsStore.load();
+        snackbar.value = { show: true, message: t('unpin.removeFailed'), color: "error" };
     }
 }
 
