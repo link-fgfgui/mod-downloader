@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 9
+- **Total Sessions**: 10
 - **Last Active**: 2026-07-05
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~307 | Active |
+| `journal-1.md` | ~341 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 10 | 2026-07-05 | Extract core service and add CLI | `dd6f8e8`, `972d85b` | `master` |
 | 9 | 2026-07-05 | Manage page mod icons via SHA1 lookup | `66f178d` | `master` |
 | 8 | 2026-07-04 | Distinguish Forge/NeoForge strong vs weak modID references (JIJ priority) | `51ea9cc` | `master` |
 | 7 | 2026-06-28 | Abstract launcher instance layouts | `c4ebf81` | `abs-mc-dir` |

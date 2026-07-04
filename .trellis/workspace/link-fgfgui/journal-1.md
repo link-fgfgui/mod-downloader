@@ -305,3 +305,37 @@ Added mod icon display to the manage page by resolving SHA1 hashes against cache
 ### Next Steps
 
 - None - task complete
+
+
+## Session 10: Extract core service and add CLI
+
+**Date**: 2026-07-05
+**Task**: Extract core service and add CLI
+**Branch**: `master`
+
+### Summary
+
+Created an appcore service shared by Wails and a new CLI, added config/versions/search/install/mods commands, decoupled downloader events from Wails runtime, documented the new backend boundary, and verified build/vet/tests.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `dd6f8e8` | (see git log) |
+| `972d85b` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
