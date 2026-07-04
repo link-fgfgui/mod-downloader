@@ -301,6 +301,84 @@ func DownloadStates(req appstructs.DownloadStatesRequest, onBackfillComplete fun
 
 ---
 
+### Decision: Strong vs Weak ModID References (`ModInfo.IsJij`)
+
+**Context**: `ParseModZipReader` recursively extracts mod metadata from both the host JAR's own `mods.toml` / `neoforge.mods.toml` / `fabric.mod.json` declarations and from nested jar / jar-in-jar (JIJ) entries. Previously all modIDs were returned as a flat list, so callers could not distinguish "this JAR declares modID X" (strong reference) from "this JAR bundles a nested JAR that declares modID X" (weak reference). This caused false conflict hits and wrong replacement-archive decisions (e.g., installing `jei` archiving `tmrv` because `tmrv` also declares `jei` in its JIJ-bundled child).
+
+**Options Considered**:
+1. Return two slices `(primary []ModInfo, jij []ModInfo)` from `ParseModZipReader` — breaks every existing call site.
+2. Return a new struct `ParsedJar{Primary, Jij []ModInfo}` — cleaner but same call-site impact, higher change cost.
+3. Add `IsJij bool` to `ModInfo` — zero call-site breakage; callers filter via `PrimaryModIDs` helper.
+
+**Decision**: Option 3. `IsJij` uses `omitempty` so `false` values are invisible to JSON serialization and the frontend. Filtering is centralized in `PrimaryModIDs`.
+
+**Signatures**:
+```go
+// structs/minecraft/modinfo.go
+type ModInfo struct {
+    // ...existing fields...
+    // IsJij is true when this entry originates from a nested jar (JIJ). These
+    // are weak references that must NOT participate in install-conflict detection
+    // or replacement-archive decisions at the same level as top-level declarations.
+    IsJij bool `json:"isJij,omitempty"`
+}
+
+// minecraft/modparser.go
+// PrimaryModIDs returns lowercased, deduplicated mod IDs from mods where IsJij==false.
+// Use this instead of manual ID extraction whenever the result is consumed by
+// install-status, conflict detection, version persistence, or archive logic.
+func PrimaryModIDs(mods []structs.ModInfo) []string
+```
+
+**Contracts**:
+- `parseNestedJar` marks ALL returned `ModInfo` as `IsJij = true` regardless of recursion depth. A nested JAR's own top-level declaration is still a weak reference from the host's perspective.
+- `ParseModZipReader` returns a mix of strong (`IsJij==false`) and weak (`IsJij==true`) entries, deduped by modID (first occurrence wins, preserving `IsJij`).
+- `PrimaryModIDs` is idempotent and deduplicated. It NEVER returns JIJ modIDs.
+
+**Validation & Error Matrix**:
+- Host JAR with only JIJ entries → `PrimaryModIDs` returns `[]` (empty); no conflict or archive action.
+- Host declares same modID in top-level and JIJ → dedup keeps first occurrence; since top-level is processed before `parseNestedJar`, the entry is `IsJij==false`.
+
+**Good/Base/Bad Cases**:
+- **Good**: `tmrv.jar` declares `[[mods]] modId="tmrv"` and `[[mods]] modId="jei"` in its own `mods.toml`, plus a JIJ child `childmod`. `PrimaryModIDs` → `["tmrv", "jei"]`. Installing standalone `jei.jar` triggers conflict against `tmrv.jar` correctly.
+- **Base**: Standard JAR with one top-level modID and no JIJ. `PrimaryModIDs` → `["mymod"]`. Behavior unchanged.
+- **Bad (prevented)**: Without the rule, installing `jei` would look up `childmod` in the local index via `LocalModPathsForModIDs`, find `tmrv` (because `tmrv` bundles `childmod` as JIJ), and try to archive `tmrv` — incorrectly removing a completely unrelated mod.
+
+**Tests Required**:
+- `TestForgeModIDStrengthClassification` (`minecraft/modparser_test.go`): assert top-level `[[mods]]` entries → `IsJij==false`; JIJ child entries → `IsJij==true`; `PrimaryModIDs` excludes JIJ IDs.
+
+**Wrong vs Correct**:
+
+```go
+// Wrong — extracts all modIDs including JIJ weak refs
+modIDs := make([]string, 0, len(mods))
+for _, m := range mods {
+    if id := strings.TrimSpace(m.ID); id != "" {
+        modIDs = append(modIDs, strings.ToLower(id))
+    }
+}
+
+// Correct — extracts only strong-reference modIDs
+modIDs := minecraft.PrimaryModIDs(mods)
+```
+
+**Call-site rule**: Every place that extracts modIDs from `ParseModZipReader` / `ParseModJarWithSHA1` results for use in version-persistence, conflict-detection, or archive logic MUST call `minecraft.PrimaryModIDs` — not a manual loop. Grep for `\.ID` on `ModInfo` slices as a signal to check.
+
+**`UpsertLocalMod` guard rule**: Every loop that calls `global.UpsertLocalMod` over `ParseModZipReader` results MUST skip `IsJij==true` entries:
+```go
+for i := range mods {
+    if mods[i].IsJij {
+        continue // JIJ weak refs must not enter the local mod index
+    }
+    // ...set fields and call UpsertLocalMod
+}
+```
+Failure to add this guard causes false `installed`/`conflict` states when the JIJ modID matches a remote version being browsed.
+
+**`FilterFullyCoveredPaths` guard rule**: `archiveSupersededModJars` must always receive the output of `FilterFullyCoveredPaths`, never the raw `LocalModPathsForModIDs` result. Missing this (as was the case in `tryHardlinkInstall` before this fix) silently bypasses the coverage check and can archive JARs that provide additional modIDs the replacement does not cover.
+
+---
+
 ## Examples
 
 - Well-organized canonical-type package: [models/models.go](file:///home/link/Documents/go_proj/mod-downloader/models/models.go)

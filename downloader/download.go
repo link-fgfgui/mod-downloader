@@ -304,13 +304,8 @@ func tryHardlinkInstall(job downloadJob) bool {
 		logging.Warn("hardlink source jar has no parseable metadata, falling back to download", "src", srcPath)
 		return false
 	}
-	// Extract mod IDs for future version mod ID persistence (mirrors downloadModWithLocalParse)
-	parsedModIDs := make([]string, 0, len(parsedMods))
-	for _, m := range parsedMods {
-		if id := strings.TrimSpace(m.ID); id != "" {
-			parsedModIDs = append(parsedModIDs, strings.ToLower(id))
-		}
-	}
+	// Extract primary (strong-reference) mod IDs only. Mirrors downloadModWithLocalParse.
+	parsedModIDs := minecraft.PrimaryModIDs(parsedMods)
 	if len(parsedModIDs) > 0 && job.Version.ID != "" {
 		_ = modbridge.PersistVersionModIDs(job.Version.ID, parsedModIDs)
 	}
@@ -319,7 +314,7 @@ func tryHardlinkInstall(job downloadJob) bool {
 		_ = os.Remove(tempPath)
 		return true
 	}
-	archiveSupersededModJars(parsedExisting)
+	archiveSupersededModJars(modbridge.FilterFullyCoveredPaths(parsedModIDs, parsedExisting))
 	if downloadTargetExists(finalPath) {
 		logging.Info("hardlink skipped because target file already exists", "path", finalPath, "versionID", job.Version.ID)
 		_ = os.Remove(tempPath)
@@ -523,13 +518,10 @@ func downloadModWithLocalParse(ctx context.Context, job downloadJob) error {
 		return fmt.Errorf("downloaded jar has no parseable mod metadata: %s", filepath.Base(resp.Filename))
 	}
 
-	// Extract mod IDs for future version mod ID persistence
-	modIDs := make([]string, 0, len(mods))
-	for _, m := range mods {
-		if id := strings.TrimSpace(m.ID); id != "" {
-			modIDs = append(modIDs, strings.ToLower(id))
-		}
-	}
+	// Extract primary (strong-reference) mod IDs only. JIJ / nested-jar entries
+	// are excluded: they must not participate in version persistence, conflict
+	// detection, or replacement-archive decisions.
+	modIDs := minecraft.PrimaryModIDs(mods)
 	if len(modIDs) > 0 && job.Version.ID != "" {
 		_ = modbridge.PersistVersionModIDs(job.Version.ID, modIDs)
 	}
@@ -625,6 +617,11 @@ func upsertDownloadedMod(path string, job downloadJob) {
 	}
 	global.HardlinkIndexAdd(sha1, absPath)
 	for i := range mods {
+		if mods[i].IsJij {
+			// JIJ weak references are informational only; they must not be
+			// written to the local mod index to avoid false conflict hits.
+			continue
+		}
 		mods[i].FileName = fileName
 		mods[i].Path = relPath
 		mods[i].SHA1 = sha1

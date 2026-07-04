@@ -296,13 +296,10 @@ func VersionModIDs(version models.ModVersion, modLoader string) []string {
 		return nil
 	}
 
-	modIDs := make([]string, 0, len(mods))
-	for _, m := range mods {
-		if id := strings.TrimSpace(m.ID); id != "" {
-			modIDs = append(modIDs, strings.ToLower(id))
-		}
-	}
-	modIDs = deduplicateStrings(modIDs)
+	// Use only primary (strong-reference) mod IDs. JIJ / nested-jar entries must
+	// not be stored as version identifiers since they would cause false conflicts
+	// when the same modID appears as a JIJ in an unrelated host JAR.
+	modIDs := minecraft.PrimaryModIDs(mods)
 
 	if len(modIDs) > 0 && version.ID != "" {
 		if err := database.SetVersionModIDs(version.ID, modIDs); err != nil {

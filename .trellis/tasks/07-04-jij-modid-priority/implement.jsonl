@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "禁止 pattern 检查，确保 IsJij 字段与 PrimaryModIDs helper 符合项目代码规范"}
+{"file": ".trellis/spec/backend/directory-structure.md", "reason": "确认 structs/minecraft、minecraft、modbridge、downloader 的模块职责边界"}

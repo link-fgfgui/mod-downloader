@@ -304,6 +304,11 @@ func ScanVersionMods(versionDir string, instanceID string, minecraftVersion stri
 		}
 
 		for i := range mods {
+			if mods[i].IsJij {
+				// JIJ weak references are informational only; they must not be
+				// written to the local mod index to avoid false conflict hits.
+				continue
+			}
 			mods[i].FileName = baseName
 			mods[i].Path = relPath
 			mods[i].SHA1 = hash
@@ -421,7 +426,14 @@ func (ctx modJarParseContext) parseNestedJar(r *zip.Reader, nestedPath string, s
 		logging.Warn("open nested mod jar failed", "sourceName", sourceName, "nestedPath", nestedPath, "error", err)
 		return nil
 	}
-	return ctx.parseZipReader(zr, sourceName+" > "+nestedPath, depth)
+	result := ctx.parseZipReader(zr, sourceName+" > "+nestedPath, depth)
+	// All mods originating from a nested jar are weak references. Mark them so
+	// callers can distinguish top-level mods.toml declarations (strong refs) from
+	// jar-in-jar / JIJ entries that merely express what the host bundles.
+	for i := range result {
+		result[i].IsJij = true
+	}
+	return result
 }
 
 func parseJarJarNestedPaths(r *zip.Reader) ([]string, error) {
@@ -509,6 +521,32 @@ func uniqueModsByID(mods []structs.ModInfo) []structs.ModInfo {
 		}
 		seen[key] = struct{}{}
 		out = append(out, mod)
+	}
+	return out
+}
+
+// PrimaryModIDs returns the lowercased, deduplicated mod IDs from mods that are
+// strong references — those declared directly in the JAR's own mods.toml /
+// neoforge.mods.toml / fabric.mod.json (IsJij == false). Nested jar / JIJ
+// entries (IsJij == true) are excluded because they must not trigger install
+// conflicts or replacement-archive logic at the same priority as direct
+// declarations.
+func PrimaryModIDs(mods []structs.ModInfo) []string {
+	seen := make(map[string]struct{}, len(mods))
+	out := make([]string, 0, len(mods))
+	for _, m := range mods {
+		if m.IsJij {
+			continue
+		}
+		id := strings.ToLower(strings.TrimSpace(m.ID))
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
 	}
 	return out
 }

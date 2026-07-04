@@ -94,6 +94,87 @@ mandatory=true
 	}
 }
 
+// TestForgeModIDStrengthClassification verifies that mods.toml top-level [[mods]]
+// entries are marked as strong references (IsJij==false) and nested jar / JIJ
+// entries are marked as weak references (IsJij==true), and that PrimaryModIDs
+// returns only the strong set.
+func TestForgeModIDStrengthClassification(t *testing.T) {
+	// child JAR: declare two mods — only reachable as a JIJ from the host.
+	child := testJar(t, map[string][]byte{
+		"META-INF/mods.toml": []byte(`
+license="MIT"
+
+[[mods]]
+modId="childmod"
+displayName="Child Mod"
+
+[[mods]]
+modId="childmod-extra"
+displayName="Child Extra"
+`),
+	})
+
+	// top JAR: declares two mods directly AND embeds the child as a JIJ.
+	// The scenario mirrors a mod like tmrv that declares both "tmrv" and "jei"
+	// in its own mods.toml, while also bundling a nested jar.
+	top := testJar(t, map[string][]byte{
+		"META-INF/mods.toml": []byte(`
+license="MIT"
+
+[[mods]]
+modId="topmod"
+displayName="Top Mod"
+
+[[mods]]
+modId="extramod"
+displayName="Extra Mod declared in same mods.toml"
+`),
+		"META-INF/jarjar/metadata.json": []byte(`{
+			"jars": [{"path": "META-INF/jarjar/child.jar"}]
+		}`),
+		"META-INF/jarjar/child.jar": child,
+	})
+
+	mods := ParseModZipReader(testZipReader(t, top), "top.jar", "forge")
+
+	// Collect mods by IsJij flag.
+	var strongIDs, jijIDs []string
+	for _, m := range mods {
+		if m.IsJij {
+			jijIDs = append(jijIDs, m.ID)
+		} else {
+			strongIDs = append(strongIDs, m.ID)
+		}
+	}
+
+	wantStrong := []string{"topmod", "extramod"}
+	wantJij := []string{"childmod", "childmod-extra"}
+
+	if !reflect.DeepEqual(strongIDs, wantStrong) {
+		t.Errorf("strong modIDs = %#v, want %#v", strongIDs, wantStrong)
+	}
+	if !reflect.DeepEqual(jijIDs, wantJij) {
+		t.Errorf("jij modIDs = %#v, want %#v", jijIDs, wantJij)
+	}
+
+	// PrimaryModIDs must return only the strong set.
+	primary := PrimaryModIDs(mods)
+	if !reflect.DeepEqual(primary, wantStrong) {
+		t.Errorf("PrimaryModIDs() = %#v, want %#v", primary, wantStrong)
+	}
+
+	// PrimaryModIDs must NOT contain any JIJ mod ID.
+	primarySet := make(map[string]bool, len(primary))
+	for _, id := range primary {
+		primarySet[id] = true
+	}
+	for _, id := range jijIDs {
+		if primarySet[id] {
+			t.Errorf("PrimaryModIDs() unexpectedly contains JIJ modID %q", id)
+		}
+	}
+}
+
 func TestParseModZipReaderUsesSpecifiedLoaderOnly(t *testing.T) {
 	jar := testJar(t, map[string][]byte{
 		"META-INF/mods.toml": []byte(`

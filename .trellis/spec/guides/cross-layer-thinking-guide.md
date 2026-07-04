@@ -325,3 +325,20 @@ state correctly, but several commands still re-parsed event payload fields with
 local casts. The fix was to make the core event layer own `ThreadChannelEvent`
 and `isThreadEvent`, make `reduceChannelMetadata` the only channel metadata
 projection, and make `reduceThreads` the only thread replay reducer.
+
+---
+
+## ModInfo Strength Classification Boundary (`minecraft` → `modbridge` / `downloader`)
+
+When `ParseModZipReader` results flow from `minecraft` into `modbridge` or `downloader`, the list contains **two semantically different entry types**:
+- **Strong references** (`IsJij==false`): top-level `mods.toml` / `fabric.mod.json` declarations — participate in conflict detection, version persistence, archive logic.
+- **Weak references** (`IsJij==true`): nested jar / JIJ child declarations — informational only.
+
+### Checklist: When Consuming `ParseModZipReader` / `ParseModJarWithSHA1` Results
+
+- [ ] Use `minecraft.PrimaryModIDs(mods)` instead of a manual ID-extraction loop to get the strong-reference set
+- [ ] Guard every `UpsertLocalMod` call with `if mods[i].IsJij { continue }` — never write JIJ entries to the local index
+- [ ] Pass `FilterFullyCoveredPaths` output to `archiveSupersededModJars`, never the raw `LocalModPathsForModIDs` result
+- [ ] Never persist JIJ modIDs to the version modID DB cache (`SetVersionModIDs`)
+
+See `directory-structure.md` → "Decision: Strong vs Weak ModID References" for full contracts, cases, and the `PrimaryModIDs` signature.
