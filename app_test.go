@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"mod-downloader/configs"
-	"mod-downloader/database"
-	"mod-downloader/global"
-	structs "mod-downloader/structs/minecraft"
+	"github.com/link-fgfgui/mod-downloader-core/configs"
+	"github.com/link-fgfgui/mod-downloader-core/database"
+	"github.com/link-fgfgui/mod-downloader-core/global"
+	structs "github.com/link-fgfgui/mod-downloader-core/structs/minecraft"
 )
 
 func TestGetVersionsSelectsFirstVersionByDefault(t *testing.T) {

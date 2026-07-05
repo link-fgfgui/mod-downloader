@@ -3,14 +3,18 @@ module mod-downloader
 go 1.24.0
 
 require (
-	codeberg.org/jmansfield/go-modrinth v0.6.0
-	github.com/BurntSushi/toml v1.5.0
-	github.com/cavaliergopher/grab/v3 v3.0.1
-	github.com/ilyakaznacheev/cleanenv v1.5.0
-	github.com/klauspost/compress v1.18.6
-	github.com/sjet47/go-curseforge v0.6.0
-	github.com/urfave/cli/v2 v2.27.7
+	github.com/link-fgfgui/mod-downloader-core v0.0.0
 	github.com/wailsapp/wails/v2 v2.12.0
+)
+
+require (
+	codeberg.org/jmansfield/go-modrinth v0.6.0 // indirect
+	github.com/BurntSushi/toml v1.5.0 // indirect
+	github.com/cavaliergopher/grab/v3 v3.0.1 // indirect
+	github.com/ilyakaznacheev/cleanenv v1.5.0 // indirect
+	github.com/klauspost/compress v1.18.6 // indirect
+	github.com/sjet47/go-curseforge v0.6.0 // indirect
+	github.com/urfave/cli/v2 v2.27.7 // indirect
 )
 
 require (
@@ -70,3 +74,5 @@ require (
 // replace github.com/wailsapp/wails/v2 v2.12.0 => /home/link/go/pkg/mod
 
 tool github.com/abice/go-enum
+
+replace github.com/link-fgfgui/mod-downloader-core => ./mod-downloader-core

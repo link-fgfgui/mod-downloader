@@ -4,14 +4,14 @@ import (
 	"context"
 	"strings"
 
-	"mod-downloader/appcore"
-	"mod-downloader/configs"
-	"mod-downloader/database"
-	"mod-downloader/httpserver"
-	"mod-downloader/logging"
-	"mod-downloader/models"
-	appstructs "mod-downloader/structs"
-	structs "mod-downloader/structs/minecraft"
+	"github.com/link-fgfgui/mod-downloader-core/appcore"
+	"github.com/link-fgfgui/mod-downloader-core/configs"
+	"github.com/link-fgfgui/mod-downloader-core/database"
+	"github.com/link-fgfgui/mod-downloader-core/httpserver"
+	"github.com/link-fgfgui/mod-downloader-core/logging"
+	"github.com/link-fgfgui/mod-downloader-core/models"
+	appstructs "github.com/link-fgfgui/mod-downloader-core/structs"
+	structs "github.com/link-fgfgui/mod-downloader-core/structs/minecraft"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -53,7 +53,7 @@ func (a *App) startup(ctx context.Context) {
 	}
 	a.config = a.core.Config()
 
-	a.server = httpserver.New(ctx, httpserver.DefaultAddr)
+	a.server = httpserver.New(httpserver.DefaultAddr, httpserver.Options{OnEvent: a.emitHTTPServerEvent})
 	if err := a.server.Start(); err != nil {
 		logging.Error("start http server failed", "error", err)
 	}
@@ -96,6 +96,17 @@ func (a *App) emitCoreEvent(event appcore.Event) {
 		return
 	}
 	runtime.EventsEmit(a.ctx, eventName, event.Payload)
+}
+
+func (a *App) emitHTTPServerEvent(event httpserver.Event) {
+	if a.ctx == nil || event.Name == "" {
+		return
+	}
+	if event.Payload == nil {
+		runtime.EventsEmit(a.ctx, event.Name)
+		return
+	}
+	runtime.EventsEmit(a.ctx, event.Name, event.Payload)
 }
 
 func (a *App) SearchMods(req appstructs.SearchModsRequest) {
