@@ -75,4 +75,4 @@ require (
 
 tool github.com/abice/go-enum
 
-replace github.com/link-fgfgui/mod-downloader-core => ./mod-downloader-core
+replace github.com/link-fgfgui/mod-downloader-core => ./core
