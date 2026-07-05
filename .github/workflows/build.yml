@@ -34,6 +34,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6 # 🚀 升级到 v6 (原生支持 Node 24)
+        with:
+          submodules: recursive
+
+      - name: Verify submodules
+        run: git submodule status --recursive
 
       - name: Setup Go
         uses: actions/setup-go@v6 # 🚀 升级到 v6 (原生支持 Node 24)
