@@ -339,3 +339,37 @@ Created an appcore service shared by Wails and a new CLI, added config/versions/
 ### Next Steps
 
 - None - task complete
+
+
+## Session 11: Adapt core for apt-style CLI
+
+**Date**: 2026-07-05
+**Task**: Adapt core for apt-style CLI
+**Package**: app
+**Branch**: `master`
+
+### Summary
+
+Added core runtime options, env-only config loading, temp/default cache paths, explicit install targets, direct mods-dir scanning, and updated core submodule pointer for CLI apt-style workflows.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b067bcc` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
