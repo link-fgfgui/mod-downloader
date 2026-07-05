@@ -373,3 +373,37 @@ Added core runtime options, env-only config loading, temp/default cache paths, e
 ### Next Steps
 
 - None - task complete
+
+
+## Session 12: Use online metadata categories in Manage
+
+**Date**: 2026-07-05
+**Task**: Use online metadata categories in Manage
+**Package**: app
+**Branch**: `master`
+
+### Summary
+
+Added provider-native category metadata to core project models, enriched local mod display metadata from online project data, updated Manage rows to prefer online names/icons and render category chips with overflow handling, and recorded the implementation task.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `73939ca` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

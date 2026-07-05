@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 11
+- **Total Sessions**: 12
 - **Last Active**: 2026-07-05
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~375 | Active |
+| `journal-1.md` | ~409 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 12 | 2026-07-05 | Use online metadata categories in Manage | `73939ca` | `master` |
 | 11 | 2026-07-05 | Adapt core for apt-style CLI | `b067bcc` | `master` |
 | 10 | 2026-07-05 | Extract core service and add CLI | `dd6f8e8`, `972d85b` | `master` |
 | 9 | 2026-07-05 | Manage page mod icons via SHA1 lookup | `66f178d` | `master` |
