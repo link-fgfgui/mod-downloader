@@ -33,7 +33,7 @@
                     <template #prepend>
                         <div class="align-self-start pt-1 me-3">
                             <v-avatar color="surface-container-high" rounded="lg" size="48">
-                                <v-img v-if="group.primary.iconUrl" :src="group.primary.iconUrl" :alt="group.primary.name"></v-img>
+                                <v-img v-if="group.primary.iconUrl" :src="group.primary.iconUrl" :alt="displayModName(group)"></v-img>
                                 <v-icon v-else icon="mdi-package-variant" color="on-surface-variant"></v-icon>
                             </v-avatar>
                         </div>
@@ -42,17 +42,36 @@
                     <v-list-item-title class="font-weight-medium">
                             <v-tooltip v-if="hasGroupedDetails(group)" :text="groupTooltip(group)" location="top">
                                 <template #activator="{ props: tip }">
-                                    <span v-bind="tip">{{ group.primary.name || group.primary.id }}
+                                    <span v-bind="tip">{{ displayModName(group) }}
                                         <v-icon icon="mdi-package-variant-closed-plus" size="14" class="ms-1 text-medium-emphasis"></v-icon>
                                     </span>
                                 </template>
                         </v-tooltip>
-                        <span v-else>{{ group.primary.name || group.primary.id }}</span>
+                        <span v-else>{{ displayModName(group) }}</span>
                     </v-list-item-title>
-                    <v-list-item-subtitle class="text-caption text-medium-emphasis">
-                        {{ strongModIds(group).join(", ") }}
-                        <span v-if="group.primary.version"> · {{ group.primary.version }}</span>
-                        <span v-if="group.primary.fileName || group.primary.path"> · {{ group.primary.fileName || group.primary.path }}</span>
+                    <v-list-item-subtitle class="manage-subtitle text-caption text-medium-emphasis">
+                        <span class="manage-subtitle-scroll">
+                            <span class="manage-subtitle-details">
+                                {{ strongModIds(group).join(", ") }}
+                                <span v-if="group.primary.version"> · {{ group.primary.version }}</span>
+                                <span v-if="group.primary.fileName || group.primary.path"> · {{ group.primary.fileName || group.primary.path }}</span>
+                            </span>
+                            <v-tooltip v-if="modCategories(group).length" :text="categoryTooltip(group)" location="top">
+                                <template #activator="{ props: tagTip }">
+                                    <span v-bind="tagTip" class="manage-category-strip">
+                                        <v-chip
+                                            v-for="category in modCategories(group)"
+                                            :key="category"
+                                            class="manage-category-chip"
+                                            size="x-small"
+                                            variant="tonal"
+                                        >
+                                            {{ category }}
+                                        </v-chip>
+                                    </span>
+                                </template>
+                            </v-tooltip>
+                        </span>
                     </v-list-item-subtitle>
 
                     <template #append>
@@ -126,6 +145,28 @@ const modRowKey = (group) => {
     const mod = group.primary;
     return [mod.id, mod.sha1, mod.path, mod.fileName].filter(Boolean).join("|");
 };
+
+const displayModName = (group) => {
+    const mod = group.primary || {};
+    return mod.onlineName || mod.name || mod.id;
+};
+
+const modCategories = (group) => {
+    const categories = group.primary?.categories || [];
+    const seen = new Set();
+    return categories
+        .map((category) => (category || "").trim())
+        .filter((category) => {
+            const key = category.toLowerCase();
+            if (!key || seen.has(key)) {
+                return false;
+            }
+            seen.add(key);
+            return true;
+        });
+};
+
+const categoryTooltip = (group) => modCategories(group).join(", ");
 
 const strongModIds = (group) => {
     return group.strong.map((m) => m.id).filter(Boolean);
@@ -213,5 +254,45 @@ onActivated(() => {
 .manage-item-selected {
     background-color: rgba(var(--v-theme-primary), 0.12) !important;
     transition: background-color var(--md-transition-fast) ease;
+}
+
+.manage-subtitle {
+    overflow: visible;
+}
+
+.manage-subtitle-scroll {
+    align-items: center;
+    display: flex;
+    gap: 6px;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    white-space: nowrap;
+}
+
+.manage-subtitle-details {
+    flex: 0 0 auto;
+}
+
+.manage-category-strip {
+    display: inline-flex;
+    flex: 1 1 auto;
+    flex-wrap: nowrap;
+    gap: 4px;
+    min-width: min(72px, 100%);
+    overflow: hidden;
+}
+
+.manage-category-chip {
+    flex: 0 0 auto;
+    max-width: 120px;
+}
+
+.manage-category-chip :deep(.v-chip__content) {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 </style>

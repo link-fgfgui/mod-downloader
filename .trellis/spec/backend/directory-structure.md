@@ -226,6 +226,85 @@ type SearchModResult = models.ModProject   // forbidden: third name for same typ
 // providers/model.go: type ModProject = models.ModProject  // forbidden: re-export file
 ```
 
+### Scenario: Online Metadata Display For Local Mods
+
+#### 1. Scope / Trigger
+
+Use this pattern when platform metadata from CurseForge or Modrinth should affect how a locally installed JAR is displayed. Local JAR parsing still owns install identity; platform metadata owns display enrichment.
+
+#### 2. Signatures
+
+Canonical project metadata:
+
+```go
+type ModProject struct {
+    Title      string   `json:"title"`
+    IconURL    string   `json:"iconUrl"`
+    Categories []string `json:"categories,omitempty"`
+}
+```
+
+Local mod display metadata:
+
+```go
+type ModInfo struct {
+    ID              string   `json:"id"`      // JAR-declared identity
+    Name            string   `json:"name"`    // JAR-declared fallback display
+    OnlineName      string   `json:"onlineName,omitempty"`
+    OnlinePlatform  string   `json:"onlinePlatform,omitempty"`
+    OnlineProjectID string   `json:"onlineProjectId,omitempty"`
+    OnlineSlug      string   `json:"onlineSlug,omitempty"`
+    IconURL         string   `json:"iconUrl,omitempty"`
+    Categories      []string `json:"categories,omitempty"`
+}
+```
+
+#### 3. Contracts
+
+- Provider converters populate `models.ModProject.Categories` from provider-native categories/tags:
+  - Modrinth search: `SearchResult.Categories`
+  - Modrinth project: `Project.Categories` plus `Project.AdditionalCategories`
+  - CurseForge mod: `Mod.Categories`, preferring `Slug` and falling back to `Name`
+- `models.NormalizeCategories` lowercases, trims, and deduplicates category strings before they cross package boundaries.
+- `modbridge.ApplyProjectMetadataToModInfo` may fill `OnlineName`, `IconURL`, platform/project fields, and `Categories`.
+- Display enrichment must not overwrite `ModInfo.ID`, `Name`, `Version`, `SHA1`, `Path`, `Enabled`, or `JijMods`.
+- Frontend display should prefer `onlineName || name || id`; technical subtitles may keep JAR-derived IDs/version/file details.
+
+#### 4. Validation & Error Matrix
+
+- Empty provider categories -> `nil` / omitted `categories`, not a placeholder.
+- Duplicate categories with different casing -> one lowercase category.
+- SHA1 maps to only partial platform metadata without title/icon/categories -> treat as a display miss and allow hash resolution to try fuller metadata.
+- No platform metadata -> keep existing JAR-derived display fallback.
+
+#### 5. Good/Base/Bad Cases
+
+- Good: Modrinth categories `["library", "Magic"]` become `[]string{"library", "magic"}` and render as category chips.
+- Base: Local-only JAR with no platform match still displays `ModInfo.Name` and fallback icon.
+- Bad: Replacing `ModInfo.ID` with a platform slug; this breaks install status and conflict detection.
+
+#### 6. Tests Required
+
+- Provider converter tests assert unified categories are populated for Modrinth and CurseForge.
+- Enrichment tests assert online display fields are applied while JAR-derived identity and JiJ fields are preserved.
+- Frontend build/type check must pass after adding response fields consumed by Vue.
+
+#### 7. Wrong vs Correct
+
+Wrong:
+
+```go
+info.Name = project.Title
+info.ID = project.Slug
+```
+
+Correct:
+
+```go
+info = modbridge.ApplyProjectMetadataToModInfo(info, project)
+// UI uses info.OnlineName || info.Name || info.ID
+```
+
 ---
 
 ## Naming Conventions

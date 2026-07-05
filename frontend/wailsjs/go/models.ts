@@ -110,6 +110,7 @@ export namespace models {
 	    iconUrl: string;
 	    description: string;
 	    downloads: number;
+	    categories?: string[];
 	    updatedAt: number;
 	    cachedAt: number;
 	
@@ -128,6 +129,7 @@ export namespace models {
 	        this.iconUrl = source["iconUrl"];
 	        this.description = source["description"];
 	        this.downloads = source["downloads"];
+	        this.categories = source["categories"];
 	        this.updatedAt = source["updatedAt"];
 	        this.cachedAt = source["cachedAt"];
 	    }
@@ -395,7 +397,12 @@ export namespace structs {
 	    fileName: string;
 	    path: string;
 	    sha1?: string;
+	    onlineName?: string;
+	    onlinePlatform?: string;
+	    onlineProjectId?: string;
+	    onlineSlug?: string;
 	    iconUrl?: string;
+	    categories?: string[];
 	    enabled: boolean;
 	    jijMods?: JijModInfo[];
 	
@@ -412,7 +419,12 @@ export namespace structs {
 	        this.fileName = source["fileName"];
 	        this.path = source["path"];
 	        this.sha1 = source["sha1"];
+	        this.onlineName = source["onlineName"];
+	        this.onlinePlatform = source["onlinePlatform"];
+	        this.onlineProjectId = source["onlineProjectId"];
+	        this.onlineSlug = source["onlineSlug"];
 	        this.iconUrl = source["iconUrl"];
+	        this.categories = source["categories"];
 	        this.enabled = source["enabled"];
 	        this.jijMods = this.convertValues(source["jijMods"], JijModInfo);
 	    }
@@ -517,4 +529,3 @@ export namespace structs {
 	}
 
 }
-
