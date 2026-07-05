@@ -6,7 +6,13 @@
 
 ## Overview
 
-mod-downloader is a Wails v2 desktop app (Go backend + Vue 3 frontend). The backend is a single Go module (`mod-downloader`) organized into packages by layer. CF/MR mod metadata types live in `models` as the single source of truth.
+mod-downloader is now split into three Go-facing repositories:
+
+- `mod-downloader` — Wails v2 desktop app shell, Vue 3 frontend, and Wails adapter code.
+- `mod-downloader-core` — reusable Go core module, checked out in this repo as the `core/` git submodule.
+- `mod-downloader-cli` — standalone CLI repo that depends on the same core module through its own `core/` submodule.
+
+The main app module keeps `replace github.com/link-fgfgui/mod-downloader-core => ./core` in `go.mod` for local development. CF/MR mod metadata types live in `github.com/link-fgfgui/mod-downloader-core/models` as the single source of truth.
 
 ---
 
@@ -16,39 +22,37 @@ mod-downloader is a Wails v2 desktop app (Go backend + Vue 3 frontend). The back
 mod-downloader/
 ├── main.go                      # Wails app bootstrap
 ├── app.go                       # Wails-exposed API methods (App struct)
-├── appcore/                     # UI-independent service boundary shared by Wails and CLI
-│   └── service.go               #   Service lifecycle, config, search, download, instance workflows
+├── core/                        # git submodule: github.com/link-fgfgui/mod-downloader-core
+│   ├── appcore/                 # UI-independent service boundary shared by Wails and CLI
+│   ├── httpserver/              # Extension HTTP bridge, adapter-neutral event callback
+│   ├── models/                  # Canonical data types (single source of truth)
+│   ├── structs/                 # Request/response structs + Minecraft manifest types
+│   ├── providers/               # CurseForge/Modrinth platform abstraction layer
+│   ├── database/                # BoltDB persistence
+│   ├── downloader/              # Download queue + state machine
+│   ├── modbridge/               # Cross-domain bridge
+│   ├── global/                  # Global clients and in-memory indexes
+│   ├── configs/                 # Config load/save
+│   ├── minecraft/               # Minecraft JAR parser and launcher layouts
+│   └── logging/                 # Structured logger wrapper
+├── frontend/                    # Vue 3 + Pinia frontend (Wails-generated bindings in wailsjs/)
+├── go.mod                       # requires mod-downloader-core and replaces it with ./core
+└── .gitmodules                  # pins the local core/ submodule
+```
+
+```
+mod-downloader-cli/
 ├── cliapp/                      # CLI command definitions and output formatting
 ├── cmd/mod-downloader-cli/       # CLI binary entrypoint
-├── models/                      # Canonical data types (single source of truth)
-│   ├── models.go                #   ModProject, ModVersion, ModDependency + composite-key helpers
-│   └── models_test.go
-├── structs/                     # Request/response structs + minecraft manifest types
-│   ├── search.go                #   SearchModsRequest, ModDownloadRequest, SearchModsUpdate, ...
-│   └── minecraft/               #   Minecraft version manifest types (unrelated to mod metadata)
-├── providers/                   # CF/MR platform abstraction layer
-│   ├── modprovider.go           #   modProvider interface + CF/MR implementations + SDK→models converters
-│   ├── service.go               #   Facade: SearchMods, ListMatchingProjectVersions, ...
-│   └── cache.go                 #   Higher-level DB access (GetProjectByID, StoreVersion, ...)
-├── database/                    # BoltDB persistence (cache snapshots, associations, pins)
-│   ├── database.go              #   cacheState, load/save, copy helpers
-│   └── mods.go                  #   ModPlatform/Version/Association/Pinned CRUD
-├── downloader/                  # Download queue + state machine
-│   └── download.go
-├── modbridge/                   # Cross-domain bridge: version resolution, install status, SHA1↔platform mapping
-│   └── modbridge.go
-├── global/                      # Global singletons (CF/MR SDK clients, local mods, in-memory JAR metadata cache)
-├── configs/                     # Config load/save
-├── minecraft/                   # Minecraft JAR parser, version manifest fetcher
-├── logging/                     # Structured logger wrapper
-└── frontend/                    # Vue 3 + Pinia frontend (Wails-generated bindings in wailsjs/)
+├── core/                        # git submodule: github.com/link-fgfgui/mod-downloader-core
+└── go.mod                       # requires mod-downloader-core and replaces it with ./core
 ```
 
 ---
 
 ## Module Organization
 
-### Layered data flow (mod metadata)
+### Layered data flow (mod metadata, inside `core/`)
 
 ```
 [CF/MR SDK] → providers (SDK→models converters) → models (canonical types)
@@ -103,14 +107,18 @@ Adapters:
 func (a *App) SearchMods(req structs.SearchModsRequest)
 func (a *App) QueueModDownload(req structs.ModDownloadRequest) structs.ModDownloadResult
 
-// CLI binary entrypoint.
+// CLI binary entrypoint lives in the sibling mod-downloader-cli repository.
 go run ./cmd/mod-downloader-cli <command> [flags]
 ```
 
 #### 3. Contracts
 
 - `appcore` must not import `github.com/wailsapp/wails/v2/pkg/runtime`.
-- `cliapp` and `cmd/mod-downloader-cli` must not import Wails runtime.
+- `httpserver` must not import Wails runtime; it emits `httpserver.Event`
+  through `httpserver.Options.OnEvent`, and `app.go` maps that to
+  `runtime.EventsEmit`.
+- `cliapp` and `cmd/mod-downloader-cli` live in the `mod-downloader-cli`
+  repository and must not import Wails runtime.
 - Wails event names such as `search-mods-updated`,
   `download-queue-updated`, and `selected-version-changed` belong in `app.go`
   or another Wails adapter, not in `appcore`.
@@ -142,10 +150,14 @@ go run ./cmd/mod-downloader-cli <command> [flags]
 - Good: `app.go` opens a Wails directory dialog, passes the chosen path to
   `svc.SetMinecraftDir`, then maps `appcore.EventSelectedVersionChanged` to
   `runtime.EventsEmit(ctx, "selected-version-changed", payload)`.
-- Base: `go run ./cmd/mod-downloader-cli --minecraft-dir /tmp/mc versions
-  --json` lists instances and then calls `svc.Close`; `/tmp/mc` is not
-  persisted.
+- Good: `app.go` starts `httpserver.New(httpserver.DefaultAddr,
+  httpserver.Options{OnEvent: a.emitHTTPServerEvent})` and owns the Wails event
+  bridge; `core/httpserver` only reports adapter-neutral events.
+- Base: in the `mod-downloader-cli` repo, `go run ./cmd/mod-downloader-cli
+  --minecraft-dir /tmp/mc versions --json` lists instances and then calls
+  `svc.Close`; `/tmp/mc` is not persisted.
 - Bad: `appcore` imports Wails runtime to emit frontend events directly.
+- Bad: `httpserver` imports Wails runtime to emit extension events directly.
 - Bad: CLI creates its own Modrinth/CurseForge converters instead of using
   `providers` and `models`.
 - Bad: `cliapp` duplicates version-directory parsing instead of calling
@@ -153,8 +165,10 @@ go run ./cmd/mod-downloader-cli <command> [flags]
 
 #### 6. Tests Required
 
-- Dependency test: `go list -deps mod-downloader/appcore
-  mod-downloader/cliapp mod-downloader/cmd/mod-downloader-cli` must not include
+- Core dependency test: from `core/`, `go list -deps ./appcore ./httpserver`
+  must not include `github.com/wailsapp/wails/v2/pkg/runtime`.
+- CLI dependency test: from the `mod-downloader-cli` repo, `go list -deps
+  ./cliapp ./cmd/mod-downloader-cli` must not include
   `github.com/wailsapp/wails/v2/pkg/runtime`.
 - CLI JSON test: `config --json` decodes as `appcore.SettingsView` and masks
   API keys.
@@ -168,7 +182,7 @@ go run ./cmd/mod-downloader-cli <command> [flags]
 Wrong:
 
 ```go
-// appcore/service.go
+// core/appcore/service.go
 import "github.com/wailsapp/wails/v2/pkg/runtime"
 
 func (s *Service) SearchMods(req structs.SearchModsRequest) {
@@ -181,7 +195,7 @@ func (s *Service) SearchMods(req structs.SearchModsRequest) {
 Correct:
 
 ```go
-// appcore/service.go
+// core/appcore/service.go
 func (s *Service) SearchMods(req structs.SearchModsRequest) {
     providers.SearchMods(req, func(update structs.SearchModsUpdate) {
         s.emit(EventSearchModsUpdated, update)
@@ -196,14 +210,14 @@ func (a *App) emitCoreEvent(event appcore.Event) {
 
 ### Convention: `models` is the single source of truth
 
-**What**: `mod-downloader/models` defines `ModProject`, `ModVersion`, `ModDependency`, and the composite-key helpers (`ProjectKey`, `ParseProjectKey`, `VersionKey`, `ParseVersionKey`). Every other package imports `models` directly — no type aliases, no re-export files.
+**What**: `github.com/link-fgfgui/mod-downloader-core/models` defines `ModProject`, `ModVersion`, `ModDependency`, and the composite-key helpers (`ProjectKey`, `ParseProjectKey`, `VersionKey`, `ParseVersionKey`). Every other package imports `models` directly — no type aliases, no re-export files.
 
 **Why**: Previously `structs.SearchModResult = models.ModProject` (alias) and `providers/model.go` (re-export) gave the same type three names. This made cross-file search noisy, obscured which package owned the type, and let a parallel "old" conversion path (`modToSearchResult`) coexist with a "new" path (`modToModProject`) — the old path silently dropped the `ProjectID` field, a bug that went unnoticed because the new (correct) path was dead code.
 
 **Example**:
 ```go
 // Good — import models directly
-import "mod-downloader/models"
+import "github.com/link-fgfgui/mod-downloader-core/models"
 
 func (a *App) ListMatchingProjectVersions(result models.ModProject, mcVersion, modLoader string) []models.ModVersion
 
@@ -256,10 +270,10 @@ These needed to bridge via SHA1 hash matching for features like "show install st
 package modbridge
 
 import (
-    "mod-downloader/minecraft"  // local JAR parsing
-    "mod-downloader/providers"  // platform API
-    "mod-downloader/database"   // persistence
-    "mod-downloader/global"     // local mod index
+    "github.com/link-fgfgui/mod-downloader-core/minecraft"  // local JAR parsing
+    "github.com/link-fgfgui/mod-downloader-core/providers"  // platform API
+    "github.com/link-fgfgui/mod-downloader-core/database"   // persistence
+    "github.com/link-fgfgui/mod-downloader-core/global"     // local mod index
 )
 
 // InstallStatus checks if a platform ModVersion is installed locally
@@ -285,7 +299,7 @@ Prism Launcher `instances/` directory. Both produce the same app-facing shape:
 `mods/` child is scanned or used as an install target.
 
 **Decision**: Launcher-specific directory detection, instance aggregation, and
-version-directory resolution belong in `mod-downloader/minecraft`. App-facing
+version-directory resolution belong in `github.com/link-fgfgui/mod-downloader-core/minecraft`. App-facing
 code calls `minecraft.LoadLauncherVersions` and `minecraft.VersionDirPath`
 instead of branching on launcher markers.
 
@@ -392,30 +406,41 @@ func (db *Database) SetVersionModIDs(platformVersionID string, modIDs []string) 
 
 ### Decision: Upward Signaling via Callback (Layer Constraint Workaround)
 
-**Context**: `modbridge` sits below `app.go` in the dependency graph (`downloader → modbridge → {providers, database, global, minecraft}`). `modbridge` must NOT import `wails/runtime` (it would invert the dependency direction and couple a pure-logic package to the Wails runtime). But `modbridge.DownloadStates` sometimes needs to trigger a frontend refresh after an async backfill completes — and only `app.go` can emit Wails events because only it owns `a.ctx`.
+**Context**: `modbridge` sits below the Wails adapter in the dependency graph (`app.go → appcore → downloader → modbridge → {providers, database, global, minecraft}`). `modbridge` must NOT import `wails/runtime` (it would invert the dependency direction and couple a pure-logic package to the Wails runtime). But `modbridge.DownloadStates` sometimes needs to trigger a frontend refresh after an async backfill completes — and only `app.go` can emit Wails events because only it owns `a.ctx`.
 
 **Options Considered**:
 1. Let `modbridge` import `wails/runtime` and emit directly (breaks layering, couples logic to runtime)
 2. Have `modbridge` return a "needs refresh" flag and let `app.go` poll (brittle, races with async goroutine)
 3. Pass a `func()` callback from `app.go` through `downloader` into `modbridge`, invoked when async work finishes
 
-**Decision**: Option 3 (callback through the intermediate layer). `app.GetDownloadStates` creates a closure over `runtime.EventsEmit(a.ctx, ...)`, passes it as `onBackfillComplete func()` to `downloader.GetDownloadStates`, which transparently forwards it to `modbridge.DownloadStates`. `modbridge` invokes the callback once after all async backfill goroutines finish — never needing to know about Wails.
+**Decision**: Option 3 (callback through the intermediate layer). `app.GetDownloadStates` calls `appcore.Service.GetDownloadStates`; `appcore` passes an `onBackfillComplete func()` to `downloader.GetDownloadStates`, which transparently forwards it to `modbridge.DownloadStates`. When the callback fires, `appcore` emits `EventDownloadStatesUpdated`; `app.go` maps that adapter-neutral event to `runtime.EventsEmit`. `modbridge` invokes the callback once after all async backfill goroutines finish — never needing to know about Wails.
 
 **Implementation**:
 ```go
-// app.go — owns ctx, creates the emitter closure
+// app.go — owns ctx and maps adapter-neutral core events to Wails
 func (a *App) GetDownloadStates(req appstructs.DownloadStatesRequest) []appstructs.ModDownloadButtonState {
-    return downloader.GetDownloadStates(req, func() {
+    return a.service().GetDownloadStates(req)
+}
+
+func (a *App) emitCoreEvent(event appcore.Event) {
+    if event.Kind == appcore.EventDownloadStatesUpdated {
         runtime.EventsEmit(a.ctx, downloadStatesUpdatedEvent)
+    }
+}
+
+// core/appcore/service.go — pure service layer emits adapter-neutral event
+func (s *Service) GetDownloadStates(req appstructs.DownloadStatesRequest) []appstructs.ModDownloadButtonState {
+    return downloader.GetDownloadStates(req, func() {
+        s.emit(EventDownloadStatesUpdated, nil)
     })
 }
 
-// downloader/download.go — pure passthrough
+// core/downloader/download.go — pure passthrough
 func GetDownloadStates(req appstructs.DownloadStatesRequest, onBackfillComplete func()) []appstructs.ModDownloadButtonState {
     return modbridge.DownloadStates(req, onBackfillComplete)
 }
 
-// modbridge/modbridge.go — invokes callback after async work, no wails import
+// core/modbridge/modbridge.go — invokes callback after async work, no wails import
 func DownloadStates(req appstructs.DownloadStatesRequest, onBackfillComplete func()) []appstructs.ModDownloadButtonState {
     // ... sync status decisions ...
     backfill := drainPendingBackfills()
@@ -429,7 +454,7 @@ func DownloadStates(req appstructs.DownloadStatesRequest, onBackfillComplete fun
 }
 ```
 
-**When to apply**: Any time a lower-layer package (`modbridge`, `providers`, `database`) needs to signal the frontend after async work, but cannot import `wails/runtime` due to layering. Pass a `func()` callback from the layer that owns the Wails context (`app.go`) through any intermediate layers. The callback must be invoked exactly once after all async work completes; nil-check before invoking.
+**When to apply**: Any time a lower-layer package (`modbridge`, `providers`, `database`, `httpserver`) needs to signal an adapter after async work, but cannot import `wails/runtime` due to layering. Pass a `func()` callback or `OnEvent` hook from the adapter-neutral service boundary, then let `app.go` perform Wails-specific event emission. The callback must be invoked exactly once after all async work completes; nil-check before invoking.
 
 ---
 
@@ -504,6 +529,6 @@ modIDs := minecraft.PrimaryModIDs(mods)
 
 ## Examples
 
-- Well-organized canonical-type package: [models/models.go](file:///home/link/Documents/go_proj/mod-downloader/models/models.go)
-- Converter functions following the naming convention: [providers/modprovider.go](file:///home/link/Documents/go_proj/mod-downloader/providers/modprovider.go) (`modToModProject`, `fileToModVersion`, etc.)
-- Bridge package for cross-domain convergence: [modbridge/modbridge.go](file:///home/link/Documents/go_proj/mod-downloader/modbridge/modbridge.go)
+- Well-organized canonical-type package: `core/models/models.go`
+- Converter functions following the naming convention: `core/providers/modprovider.go` (`modToModProject`, `fileToModVersion`, etc.)
+- Bridge package for cross-domain convergence: `core/modbridge/modbridge.go`

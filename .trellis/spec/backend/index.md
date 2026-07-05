@@ -14,7 +14,7 @@ This directory contains guidelines for backend development. Fill in each file wi
 
 | Guide | Description | Status |
 |-------|-------------|--------|
-| [Directory Structure](./directory-structure.md) | Module organization, file layout, `models` single-source-of-truth convention, bridge pattern | Filled |
+| [Directory Structure](./directory-structure.md) | Repo split, core submodule layout, `models` single-source-of-truth convention, bridge pattern | Filled |
 | [Database Guidelines](./database-guidelines.md) | BoltDB cache patterns, version bumps, persistent vs memory-only caches | Filled |
 | [Error Handling](./error-handling.md) | Error types, handling strategies | To fill |
 | [Quality Guidelines](./quality-guidelines.md) | Code standards, forbidden patterns (aliases, re-exports, parallel converters) | Filled |

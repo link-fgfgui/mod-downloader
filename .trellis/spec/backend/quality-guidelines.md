@@ -26,7 +26,7 @@ type ProjectVersionResult = models.ModVersion
 **Instead**:
 ```go
 // Import models directly everywhere
-import "mod-downloader/models"
+import "github.com/link-fgfgui/mod-downloader-core/models"
 func F(p models.ModProject) ...
 ```
 
@@ -38,7 +38,7 @@ If a rename is genuinely needed during a migration, land it in one commit and de
 ```go
 // providers/model.go — entire file is re-exports
 package providers
-import "mod-downloader/models"
+import "github.com/link-fgfgui/mod-downloader-core/models"
 type ModProject = models.ModProject
 type ModVersion = models.ModVersion
 var ProjectKey = models.ProjectKey
@@ -83,11 +83,22 @@ func (p curseForgeProvider) modToSearchResult(mod cfSchema.Mod) models.ModProjec
 
 Shared data types live in one package (`models`). Other packages import them directly. See [directory-structure.md](./directory-structure.md#convention-models-is-the-single-source-of-truth) for the full contract.
 
+### Convention: Core dependency is local during development
+
+The main Wails app and the standalone CLI both require `github.com/link-fgfgui/mod-downloader-core` and replace it with their local `core/` submodule:
+
+```go
+replace github.com/link-fgfgui/mod-downloader-core => ./core
+```
+
+Do not point this replace directive at `../mod-downloader-core`; the core repo is intentionally nested as a git submodule in each consumer so clones are self-contained after `git submodule update --init --recursive`.
+
 ---
 
 ## Testing Requirements
 
 - Every package with logic has `_test.go` files. Run `go test ./...` before reporting done.
+- When changing core code, run tests from `core/` as well as from the consuming app or CLI.
 - When deleting a duplicate test file (e.g. `providers/model_test.go` was a verbatim copy of `models/models_test.go`), confirm the canonical test file covers the same cases — no coverage loss.
 
 ---
@@ -95,7 +106,9 @@ Shared data types live in one package (`models`). Other packages import them dir
 ## Code Review Checklist
 
 - [ ] `go build ./... && go vet ./... && go test ./...` all pass.
+- [ ] Core changes are validated inside `core/` with `go test ./...` and, when practical, `go build ./... && go vet ./...`.
 - [ ] Modified files are gofmt-clean (`gofmt -l <files>` returns nothing). Pre-existing dirtiness in untouched files is out of scope.
+- [ ] Main app and CLI `go.mod` files replace `github.com/link-fgfgui/mod-downloader-core` with `./core`, not a sibling path.
 - [ ] No new type aliases or re-export files introduced.
 - [ ] No parallel conversion functions for the same target type — old deleted when new is wired.
 - [ ] Converter names match canonical `models` type names (`*ToModProject`, not `*ToSearchResult`).
