@@ -5,6 +5,8 @@ import {database} from '../models';
 import {main} from '../models';
 import {models} from '../models';
 
+export function ApplyLocalModBatchOperation(arg1:structs.LocalModBatchOperationRequest):Promise<structs.VersionInfo>;
+
 export function CancelDownload(arg1:string):Promise<boolean>;
 
 export function ChooseMinecraftDir():Promise<string>;

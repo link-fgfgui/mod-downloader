@@ -344,6 +344,20 @@ export namespace structs {
 	        this.name = source["name"];
 	    }
 	}
+	export class LocalModBatchOperationRequest {
+	    paths: string[];
+	    action: string;
+
+	    static createFrom(source: any = {}) {
+	        return new LocalModBatchOperationRequest(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.paths = source["paths"];
+	        this.action = source["action"];
+	    }
+	}
 	export class ModDownloadButtonState {
 	    key: string;
 	    status: string;

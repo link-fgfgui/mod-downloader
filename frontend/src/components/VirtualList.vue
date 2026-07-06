@@ -266,13 +266,16 @@ watch(() => props.items, (next, previous) => {
     transform: translateX(-50%);
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    justify-content: center;
+    max-width: calc(100% - 32px);
     padding: 8px 16px;
     border-radius: 16px;
     background-color: rgba(var(--v-theme-surface), 0.92);
     backdrop-filter: blur(8px);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
     z-index: 10;
-    white-space: nowrap;
 }
 
 .action-bar-enter-active {
