@@ -36,12 +36,14 @@
             ></v-text-field>
         </div>
         </transition>
-        <span
+        <div
             v-show="!isExpanded"
-            style="font-size: 32px; writing-mode: vertical-rl"
+            class="version-rail-summary"
+            :title="selectedVersionName || 'Version'"
+            :aria-label="selectedVersionName || 'Version'"
         >
-            {{ selectedVersionName }}
-        </span>
+            <v-icon icon="mdi-cube-outline" size="24"></v-icon>
+        </div>
         <v-overlay
             v-model="isLoading"
             contained
@@ -101,4 +103,12 @@ const selectFolder = async () => {
     await minecraftStore.chooseMinecraftDir();
 };
 </script>
-<style scoped></style>
+<style scoped>
+.version-rail-summary {
+    align-items: center;
+    color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+    display: flex;
+    justify-content: center;
+    min-height: 48px;
+}
+</style>
