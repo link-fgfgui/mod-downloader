@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 1
+- **Total Sessions**: 2
 - **Last Active**: 2026-07-06
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~42 | Active |
+| `journal-1.md` | ~77 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 2 | 2026-07-06 | Active download retry and stall retry | `9208f08`, `3c9fd9d` | `extend-download-list` |
 | 1 | 2026-07-06 | Download queue controls | `0fef7c1`, `10381f6` | `extend-download-list` |
 <!-- @@@/auto:session-history -->
 
