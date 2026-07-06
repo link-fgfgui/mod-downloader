@@ -4,15 +4,15 @@
             <v-col cols="12" md="auto">
                 <h1 class="text-h5">{{ $t('unpin.title') }}</h1>
             </v-col>
-            <v-col cols="12" md="auto" class="d-flex gap-2">
+            <v-col cols="12" md="auto" class="unpin-filter-row">
                 <v-text-field v-model="pinnedModsStore.filterPlatform" :label="$t('unpin.columns.platform')"
-                    density="compact" hide-details clearable style="min-width: 140px;" />
+                    class="unpin-filter-field" density="compact" hide-details clearable />
                 <v-text-field v-model="pinnedModsStore.filterMinecraftVersion" :label="$t('unpin.columns.minecraftVersion')"
-                    density="compact" hide-details clearable style="min-width: 160px;" />
+                    class="unpin-filter-field unpin-filter-field-wide" density="compact" hide-details clearable />
                 <v-text-field v-model="pinnedModsStore.filterModLoader" :label="$t('unpin.columns.modLoader')"
-                    density="compact" hide-details clearable style="min-width: 140px;" />
+                    class="unpin-filter-field" density="compact" hide-details clearable />
             </v-col>
-            <v-col cols="12" md="auto" class="d-flex gap-2 ml-auto">
+            <v-col cols="12" md="auto" class="unpin-action-row ml-auto">
                 <v-btn :loading="pinnedModsStore.isLoading" variant="outlined" prepend-icon="mdi-refresh"
                     @click="pinnedModsStore.load()">
                     {{ $t('unpin.refresh') }}
@@ -107,8 +107,24 @@ async function unpinAll() {
 </script>
 
 <style scoped>
-.gap-2 {
+.unpin-filter-row,
+.unpin-action-row {
+    display: flex;
+    flex-wrap: wrap;
     gap: 8px;
+}
+
+.unpin-filter-field {
+    flex: 1 1 140px;
+    min-width: 0;
+}
+
+.unpin-filter-field-wide {
+    flex-basis: 160px;
+}
+
+.unpin-action-row {
+    justify-content: flex-end;
 }
 
 .unpin-table-wrap {
@@ -118,5 +134,15 @@ async function unpinAll() {
 
 .unpin-table {
     min-width: max-content;
+}
+
+@media (max-width: 599.98px) {
+    .unpin-action-row {
+        justify-content: stretch;
+    }
+
+    .unpin-action-row :deep(.v-btn) {
+        flex: 1 1 auto;
+    }
 }
 </style>
