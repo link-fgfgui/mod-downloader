@@ -363,6 +363,14 @@ type DownloadQueueItem struct {
   count badges.
 - Failed/canceled retry history is memory-only and bounded. It is not persisted
   to BoltDB.
+- Running queue items may be both `Cancelable` and `Retryable`. Running retry is
+  a restart action: it cancels the active transfer attempt and requeues the same
+  backend-owned job with a fresh queue ID, without creating a `canceled` history
+  row.
+- Network transfers use a stall watchdog around `grab.Response.BytesComplete()`.
+  If byte count does not advance for the configured stall timeout, the current
+  transfer attempt is canceled and retried automatically up to the bounded
+  stall-retry limit.
 
 #### 4. Validation & Error Matrix
 
@@ -373,6 +381,14 @@ type DownloadQueueItem struct {
 - Cancel running item -> request context cancellation, suppress
   `download-failed`, append `canceled` retryable item after the job exits, emit
   queue state.
+- Retry running item -> request context cancellation, record restart intent,
+  requeue the job with a fresh ID after the active attempt exits, do not create
+  canceled history.
+- Stalled transfer before retry limit -> cancel only the current transfer
+  attempt, requeue with incremented auto-attempt count, do not emit
+  `download-failed`.
+- Stalled transfer at retry limit -> treat as download failure and append
+  `failed` retryable history.
 - Download failure -> append `failed` retryable item and emit
   `download-failed`.
 - Retry failed/canceled item -> remove history row, enqueue a copy with a fresh
@@ -382,10 +398,15 @@ type DownloadQueueItem struct {
 
 - Good: Vue calls `RetryDownload(item.id)` and refreshes from
   `GetDownloadQueueState`.
+- Good: `core/downloader` distinguishes `cancelRequested`,
+  `restartRequested`, and stall sentinel errors so user cancel, user restart,
+  and automatic retry do not leak into one another.
 - Base: A successful download disappears from queue state after completion.
 - Bad: Vue builds a new `ModDownloadRequest` from `DownloadQueueItem.Platform`,
   `VersionID`, and `FileName`; this loses resolved target and dependency/API-key
   context.
+- Bad: Treating `context.Canceled` from a stall watchdog as a user cancellation;
+  it would create a canceled history row instead of automatic retrying.
 
 #### 6. Tests Required
 
@@ -393,6 +414,10 @@ type DownloadQueueItem struct {
   retryable queue item.
 - Downloader unit test: retrying a retryable item removes the history row and
   requeues the job with a fresh ID.
+- Downloader unit test: retrying a running item marks restart intent and does
+  not mark user cancellation.
+- Downloader unit test: stalled jobs requeue until the bounded retry limit and
+  then fall through to failure handling.
 - Frontend type check/build must pass after Wails binding regeneration when
   queue fields or Wails methods change.
 
