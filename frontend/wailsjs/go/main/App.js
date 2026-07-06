@@ -74,6 +74,10 @@ export function SaveAnimationSettings(arg1) {
   return window['go']['main']['App']['SaveAnimationSettings'](arg1);
 }
 
+export function RetryDownload(arg1) {
+  return window['go']['main']['App']['RetryDownload'](arg1);
+}
+
 export function SaveApiKeys(arg1) {
   return window['go']['main']['App']['SaveApiKeys'](arg1);
 }

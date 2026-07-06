@@ -234,6 +234,8 @@ export namespace structs {
 	    minecraftVersion: string;
 	    modLoader: string;
 	    cancelable: boolean;
+	    retryable: boolean;
+	    reason?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new DownloadQueueItem(source);
@@ -250,6 +252,8 @@ export namespace structs {
 	        this.minecraftVersion = source["minecraftVersion"];
 	        this.modLoader = source["modLoader"];
 	        this.cancelable = source["cancelable"];
+	        this.retryable = source["retryable"];
+	        this.reason = source["reason"];
 	    }
 	}
 	export class DownloadQueueState {
@@ -564,3 +568,4 @@ export namespace structs {
 	}
 
 }
+
