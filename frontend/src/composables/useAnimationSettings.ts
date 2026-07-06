@@ -101,30 +101,65 @@ function clearGsapProps(el: Element | Element[]) {
     gsap.set(el, { clearProps: "opacity,transform,scale,rotation" });
 }
 
+function getPageContentTargets(root: Element, selector = pageContentSelector): Element[] {
+    return Array.from(root.querySelectorAll(selector));
+}
+
+function getVisiblePageContentTargets(root: Element, selector = pageContentSelector): Element[] {
+    return getPageContentTargets(root, selector).filter((el) => {
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+    });
+}
+
+function routeAnimationTargets(el: Element): Element[] {
+    return [el, ...getVisiblePageContentTargets(el)];
+}
+
 export function beforeGsapRouteEnter(el: Element) {
-    gsap.killTweensOf(el);
+    const targets = getPageContentTargets(el);
+    gsap.killTweensOf([el, ...targets]);
     gsap.set(el, { opacity: 0, y: 20, scale: 0.985 });
+    if (targets.length > 0) {
+        gsap.set(targets, { opacity: 0, y: 24, scale: 0.985 });
+    }
 }
 
 export function enterGsapRoute(el: Element, done: () => void) {
-    gsap.fromTo(
-        el,
-        { opacity: 0, y: 20, scale: 0.985 },
-        {
+    const targets = getVisiblePageContentTargets(el);
+    const timeline = gsap.timeline({
+        onComplete: () => {
+            clearGsapProps([el, ...targets]);
+            done();
+        },
+    });
+
+    timeline.to(el, {
+        opacity: 1,
+        y: 0,
+        scale: 1,
+        duration: gsapDuration(0.32),
+        ease: "expo.out",
+    }, 0);
+
+    if (targets.length > 0) {
+        timeline.to(targets, {
             opacity: 1,
             y: 0,
             scale: 1,
             duration: gsapDuration(0.42),
-            ease: "expo.out",
-            onComplete: () => {
-                clearGsapProps(el);
-                done();
+            ease: "power3.out",
+            stagger: {
+                each: gsapDuration(0.05),
+                from: "start",
             },
-        },
-    );
+        }, 0.06);
+    }
 }
 
 export function leaveGsapRoute(el: Element, done: () => void) {
+    const targets = routeAnimationTargets(el);
+    gsap.killTweensOf(targets);
     gsap.to(el, {
         opacity: 0,
         y: -14,
@@ -133,6 +168,10 @@ export function leaveGsapRoute(el: Element, done: () => void) {
         ease: "power2.in",
         onComplete: done,
     });
+}
+
+export function afterGsapRouteLeave(el: Element) {
+    clearGsapProps(routeAnimationTargets(el));
 }
 
 export function beforeGsapFabEnter(el: Element) {
@@ -179,11 +218,7 @@ export function animateGsapPageContent(
     if (!root) return null;
     if (prefersReducedMotion()) return gsap.timeline();
 
-    const selector = options?.selector ?? pageContentSelector;
-    const targets = Array.from(root.querySelectorAll(selector)).filter((el) => {
-        const rect = el.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0;
-    });
+    const targets = getVisiblePageContentTargets(root, options?.selector ?? pageContentSelector);
 
     if (targets.length === 0) return gsap.timeline();
 

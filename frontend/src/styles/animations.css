@@ -347,33 +347,10 @@
   transition-duration: 0.01ms !important;
 }
 
-/* GSAP mode: disable our custom CSS animations so GSAP owns the motion,
- * but leave Vuetify component transitions intact for hover, ripple, dialogs, etc. */
-:root[data-md-animations="gsap"] .md-animate-fade,
-:root[data-md-animations="gsap"] .md-animate-fade-up,
-:root[data-md-animations="gsap"] .md-animate-fade-down,
-:root[data-md-animations="gsap"] .md-animate-fade-y,
-:root[data-md-animations="gsap"] .md-animate-fade-left,
-:root[data-md-animations="gsap"] .md-animate-fade-right,
-:root[data-md-animations="gsap"] .md-animate-scale,
-:root[data-md-animations="gsap"] .md-animate-slide-up,
-:root[data-md-animations="gsap"] .md-animate-pulse,
-:root[data-md-animations="gsap"] .md-animate-shake,
-:root[data-md-animations="gsap"] .md-animate-float,
-:root[data-md-animations="gsap"] .md-stagger > *,
-:root[data-md-animations="gsap"] .slide-fade-enter-active,
-:root[data-md-animations="gsap"] .slide-fade-leave-active,
-:root[data-md-animations="gsap"] .scale-fade-enter-active,
-:root[data-md-animations="gsap"] .scale-fade-leave-active,
-:root[data-md-animations="gsap"] .md-list-item-enter-active,
-:root[data-md-animations="gsap"] .md-expand-enter-active,
-:root[data-md-animations="gsap"] .md-expand-leave-active,
-:root[data-md-animations="gsap"] .md-fab-enter-active,
-:root[data-md-animations="gsap"] .md-fab-leave-active,
-:root[data-md-animations="gsap"] .md-page,
-:root[data-md-animations="gsap"] .md-skeleton,
-:root[data-md-animations="gsap"] .action-bar-enter-active,
-:root[data-md-animations="gsap"] .action-bar-leave-active {
+/* GSAP mode: CSS and Vuetify transitions are suppressed so GSAP owns motion. */
+:root[data-md-animations="gsap"] *,
+:root[data-md-animations="gsap"] *::before,
+:root[data-md-animations="gsap"] *::after {
   animation-delay: 0ms !important;
   animation-duration: 0.01ms !important;
   animation-iteration-count: 1 !important;
