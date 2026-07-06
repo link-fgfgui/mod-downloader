@@ -9,8 +9,10 @@ import {
 } from "../../wailsjs/go/main/App";
 import type { main } from "../../wailsjs/go/models";
 import {
-    defaultAnimationsEnabled,
+    animationModeEnabled,
+    defaultAnimationMode,
     defaultAnimationDurationMultiplier,
+    normalizeAnimationMode,
     normalizeAnimationDurationMultiplier,
 } from "../composables/useAnimationSettings";
 
@@ -30,7 +32,7 @@ export const useSettingsStore = defineStore("settings", {
         isValidatingDir: false,
         dirValid: null as boolean | null,
         draftTheme: "",
-        draftAnimationEnabled: defaultAnimationsEnabled,
+        draftAnimationMode: defaultAnimationMode,
         draftAnimationDurationMultiplier: defaultAnimationDurationMultiplier,
         draftCurseforgeKey: "",
         draftModrinthKey: "",
@@ -47,7 +49,10 @@ export const useSettingsStore = defineStore("settings", {
             try {
                 this.view = await GetSettings();
                 this.draftTheme = this.view?.theme || themeDark;
-                this.draftAnimationEnabled = this.view?.animationEnabled ?? defaultAnimationsEnabled;
+                this.draftAnimationMode = normalizeAnimationMode(
+                    this.view?.animationMode,
+                    this.view?.animationEnabled
+                );
                 this.draftAnimationDurationMultiplier = normalizeAnimationDurationMultiplier(
                     this.view?.animationDurationMultiplier ?? defaultAnimationDurationMultiplier
                 );
@@ -74,19 +79,22 @@ export const useSettingsStore = defineStore("settings", {
         async saveAnimationSettings() {
             this.isSavingAnimations = true;
             try {
+                const animationMode = normalizeAnimationMode(this.draftAnimationMode);
                 const req = {
-                    animationEnabled: this.draftAnimationEnabled,
+                    animationMode,
+                    animationEnabled: animationModeEnabled(animationMode),
                     animationDurationMultiplier: normalizeAnimationDurationMultiplier(
                         this.draftAnimationDurationMultiplier
                     ),
                 };
                 this.view = await SaveAnimationSettings(req);
-                this.draftAnimationEnabled = this.view.animationEnabled;
+                this.draftAnimationMode = normalizeAnimationMode(this.view.animationMode, this.view.animationEnabled);
                 this.draftAnimationDurationMultiplier = normalizeAnimationDurationMultiplier(
                     this.view.animationDurationMultiplier
                 );
                 return {
-                    animationEnabled: this.draftAnimationEnabled,
+                    animationMode: this.draftAnimationMode,
+                    animationEnabled: animationModeEnabled(this.draftAnimationMode),
                     animationDurationMultiplier: this.draftAnimationDurationMultiplier,
                 };
             } finally {

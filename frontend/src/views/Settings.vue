@@ -20,15 +20,27 @@
                 <v-card class="mb-4">
                     <v-card-title>{{ $t('settings.animations.label') }}</v-card-title>
                     <v-card-text>
-                        <v-switch v-model="settingsStore.draftAnimationEnabled"
-                            :label="$t('settings.animations.enabled')" color="primary" density="compact"
-                            hide-details class="mb-3" />
+                        <div class="text-caption text-medium-emphasis mb-2">
+                            {{ $t('settings.animations.mode') }}
+                        </div>
+                        <v-btn-toggle v-model="settingsStore.draftAnimationMode" color="primary" density="comfortable"
+                            divided mandatory variant="outlined" class="animation-mode-toggle mb-3">
+                            <v-btn :value="animationModeOff" size="small">
+                                {{ $t('settings.animations.modes.off') }}
+                            </v-btn>
+                            <v-btn :value="animationModeVuetify" size="small">
+                                {{ $t('settings.animations.modes.vuetify') }}
+                            </v-btn>
+                            <v-btn :value="animationModeGsap" size="small">
+                                {{ $t('settings.animations.modes.gsap') }}
+                            </v-btn>
+                        </v-btn-toggle>
                         <div class="d-flex align-center gap-2 mb-3">
                             <v-slider v-model="settingsStore.draftAnimationDurationMultiplier"
-                                :disabled="!settingsStore.draftAnimationEnabled" :min="minAnimationDurationMultiplier"
+                                :disabled="animationsDisabled" :min="minAnimationDurationMultiplier"
                                 :max="maxAnimationDurationMultiplier" :step="0.25" density="compact" hide-details />
                             <v-text-field v-model.number="settingsStore.draftAnimationDurationMultiplier"
-                                :disabled="!settingsStore.draftAnimationEnabled" type="number"
+                                :disabled="animationsDisabled" type="number"
                                 :min="minAnimationDurationMultiplier" :max="maxAnimationDurationMultiplier"
                                 step="0.25" suffix="x" density="compact" hide-details class="multiplier-input" />
                         </div>
@@ -126,11 +138,14 @@
 </template>
 
 <script setup lang="ts">
-import { onActivated, ref } from "vue";
+import { computed, onActivated, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useSettingsStore } from "../stores/settings";
 import { applyVuetifyTheme } from "../composables/useTheme";
 import {
+    animationModeGsap,
+    animationModeOff,
+    animationModeVuetify,
     applyAnimationSettings,
     maxAnimationDurationMultiplier,
     minAnimationDurationMultiplier,
@@ -139,6 +154,7 @@ import {
 const { t } = useI18n();
 const settingsStore = useSettingsStore();
 const snackbar = ref({ show: false, message: "", color: "success" });
+const animationsDisabled = computed(() => settingsStore.draftAnimationMode === animationModeOff);
 
 onActivated(() => {
     void settingsStore.load();
@@ -189,5 +205,14 @@ function clearModrinth() {
 
 .multiplier-input {
     max-width: 112px;
+}
+
+.animation-mode-toggle {
+    width: 100%;
+}
+
+.animation-mode-toggle :deep(.v-btn) {
+    flex: 1 1 0;
+    min-width: 0;
 }
 </style>

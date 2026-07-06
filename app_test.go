@@ -269,6 +269,9 @@ func TestGetSettingsMasksKeys(t *testing.T) {
 	if !sv.AnimationEnabled {
 		t.Fatal("AnimationEnabled = false, want true")
 	}
+	if sv.AnimationMode != configs.AnimationModeVuetify.String() {
+		t.Fatalf("AnimationMode = %q, want %q", sv.AnimationMode, configs.AnimationModeVuetify)
+	}
 	if sv.AnimationDurationMultiplier != configs.DefaultAnimationDurationMultiplier {
 		t.Fatalf("AnimationDurationMultiplier = %v, want %v", sv.AnimationDurationMultiplier, configs.DefaultAnimationDurationMultiplier)
 	}
@@ -338,11 +341,15 @@ func TestSaveAnimationSettingsPersistsAndNormalizes(t *testing.T) {
 
 	app := &App{config: &configs.Config{}}
 	sv := app.SaveAnimationSettings(SaveAnimationSettingsRequest{
-		AnimationEnabled:            false,
+		AnimationMode:               configs.AnimationModeGSAP.String(),
+		AnimationEnabled:            true,
 		AnimationDurationMultiplier: 99,
 	})
-	if sv.AnimationEnabled {
-		t.Fatal("AnimationEnabled = true, want false")
+	if !sv.AnimationEnabled {
+		t.Fatal("AnimationEnabled = false, want true")
+	}
+	if sv.AnimationMode != configs.AnimationModeGSAP.String() {
+		t.Fatalf("AnimationMode = %q, want %q", sv.AnimationMode, configs.AnimationModeGSAP)
 	}
 	if sv.AnimationDurationMultiplier != configs.MaxAnimationDurationMultiplier {
 		t.Fatalf("AnimationDurationMultiplier = %v, want %v", sv.AnimationDurationMultiplier, configs.MaxAnimationDurationMultiplier)
@@ -352,11 +359,86 @@ func TestSaveAnimationSettingsPersistsAndNormalizes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if loaded.Prefers.AnimationsEnabledValue() {
-		t.Fatal("persisted animations enabled = true, want false")
+	if loaded.Prefers.AnimationModeValue() != configs.AnimationModeGSAP {
+		t.Fatalf("persisted animation mode = %q, want %q", loaded.Prefers.AnimationModeValue(), configs.AnimationModeGSAP)
+	}
+	if !loaded.Prefers.AnimationsEnabledValue() {
+		t.Fatal("persisted animations enabled = false, want true")
 	}
 	if loaded.Prefers.NormalizedAnimationDurationMultiplier() != configs.MaxAnimationDurationMultiplier {
 		t.Fatalf("persisted animation multiplier = %v, want %v", loaded.Prefers.NormalizedAnimationDurationMultiplier(), configs.MaxAnimationDurationMultiplier)
+	}
+}
+
+func TestSaveAnimationSettingsSupportsLegacyDisabledRequest(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(oldwd); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	app := &App{config: &configs.Config{}}
+	sv := app.SaveAnimationSettings(SaveAnimationSettingsRequest{
+		AnimationEnabled:            false,
+		AnimationDurationMultiplier: 1,
+	})
+	if sv.AnimationEnabled {
+		t.Fatal("AnimationEnabled = true, want false")
+	}
+	if sv.AnimationMode != configs.AnimationModeOff.String() {
+		t.Fatalf("AnimationMode = %q, want %q", sv.AnimationMode, configs.AnimationModeOff)
+	}
+
+	loaded, err := configs.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Prefers.AnimationModeValue() != configs.AnimationModeOff {
+		t.Fatalf("persisted animation mode = %q, want %q", loaded.Prefers.AnimationModeValue(), configs.AnimationModeOff)
+	}
+}
+
+func TestSaveAnimationSettingsSupportsLegacyEnabledRequest(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(oldwd); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	app := &App{config: &configs.Config{}}
+	sv := app.SaveAnimationSettings(SaveAnimationSettingsRequest{
+		AnimationEnabled:            true,
+		AnimationDurationMultiplier: 1,
+	})
+	if !sv.AnimationEnabled {
+		t.Fatal("AnimationEnabled = false, want true")
+	}
+	if sv.AnimationMode != configs.AnimationModeVuetify.String() {
+		t.Fatalf("AnimationMode = %q, want %q", sv.AnimationMode, configs.AnimationModeVuetify)
+	}
+
+	loaded, err := configs.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Prefers.AnimationModeValue() != configs.AnimationModeVuetify {
+		t.Fatalf("persisted animation mode = %q, want %q", loaded.Prefers.AnimationModeValue(), configs.AnimationModeVuetify)
 	}
 }
 

@@ -29,6 +29,7 @@ export namespace main {
 	
 	export class AppPreferences {
 	    theme: string;
+	    animationMode: string;
 	    animationEnabled: boolean;
 	    animationDurationMultiplier: number;
 	
@@ -39,11 +40,13 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.theme = source["theme"];
+	        this.animationMode = source["animationMode"];
 	        this.animationEnabled = source["animationEnabled"];
 	        this.animationDurationMultiplier = source["animationDurationMultiplier"];
 	    }
 	}
 	export class SaveAnimationSettingsRequest {
+	    animationMode: string;
 	    animationEnabled: boolean;
 	    animationDurationMultiplier: number;
 
@@ -53,6 +56,7 @@ export namespace main {
 
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.animationMode = source["animationMode"];
 	        this.animationEnabled = source["animationEnabled"];
 	        this.animationDurationMultiplier = source["animationDurationMultiplier"];
 	    }
@@ -73,6 +77,7 @@ export namespace main {
 	}
 	export class SettingsView {
 	    theme: string;
+	    animationMode: string;
 	    animationEnabled: boolean;
 	    animationDurationMultiplier: number;
 	    minecraftDir: string;
@@ -88,6 +93,7 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.theme = source["theme"];
+	        this.animationMode = source["animationMode"];
 	        this.animationEnabled = source["animationEnabled"];
 	        this.animationDurationMultiplier = source["animationDurationMultiplier"];
 	        this.minecraftDir = source["minecraftDir"];

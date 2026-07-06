@@ -334,11 +334,14 @@
   animation: md-fade-in-up var(--md-transition-slow) var(--md-ease-out) both;
 }
 
-/* User-configured animation off switch. Keep animations effectively instant
- * instead of removing them so "both"/forwards keyframe final states still apply. */
+/* User-configured CSS/Vuetify animation suppression. Keep animations effectively
+ * instant instead of removing them so "both"/forwards keyframe final states still apply. */
 :root[data-md-animations="off"] *,
 :root[data-md-animations="off"] *::before,
-:root[data-md-animations="off"] *::after {
+:root[data-md-animations="off"] *::after,
+:root[data-md-animations="gsap"] *,
+:root[data-md-animations="gsap"] *::before,
+:root[data-md-animations="gsap"] *::after {
   animation-delay: 0ms !important;
   animation-duration: 0.01ms !important;
   animation-iteration-count: 1 !important;

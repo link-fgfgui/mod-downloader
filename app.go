@@ -33,6 +33,7 @@ type App struct {
 
 type AppPreferences struct {
 	Theme                       string  `json:"theme"`
+	AnimationMode               string  `json:"animationMode"`
 	AnimationEnabled            bool    `json:"animationEnabled"`
 	AnimationDurationMultiplier float64 `json:"animationDurationMultiplier"`
 }
@@ -143,6 +144,7 @@ func (a *App) GetPreferences() AppPreferences {
 	prefs := a.service().GetPreferences()
 	return AppPreferences{
 		Theme:                       prefs.Theme,
+		AnimationMode:               prefs.AnimationMode,
 		AnimationEnabled:            prefs.AnimationEnabled,
 		AnimationDurationMultiplier: prefs.AnimationDurationMultiplier,
 	}
@@ -152,6 +154,7 @@ func (a *App) GetPreferences() AppPreferences {
 // not sending raw keys back to the frontend; the frontend overwrites via SaveApiKeys.
 type SettingsView struct {
 	Theme                       string  `json:"theme"` // dark | light | system
+	AnimationMode               string  `json:"animationMode"`
 	AnimationEnabled            bool    `json:"animationEnabled"`
 	AnimationDurationMultiplier float64 `json:"animationDurationMultiplier"`
 	MinecraftDir                string  `json:"minecraftDir"` // simplified path (with env vars)
@@ -168,6 +171,7 @@ type SaveApiKeysRequest struct {
 }
 
 type SaveAnimationSettingsRequest struct {
+	AnimationMode               string  `json:"animationMode"`
 	AnimationEnabled            bool    `json:"animationEnabled"`
 	AnimationDurationMultiplier float64 `json:"animationDurationMultiplier"`
 }
@@ -196,6 +200,7 @@ func (a *App) SaveTheme(theme string) string {
 
 func (a *App) SaveAnimationSettings(req SaveAnimationSettingsRequest) SettingsView {
 	next := a.service().SaveAnimationSettings(appcore.SaveAnimationSettingsRequest{
+		AnimationMode:               req.AnimationMode,
 		AnimationEnabled:            req.AnimationEnabled,
 		AnimationDurationMultiplier: req.AnimationDurationMultiplier,
 	})
@@ -291,6 +296,7 @@ func (a *App) SelectVersion(versionKey string) structs.VersionInfo {
 func settingsViewFromCore(sv appcore.SettingsView) SettingsView {
 	return SettingsView{
 		Theme:                       sv.Theme,
+		AnimationMode:               sv.AnimationMode,
 		AnimationEnabled:            sv.AnimationEnabled,
 		AnimationDurationMultiplier: sv.AnimationDurationMultiplier,
 		MinecraftDir:                sv.MinecraftDir,
