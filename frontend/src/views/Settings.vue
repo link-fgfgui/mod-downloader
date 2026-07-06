@@ -56,7 +56,7 @@
                     <v-card-text>
                         <v-text-field :model-value="settingsStore.view?.minecraftDir" readonly density="compact"
                             hide-details class="mb-2" />
-                        <div class="d-flex align-center gap-2">
+                        <div class="settings-action-row settings-action-row--center">
                             <v-btn :loading="settingsStore.isChoosingDir" variant="outlined"
                                 prepend-icon="mdi-folder-open" @click="chooseDir">
                                 {{ $t('settings.minecraftDir.choose') }}
@@ -88,7 +88,7 @@
                         <v-text-field v-model="settingsStore.draftCurseforgeKey"
                             :label="$t('settings.apiKeys.curseforge.placeholder')" type="password" density="compact"
                             hide-details class="mb-2" />
-                        <div class="d-flex gap-2">
+                        <div class="settings-action-row">
                             <v-btn :loading="settingsStore.isSavingKeys" variant="outlined"
                                 prepend-icon="mdi-content-save" @click="saveKeys">
                                 {{ $t('settings.apiKeys.curseforge.save') }}
@@ -116,7 +116,7 @@
                         <v-text-field v-model="settingsStore.draftModrinthKey"
                             :label="$t('settings.apiKeys.modrinth.placeholder')" type="password" density="compact"
                             hide-details class="mb-2" />
-                        <div class="d-flex gap-2">
+                        <div class="settings-action-row">
                             <v-btn :loading="settingsStore.isSavingKeys" variant="outlined"
                                 prepend-icon="mdi-content-save" @click="saveKeys">
                                 {{ $t('settings.apiKeys.modrinth.save') }}
@@ -201,6 +201,16 @@ function clearModrinth() {
 <style scoped>
 .gap-2 {
     gap: 8px;
+}
+
+.settings-action-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.settings-action-row--center {
+    align-items: center;
 }
 
 .multiplier-input {
