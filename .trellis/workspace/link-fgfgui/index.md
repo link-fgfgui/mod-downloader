@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 12
-- **Last Active**: 2026-07-05
+- **Total Sessions**: 13
+- **Last Active**: 2026-07-07
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~409 | Active |
+| `journal-1.md` | ~443 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 13 | 2026-07-07 | Check core CLI compatibility | `f42c5ae` | `master` |
 | 12 | 2026-07-05 | Use online metadata categories in Manage | `73939ca` | `master` |
 | 11 | 2026-07-05 | Adapt core for apt-style CLI | `b067bcc` | `master` |
 | 10 | 2026-07-05 | Extract core service and add CLI | `dd6f8e8`, `972d85b` | `master` |

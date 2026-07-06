@@ -407,3 +407,37 @@ Added provider-native category metadata to core project models, enriched local m
 ### Next Steps
 
 - None - task complete
+
+
+## Session 13: Check core CLI compatibility
+
+**Date**: 2026-07-07
+**Task**: Check core CLI compatibility
+**Package**: app
+**Branch**: `master`
+
+### Summary
+
+Validated mod-downloader-cli against core 56f8e8b. No source-level compatibility conflicts were found; updated the CLI core submodule pointer and verified core/CLI build, test, vet, and Wails dependency boundaries.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f42c5ae` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
