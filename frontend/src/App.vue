@@ -4,7 +4,7 @@
         <v-main>
             <v-container fluid class="position-relative">
                 <router-view v-slot="{ Component, route }">
-                    <transition name="slide-fade" mode="out-in">
+                    <transition v-bind="routeTransitionProps">
                         <keep-alive>
                             <component :is="Component" :key="route.path" />
                         </keep-alive>
@@ -19,7 +19,7 @@
                 class="main-loading-overlay"
             />
         </v-main>
-        <transition name="md-fab">
+        <transition v-bind="fabTransitionProps">
             <div v-if="downloadQueueStore.queue.active" class="download-fab">
                 <v-badge :model-value="downloadQueueStore.queue.pending + downloadQueueStore.queue.running > 1"
                     :content="downloadQueueStore.queue.pending + downloadQueueStore.queue.running" color="error" floating>
@@ -34,12 +34,24 @@
 
 <script setup lang="ts">
 import SideBar from "./components/SideBar/SideBar.vue";
-import { onMounted, onUnmounted } from "vue";
+import { computed, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { GetPreferences } from "../wailsjs/go/main/App";
 import { useDownloadQueueStore } from "./stores/downloadQueue";
 import { useMinecraftStore } from "./stores/minecraft";
 import { initTheme, applyVuetifyTheme, stopThemeListener } from "./composables/useTheme";
+import {
+    afterGsapRouteLeave,
+    animationModeGsap,
+    applyAnimationSettings,
+    beforeGsapFabEnter,
+    beforeGsapRouteEnter,
+    enterGsapFab,
+    enterGsapRoute,
+    leaveGsapFab,
+    leaveGsapRoute,
+    useActiveAnimationMode,
+} from "./composables/useAnimationSettings";
 
 const themeDark = "dark";
 
@@ -48,6 +60,32 @@ initTheme();
 const router = useRouter();
 const downloadQueueStore = useDownloadQueueStore();
 const minecraftStore = useMinecraftStore();
+const activeAnimationMode = useActiveAnimationMode();
+
+const gsapAnimationsActive = computed(() => activeAnimationMode.value === animationModeGsap);
+
+const routeTransitionProps = computed(() => (
+    gsapAnimationsActive.value
+        ? {
+            css: false,
+            mode: "out-in" as const,
+            onBeforeEnter: beforeGsapRouteEnter,
+            onEnter: enterGsapRoute,
+            onLeave: leaveGsapRoute,
+            onAfterLeave: afterGsapRouteLeave,
+        }
+        : { name: "slide-fade", mode: "out-in" as const }
+));
+const fabTransitionProps = computed(() => (
+    gsapAnimationsActive.value
+        ? {
+            css: false,
+            onBeforeEnter: beforeGsapFabEnter,
+            onEnter: enterGsapFab,
+            onLeave: leaveGsapFab,
+        }
+        : { name: "md-fab" }
+));
 
 const isEditableTarget = (target: EventTarget | null) => {
     if (!(target instanceof HTMLElement)) return false;
@@ -73,6 +111,7 @@ onMounted(async () => {
     document.addEventListener("keydown", onGlobalEscape);
     const preferences = await GetPreferences();
     applyVuetifyTheme(preferences?.theme ?? themeDark);
+    applyAnimationSettings(preferences);
     void downloadQueueStore.start();
     void minecraftStore.start();
 });

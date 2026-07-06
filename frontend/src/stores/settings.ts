@@ -1,6 +1,20 @@
 import { defineStore } from "pinia";
-import { GetSettings, SaveTheme, SaveApiKeys, ChooseMinecraftDir, ValidateMinecraftDir } from "../../wailsjs/go/main/App";
+import {
+    GetSettings,
+    SaveTheme,
+    SaveAnimationSettings,
+    SaveApiKeys,
+    ChooseMinecraftDir,
+    ValidateMinecraftDir,
+} from "../../wailsjs/go/main/App";
 import type { main } from "../../wailsjs/go/models";
+import {
+    animationModeEnabled,
+    defaultAnimationMode,
+    defaultAnimationDurationMultiplier,
+    normalizeAnimationMode,
+    normalizeAnimationDurationMultiplier,
+} from "../composables/useAnimationSettings";
 
 const themeDark = "dark";
 const themeLight = "light";
@@ -12,11 +26,14 @@ export const useSettingsStore = defineStore("settings", {
         view: null as main.SettingsView | null,
         isLoading: false,
         isSavingTheme: false,
+        isSavingAnimations: false,
         isSavingKeys: false,
         isChoosingDir: false,
         isValidatingDir: false,
         dirValid: null as boolean | null,
         draftTheme: "",
+        draftAnimationMode: defaultAnimationMode,
+        draftAnimationDurationMultiplier: defaultAnimationDurationMultiplier,
         draftCurseforgeKey: "",
         draftModrinthKey: "",
         clearCurseforgeKey: false,
@@ -32,6 +49,13 @@ export const useSettingsStore = defineStore("settings", {
             try {
                 this.view = await GetSettings();
                 this.draftTheme = this.view?.theme || themeDark;
+                this.draftAnimationMode = normalizeAnimationMode(
+                    this.view?.animationMode,
+                    this.view?.animationEnabled
+                );
+                this.draftAnimationDurationMultiplier = normalizeAnimationDurationMultiplier(
+                    this.view?.animationDurationMultiplier ?? defaultAnimationDurationMultiplier
+                );
                 this.draftCurseforgeKey = "";
                 this.draftModrinthKey = "";
                 this.clearCurseforgeKey = false;
@@ -50,6 +74,31 @@ export const useSettingsStore = defineStore("settings", {
                 return next;
             } finally {
                 this.isSavingTheme = false;
+            }
+        },
+        async saveAnimationSettings() {
+            this.isSavingAnimations = true;
+            try {
+                const animationMode = normalizeAnimationMode(this.draftAnimationMode);
+                const req = {
+                    animationMode,
+                    animationEnabled: animationModeEnabled(animationMode),
+                    animationDurationMultiplier: normalizeAnimationDurationMultiplier(
+                        this.draftAnimationDurationMultiplier
+                    ),
+                };
+                this.view = await SaveAnimationSettings(req);
+                this.draftAnimationMode = normalizeAnimationMode(this.view.animationMode, this.view.animationEnabled);
+                this.draftAnimationDurationMultiplier = normalizeAnimationDurationMultiplier(
+                    this.view.animationDurationMultiplier
+                );
+                return {
+                    animationMode: this.draftAnimationMode,
+                    animationEnabled: animationModeEnabled(this.draftAnimationMode),
+                    animationDurationMultiplier: this.draftAnimationDurationMultiplier,
+                };
+            } finally {
+                this.isSavingAnimations = false;
             }
         },
         async saveApiKeys() {

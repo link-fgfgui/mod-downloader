@@ -226,6 +226,111 @@ type SearchModResult = models.ModProject   // forbidden: third name for same typ
 // providers/model.go: type ModProject = models.ModProject  // forbidden: re-export file
 ```
 
+### Scenario: User Preference Settings Flow
+
+#### 1. Scope / Trigger
+
+Use this pattern when adding a persisted user preference that must be visible in
+the Wails UI and editable from the Settings page. The same source of truth must
+support config-file loading, app startup preferences, Settings page snapshots,
+and immediate save/apply behavior.
+
+#### 2. Signatures
+
+Core config:
+
+```go
+// core/configs/structs.go
+type Preferences struct {
+    Theme        Theme  `toml:"theme" json:"theme" env:"THEME"`
+    MinecraftDir string `toml:"minecraft_dir" json:"minecraft_dir" env:"MINECRAFT_DIR"`
+}
+```
+
+Core service:
+
+```go
+// core/appcore/service.go
+func (s *Service) GetPreferences() AppPreferences
+func (s *Service) GetSettings() SettingsView
+func (s *Service) SaveTheme(theme string) string
+```
+
+Wails adapter:
+
+```go
+// app.go
+func (a *App) GetPreferences() AppPreferences
+func (a *App) GetSettings() SettingsView
+```
+
+#### 3. Contracts
+
+- Config structs and normalization helpers belong in `core/configs`.
+- Adapter-neutral view and save methods belong in `core/appcore`.
+- Wails-facing request/response structs belong in `app.go`; do not import
+  Wails runtime into `core/`.
+- Public Wails API/type changes require regenerated `frontend/wailsjs/go/*`
+  bindings.
+- Startup-only preferences returned by `GetPreferences` must use the same
+  normalized values as full Settings page snapshots returned by `GetSettings`.
+- Optional config booleans that need "missing means default" semantics should
+  avoid `env` tags on pointer fields; `cleanenv` does not support `*bool` env
+  parsing. Use TOML-backed optional fields plus normalization, or use a
+  non-pointer field only when the zero value is a valid default.
+
+#### 4. Validation & Error Matrix
+
+- Missing config file -> load defaults and environment-supported fields.
+- Missing optional preference field -> use documented default.
+- Invalid preference value -> normalize before exposing through appcore views.
+- Settings save failure -> log through `logging` and return the normalized
+  in-memory view.
+- Generated binding drift -> frontend type-check/build must fail or be fixed by
+  regenerating bindings.
+
+#### 5. Good/Base/Bad Cases
+
+- Good: add a new preference in `configs.Preferences`, expose normalized values
+  through `appcore.SettingsView`, map it through `app.go`, regenerate bindings,
+  and consume the typed fields in Pinia.
+- Base: existing config files without the new field preserve current behavior.
+- Bad: reading raw TOML fields directly in Vue or duplicating preference
+  defaults in `app.go`.
+- Bad: using a `*bool` field with a `cleanenv` env tag; env parsing rejects the
+  pointer type.
+
+#### 6. Tests Required
+
+- Config tests for TOML/default/normalization behavior.
+- Appcore or Wails adapter tests for save and settings-view behavior.
+- Frontend `npm run build --prefix frontend` after bindings change.
+
+#### 7. Wrong vs Correct
+
+Wrong:
+
+```go
+type Preferences struct {
+    AnimationsEnabled *bool `toml:"animations_enabled" env:"ANIMATIONS_ENABLED"`
+}
+```
+
+Correct:
+
+```go
+type Preferences struct {
+    AnimationsEnabled *bool `toml:"animations_enabled" json:"animations_enabled"`
+}
+
+func (p Preferences) AnimationsEnabledValue() bool {
+    if p.AnimationsEnabled == nil {
+        return true
+    }
+    return *p.AnimationsEnabled
+}
+```
+
 ### Scenario: Online Metadata Display For Local Mods
 
 #### 1. Scope / Trigger

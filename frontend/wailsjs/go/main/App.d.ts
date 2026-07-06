@@ -39,6 +39,8 @@ export function RefreshSelectedVersionMods():Promise<structs.VersionInfo>;
 
 export function RefreshVersions():Promise<Array<structs.VersionInfo>>;
 
+export function SaveAnimationSettings(arg1:main.SaveAnimationSettingsRequest):Promise<main.SettingsView>;
+
 export function SaveApiKeys(arg1:main.SaveApiKeysRequest):Promise<main.SettingsView>;
 
 export function SaveTheme(arg1:string):Promise<string>;

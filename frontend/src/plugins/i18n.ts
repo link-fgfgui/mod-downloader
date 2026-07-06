@@ -40,6 +40,13 @@ const messages = {
     settings: {
       title: "设置",
       theme: { label: "主题", dark: "深色", light: "浅色", system: "跟随系统", saved: "主题已应用" },
+      animations: {
+        label: "动画",
+        mode: "模式",
+        modes: { off: "关", vuetify: "Vuetify", gsap: "GSAP" },
+        save: "保存",
+        saved: "动画设置已应用",
+      },
       minecraftDir: { label: ".minecraft 目录", choose: "选择目录", valid: "目录有效", invalid: "目录无效或为空" },
       apiKeys: {
         curseforge: { label: "CurseForge API Key", status: "已设置", statusEmpty: "未设置", placeholder: "输入新的 API Key", save: "保存", clear: "清除", hint: "配置后可搜索 CurseForge 资源" },
@@ -136,6 +143,13 @@ const messages = {
     settings: {
       title: "Settings",
       theme: { label: "Theme", dark: "Dark", light: "Light", system: "System", saved: "Theme applied" },
+      animations: {
+        label: "Animations",
+        mode: "Mode",
+        modes: { off: "Off", vuetify: "Vuetify", gsap: "GSAP" },
+        save: "Save",
+        saved: "Animation settings applied",
+      },
       minecraftDir: { label: ".minecraft Directory", choose: "Choose Directory", valid: "Directory valid", invalid: "Directory invalid or empty" },
       apiKeys: {
         curseforge: { label: "CurseForge API Key", status: "Set", statusEmpty: "Not set", placeholder: "Enter new API Key", save: "Save", clear: "Clear", hint: "Required to search CurseForge resources" },

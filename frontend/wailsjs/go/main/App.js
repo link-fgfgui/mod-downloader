@@ -70,6 +70,10 @@ export function RefreshVersions() {
   return window['go']['main']['App']['RefreshVersions']();
 }
 
+export function SaveAnimationSettings(arg1) {
+  return window['go']['main']['App']['SaveAnimationSettings'](arg1);
+}
+
 export function SaveApiKeys(arg1) {
   return window['go']['main']['App']['SaveApiKeys'](arg1);
 }
