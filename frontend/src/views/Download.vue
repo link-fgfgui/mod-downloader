@@ -8,7 +8,7 @@
         ></div>
 
         <div class="search-controls">
-            <v-row class="align-center md-stagger" dense>
+            <v-row class="align-center md-stagger" density="comfortable">
                 <v-col cols="12" md="10">
                     <v-text-field
                         v-model="searchText"
@@ -37,7 +37,7 @@
                 </v-col>
             </v-row>
 
-            <v-row class="mt-4 md-stagger" dense>
+            <v-row class="mt-4 md-stagger" density="comfortable">
                 <v-col cols="12" md="6">
                     <v-select
                         v-model="selectedVersion"
