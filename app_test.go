@@ -266,6 +266,12 @@ func TestGetSettingsMasksKeys(t *testing.T) {
 	if sv.Theme != "system" {
 		t.Fatalf("theme = %q, want system", sv.Theme)
 	}
+	if !sv.AnimationEnabled {
+		t.Fatal("AnimationEnabled = false, want true")
+	}
+	if sv.AnimationDurationMultiplier != configs.DefaultAnimationDurationMultiplier {
+		t.Fatalf("AnimationDurationMultiplier = %v, want %v", sv.AnimationDurationMultiplier, configs.DefaultAnimationDurationMultiplier)
+	}
 	if !sv.HasCurseforgeKey {
 		t.Fatal("HasCurseforgeKey = false, want true")
 	}
@@ -312,6 +318,45 @@ func TestSaveThemePersistsAndNormalizes(t *testing.T) {
 	}
 	if loaded.Prefers.Theme.String() != "system" {
 		t.Fatalf("persisted theme = %q, want system", loaded.Prefers.Theme.String())
+	}
+}
+
+func TestSaveAnimationSettingsPersistsAndNormalizes(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(oldwd); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	app := &App{config: &configs.Config{}}
+	sv := app.SaveAnimationSettings(SaveAnimationSettingsRequest{
+		AnimationEnabled:            false,
+		AnimationDurationMultiplier: 99,
+	})
+	if sv.AnimationEnabled {
+		t.Fatal("AnimationEnabled = true, want false")
+	}
+	if sv.AnimationDurationMultiplier != configs.MaxAnimationDurationMultiplier {
+		t.Fatalf("AnimationDurationMultiplier = %v, want %v", sv.AnimationDurationMultiplier, configs.MaxAnimationDurationMultiplier)
+	}
+
+	loaded, err := configs.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Prefers.AnimationsEnabledValue() {
+		t.Fatal("persisted animations enabled = true, want false")
+	}
+	if loaded.Prefers.NormalizedAnimationDurationMultiplier() != configs.MaxAnimationDurationMultiplier {
+		t.Fatalf("persisted animation multiplier = %v, want %v", loaded.Prefers.NormalizedAnimationDurationMultiplier(), configs.MaxAnimationDurationMultiplier)
 	}
 }
 

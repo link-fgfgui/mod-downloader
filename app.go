@@ -32,7 +32,9 @@ type App struct {
 }
 
 type AppPreferences struct {
-	Theme string `json:"theme"`
+	Theme                       string  `json:"theme"`
+	AnimationEnabled            bool    `json:"animationEnabled"`
+	AnimationDurationMultiplier float64 `json:"animationDurationMultiplier"`
 }
 
 // NewApp creates a new App application struct
@@ -139,24 +141,35 @@ func (a *App) GetMinecraftReleaseVersions() []string {
 
 func (a *App) GetPreferences() AppPreferences {
 	prefs := a.service().GetPreferences()
-	return AppPreferences{Theme: prefs.Theme}
+	return AppPreferences{
+		Theme:                       prefs.Theme,
+		AnimationEnabled:            prefs.AnimationEnabled,
+		AnimationDurationMultiplier: prefs.AnimationDurationMultiplier,
+	}
 }
 
 // SettingsView is a settings snapshot returned to the frontend. API keys use an "existence + mask" strategy,
 // not sending raw keys back to the frontend; the frontend overwrites via SaveApiKeys.
 type SettingsView struct {
-	Theme             string `json:"theme"`        // dark | light | system
-	MinecraftDir      string `json:"minecraftDir"` // simplified path (with env vars)
-	HasCurseforgeKey  bool   `json:"hasCurseforgeKey"`
-	CurseforgeKeyMask string `json:"curseforgeKeyMask"` // e.g. "abcd****wxyz" or ""
-	HasModrinthKey    bool   `json:"hasModrinthKey"`
-	ModrinthKeyMask   string `json:"modrinthKeyMask"`
+	Theme                       string  `json:"theme"` // dark | light | system
+	AnimationEnabled            bool    `json:"animationEnabled"`
+	AnimationDurationMultiplier float64 `json:"animationDurationMultiplier"`
+	MinecraftDir                string  `json:"minecraftDir"` // simplified path (with env vars)
+	HasCurseforgeKey            bool    `json:"hasCurseforgeKey"`
+	CurseforgeKeyMask           string  `json:"curseforgeKeyMask"` // e.g. "abcd****wxyz" or ""
+	HasModrinthKey              bool    `json:"hasModrinthKey"`
+	ModrinthKeyMask             string  `json:"modrinthKeyMask"`
 }
 
 // SaveApiKeysRequest is the request structure for the frontend to save API keys.
 type SaveApiKeysRequest struct {
 	CurseforgeApiKey string `json:"curseforgeApiKey"`
 	ModrinthApiKey   string `json:"modrinthApiKey"`
+}
+
+type SaveAnimationSettingsRequest struct {
+	AnimationEnabled            bool    `json:"animationEnabled"`
+	AnimationDurationMultiplier float64 `json:"animationDurationMultiplier"`
 }
 
 // Convention: a field value of "<keep>" means do not modify the original value (since the frontend cannot access plaintext).
@@ -179,6 +192,15 @@ func (a *App) SaveTheme(theme string) string {
 	next := a.service().SaveTheme(theme)
 	a.config = a.core.Config()
 	return next
+}
+
+func (a *App) SaveAnimationSettings(req SaveAnimationSettingsRequest) SettingsView {
+	next := a.service().SaveAnimationSettings(appcore.SaveAnimationSettingsRequest{
+		AnimationEnabled:            req.AnimationEnabled,
+		AnimationDurationMultiplier: req.AnimationDurationMultiplier,
+	})
+	a.config = a.core.Config()
+	return settingsViewFromCore(next)
 }
 
 // SaveApiKeys updates API keys and persists them immediately + reinitializes clients.
@@ -268,12 +290,14 @@ func (a *App) SelectVersion(versionKey string) structs.VersionInfo {
 
 func settingsViewFromCore(sv appcore.SettingsView) SettingsView {
 	return SettingsView{
-		Theme:             sv.Theme,
-		MinecraftDir:      sv.MinecraftDir,
-		HasCurseforgeKey:  sv.HasCurseforgeKey,
-		CurseforgeKeyMask: sv.CurseforgeKeyMask,
-		HasModrinthKey:    sv.HasModrinthKey,
-		ModrinthKeyMask:   sv.ModrinthKeyMask,
+		Theme:                       sv.Theme,
+		AnimationEnabled:            sv.AnimationEnabled,
+		AnimationDurationMultiplier: sv.AnimationDurationMultiplier,
+		MinecraftDir:                sv.MinecraftDir,
+		HasCurseforgeKey:            sv.HasCurseforgeKey,
+		CurseforgeKeyMask:           sv.CurseforgeKeyMask,
+		HasModrinthKey:              sv.HasModrinthKey,
+		ModrinthKeyMask:             sv.ModrinthKeyMask,
 	}
 }
 

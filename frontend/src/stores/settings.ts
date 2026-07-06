@@ -1,6 +1,18 @@
 import { defineStore } from "pinia";
-import { GetSettings, SaveTheme, SaveApiKeys, ChooseMinecraftDir, ValidateMinecraftDir } from "../../wailsjs/go/main/App";
+import {
+    GetSettings,
+    SaveTheme,
+    SaveAnimationSettings,
+    SaveApiKeys,
+    ChooseMinecraftDir,
+    ValidateMinecraftDir,
+} from "../../wailsjs/go/main/App";
 import type { main } from "../../wailsjs/go/models";
+import {
+    defaultAnimationsEnabled,
+    defaultAnimationDurationMultiplier,
+    normalizeAnimationDurationMultiplier,
+} from "../composables/useAnimationSettings";
 
 const themeDark = "dark";
 const themeLight = "light";
@@ -12,11 +24,14 @@ export const useSettingsStore = defineStore("settings", {
         view: null as main.SettingsView | null,
         isLoading: false,
         isSavingTheme: false,
+        isSavingAnimations: false,
         isSavingKeys: false,
         isChoosingDir: false,
         isValidatingDir: false,
         dirValid: null as boolean | null,
         draftTheme: "",
+        draftAnimationEnabled: defaultAnimationsEnabled,
+        draftAnimationDurationMultiplier: defaultAnimationDurationMultiplier,
         draftCurseforgeKey: "",
         draftModrinthKey: "",
         clearCurseforgeKey: false,
@@ -32,6 +47,10 @@ export const useSettingsStore = defineStore("settings", {
             try {
                 this.view = await GetSettings();
                 this.draftTheme = this.view?.theme || themeDark;
+                this.draftAnimationEnabled = this.view?.animationEnabled ?? defaultAnimationsEnabled;
+                this.draftAnimationDurationMultiplier = normalizeAnimationDurationMultiplier(
+                    this.view?.animationDurationMultiplier ?? defaultAnimationDurationMultiplier
+                );
                 this.draftCurseforgeKey = "";
                 this.draftModrinthKey = "";
                 this.clearCurseforgeKey = false;
@@ -50,6 +69,28 @@ export const useSettingsStore = defineStore("settings", {
                 return next;
             } finally {
                 this.isSavingTheme = false;
+            }
+        },
+        async saveAnimationSettings() {
+            this.isSavingAnimations = true;
+            try {
+                const req = {
+                    animationEnabled: this.draftAnimationEnabled,
+                    animationDurationMultiplier: normalizeAnimationDurationMultiplier(
+                        this.draftAnimationDurationMultiplier
+                    ),
+                };
+                this.view = await SaveAnimationSettings(req);
+                this.draftAnimationEnabled = this.view.animationEnabled;
+                this.draftAnimationDurationMultiplier = normalizeAnimationDurationMultiplier(
+                    this.view.animationDurationMultiplier
+                );
+                return {
+                    animationEnabled: this.draftAnimationEnabled,
+                    animationDurationMultiplier: this.draftAnimationDurationMultiplier,
+                };
+            } finally {
+                this.isSavingAnimations = false;
             }
         },
         async saveApiKeys() {

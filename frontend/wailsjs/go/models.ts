@@ -29,6 +29,8 @@ export namespace main {
 	
 	export class AppPreferences {
 	    theme: string;
+	    animationEnabled: boolean;
+	    animationDurationMultiplier: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new AppPreferences(source);
@@ -37,6 +39,22 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.theme = source["theme"];
+	        this.animationEnabled = source["animationEnabled"];
+	        this.animationDurationMultiplier = source["animationDurationMultiplier"];
+	    }
+	}
+	export class SaveAnimationSettingsRequest {
+	    animationEnabled: boolean;
+	    animationDurationMultiplier: number;
+
+	    static createFrom(source: any = {}) {
+	        return new SaveAnimationSettingsRequest(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.animationEnabled = source["animationEnabled"];
+	        this.animationDurationMultiplier = source["animationDurationMultiplier"];
 	    }
 	}
 	export class SaveApiKeysRequest {
@@ -55,6 +73,8 @@ export namespace main {
 	}
 	export class SettingsView {
 	    theme: string;
+	    animationEnabled: boolean;
+	    animationDurationMultiplier: number;
 	    minecraftDir: string;
 	    hasCurseforgeKey: boolean;
 	    curseforgeKeyMask: string;
@@ -68,6 +88,8 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.theme = source["theme"];
+	        this.animationEnabled = source["animationEnabled"];
+	        this.animationDurationMultiplier = source["animationDurationMultiplier"];
 	        this.minecraftDir = source["minecraftDir"];
 	        this.hasCurseforgeKey = source["hasCurseforgeKey"];
 	        this.curseforgeKeyMask = source["curseforgeKeyMask"];
@@ -77,7 +99,6 @@ export namespace main {
 	}
 
 }
-
 export namespace models {
 	
 	export class ModDependency {
@@ -265,6 +286,8 @@ export namespace structs {
 	    results: models.ModProject[];
 	    minecraftVersion: string;
 	    modLoader: string;
+	    targetDir?: string;
+	    instanceId?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new DownloadStatesRequest(source);
@@ -275,6 +298,8 @@ export namespace structs {
 	        this.results = this.convertValues(source["results"], models.ModProject);
 	        this.minecraftVersion = source["minecraftVersion"];
 	        this.modLoader = source["modLoader"];
+	        this.targetDir = source["targetDir"];
+	        this.instanceId = source["instanceId"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -337,6 +362,8 @@ export namespace structs {
 	    minecraftVersion: string;
 	    modLoader: string;
 	    versionId?: string;
+	    targetDir?: string;
+	    instanceId?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ModDownloadRequest(source);
@@ -349,6 +376,8 @@ export namespace structs {
 	        this.minecraftVersion = source["minecraftVersion"];
 	        this.modLoader = source["modLoader"];
 	        this.versionId = source["versionId"];
+	        this.targetDir = source["targetDir"];
+	        this.instanceId = source["instanceId"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

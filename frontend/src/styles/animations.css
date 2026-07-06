@@ -334,6 +334,19 @@
   animation: md-fade-in-up var(--md-transition-slow) var(--md-ease-out) both;
 }
 
+/* User-configured animation off switch. Keep animations effectively instant
+ * instead of removing them so "both"/forwards keyframe final states still apply. */
+:root[data-md-animations="off"] *,
+:root[data-md-animations="off"] *::before,
+:root[data-md-animations="off"] *::after {
+  animation-delay: 0ms !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+  transition-delay: 0ms !important;
+  transition-duration: 0.01ms !important;
+}
+
 /* Reduced motion respect */
 @media (prefers-reduced-motion: reduce) {
   *,

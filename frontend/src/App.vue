@@ -40,6 +40,7 @@ import { GetPreferences } from "../wailsjs/go/main/App";
 import { useDownloadQueueStore } from "./stores/downloadQueue";
 import { useMinecraftStore } from "./stores/minecraft";
 import { initTheme, applyVuetifyTheme, stopThemeListener } from "./composables/useTheme";
+import { applyAnimationSettings } from "./composables/useAnimationSettings";
 
 const themeDark = "dark";
 
@@ -73,6 +74,7 @@ onMounted(async () => {
     document.addEventListener("keydown", onGlobalEscape);
     const preferences = await GetPreferences();
     applyVuetifyTheme(preferences?.theme ?? themeDark);
+    applyAnimationSettings(preferences);
     void downloadQueueStore.start();
     void minecraftStore.start();
 });
