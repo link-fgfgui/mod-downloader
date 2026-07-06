@@ -259,6 +259,122 @@ type ModInfo struct {
 }
 ```
 
+### Scenario: Local Mod File Mutations
+
+#### 1. Scope / Trigger
+
+Use this pattern when the UI or CLI needs to mutate local mod JAR files for the
+selected Minecraft instance, such as enabling, disabling, inverting enabled
+state, or deleting files. This is a cross-layer contract: frontend selection
+provides candidate paths, Wails exposes the RPC, and `core/appcore` owns
+validation plus filesystem mutation.
+
+#### 2. Signatures
+
+Request type lives in `core/structs` so all adapters can import the same
+contract:
+
+```go
+type LocalModBatchOperationRequest struct {
+    Paths  []string `json:"paths"`
+    Action string   `json:"action"` // enable | disable | invert | delete
+}
+```
+
+Core service:
+
+```go
+func (s *Service) ApplyLocalModBatchOperation(req structs.LocalModBatchOperationRequest) (minecraft.VersionInfo, error)
+```
+
+Wails adapter:
+
+```go
+func (a *App) ApplyLocalModBatchOperation(req structs.LocalModBatchOperationRequest) minecraft.VersionInfo
+```
+
+The adapter may convert service errors into Wails promise rejections, but must
+not contain filesystem mutation logic.
+
+#### 3. Contracts
+
+- `paths` are candidate paths for selected local mod rows. They may be absolute,
+  relative to the configured `.minecraft` directory, or relative to the selected
+  instance's `mods` directory.
+- Backend validation resolves each path to an absolute path and accepts it only
+  when it is inside `minecraft.VersionDirPath(global.GetMinecraftDir(), selected)/mods`.
+- Accepted file names must end with `.jar` or `.jar.disabled`.
+- `enable` renames `.jar.disabled` to `.jar` and leaves already enabled files
+  unchanged.
+- `disable` renames `.jar` to `.jar.disabled` and leaves already disabled files
+  unchanged.
+- `invert` maps each selected file independently: enabled files disable,
+  disabled files enable.
+- `delete` removes the selected files after adapter/UI confirmation.
+- The service refreshes the selected version after success or error so callers
+  can reconcile UI state with disk state.
+
+#### 4. Validation & Error Matrix
+
+- No selected version -> return an error.
+- Unknown action -> return an error before touching disk.
+- Empty `paths` -> return an error before touching disk.
+- Path outside selected instance's `mods` directory -> return an error.
+- Path inside the selected `mods` directory but missing -> return a not-found
+  error.
+- Path is a directory or not a `.jar` / `.jar.disabled` file -> return an error.
+- Rename target already exists -> return an error; never overwrite.
+- Duplicate selected paths -> perform at most one filesystem operation.
+
+#### 5. Good/Base/Bad Cases
+
+- Good: `Manage.vue` deduplicates selected grouped-row paths, asks for delete
+  confirmation, calls the Wails method, then replaces store state with the
+  returned `VersionInfo`.
+- Good: `core/appcore` resolves and validates every path before mutation, then
+  performs `os.Rename` / `os.Remove` only for validated operations.
+- Base: disabling an already disabled selected file is a no-op and still
+  refreshes selected mods.
+- Bad: frontend sends arbitrary absolute paths and the service deletes them
+  without checking the selected instance root.
+- Bad: `app.go` imports path-mutation helpers or emits Wails events from
+  `core/appcore`.
+
+#### 6. Tests Required
+
+- Service tests for enable, disable, invert, and delete with real temporary
+  files.
+- Regression test for duplicate selected paths performing one operation.
+- Regression tests for missing files, paths outside the selected `mods`
+  directory, invalid suffixes, and rename target collisions.
+- Adapter-level tests are optional when the Wails method only delegates to the
+  service and preserves existing Wails error style.
+- Frontend build/type-check must pass after Wails bindings are regenerated.
+
+#### 7. Wrong vs Correct
+
+Wrong:
+
+```go
+func (a *App) DeleteLocalMods(paths []string) {
+    for _, path := range paths {
+        _ = os.Remove(path) // trusts frontend paths and bypasses core tests
+    }
+}
+```
+
+Correct:
+
+```go
+func (a *App) ApplyLocalModBatchOperation(req structs.LocalModBatchOperationRequest) minecraft.VersionInfo {
+    version, err := a.service().ApplyLocalModBatchOperation(req)
+    if err != nil {
+        panic("local mod operation failed: " + err.Error())
+    }
+    return version
+}
+```
+
 #### 3. Contracts
 
 - Provider converters populate `models.ModProject.Categories` from provider-native categories/tags:

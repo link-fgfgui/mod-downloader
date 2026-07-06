@@ -265,6 +265,8 @@ export namespace structs {
 	    results: models.ModProject[];
 	    minecraftVersion: string;
 	    modLoader: string;
+	    targetDir?: string;
+	    instanceId?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new DownloadStatesRequest(source);
@@ -275,6 +277,8 @@ export namespace structs {
 	        this.results = this.convertValues(source["results"], models.ModProject);
 	        this.minecraftVersion = source["minecraftVersion"];
 	        this.modLoader = source["modLoader"];
+	        this.targetDir = source["targetDir"];
+	        this.instanceId = source["instanceId"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -309,6 +313,20 @@ export namespace structs {
 	        this.name = source["name"];
 	    }
 	}
+	export class LocalModBatchOperationRequest {
+	    paths: string[];
+	    action: string;
+
+	    static createFrom(source: any = {}) {
+	        return new LocalModBatchOperationRequest(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.paths = source["paths"];
+	        this.action = source["action"];
+	    }
+	}
 	export class ModDownloadButtonState {
 	    key: string;
 	    status: string;
@@ -337,6 +355,8 @@ export namespace structs {
 	    minecraftVersion: string;
 	    modLoader: string;
 	    versionId?: string;
+	    targetDir?: string;
+	    instanceId?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ModDownloadRequest(source);
@@ -349,6 +369,8 @@ export namespace structs {
 	        this.minecraftVersion = source["minecraftVersion"];
 	        this.modLoader = source["modLoader"];
 	        this.versionId = source["versionId"];
+	        this.targetDir = source["targetDir"];
+	        this.instanceId = source["instanceId"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

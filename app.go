@@ -254,6 +254,14 @@ func (a *App) RefreshSelectedVersionMods() structs.VersionInfo {
 	return a.service().RefreshSelectedVersionMods()
 }
 
+func (a *App) ApplyLocalModBatchOperation(req appstructs.LocalModBatchOperationRequest) structs.VersionInfo {
+	version, err := a.service().ApplyLocalModBatchOperation(req)
+	if err != nil {
+		panic("local mod operation failed: " + err.Error())
+	}
+	return version
+}
+
 func (a *App) SelectVersion(versionKey string) structs.VersionInfo {
 	version, err := a.service().SelectVersion(versionKey)
 	if err == nil {

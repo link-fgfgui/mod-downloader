@@ -85,35 +85,94 @@
             <template #actions="{ selectedItems, clearSelection }">
                 <v-btn size="small" variant="tonal" class="me-1"
                     prepend-icon="mdi-content-copy"
+                    :disabled="isBatchBusy"
                     @click="copyModNames(selectedItems)">
                     {{ $t('manage.copyNames') }}
                 </v-btn>
 
                 <v-btn size="small" variant="tonal" class="me-1"
                     prepend-icon="mdi-identifier"
+                    :disabled="isBatchBusy"
                     @click="copyModIds(selectedItems)">
                     {{ $t('manage.copyIds') }}
                 </v-btn>
 
+                <v-btn size="small" variant="tonal" color="primary" class="me-1"
+                    :prepend-icon="primaryBatchAction(selectedItems) === 'disable' ? 'mdi-toggle-switch-off-outline' : 'mdi-toggle-switch-outline'"
+                    :loading="batchOperation === primaryBatchAction(selectedItems)"
+                    :disabled="isBatchBusy"
+                    @click="applyBatchOperation(selectedItems, primaryBatchAction(selectedItems), clearSelection)"
+                    @contextmenu.prevent="applyBatchOperation(selectedItems, 'invert', clearSelection)">
+                    {{ primaryBatchAction(selectedItems) === 'disable' ? $t('manage.disableSelected') : $t('manage.enableSelected') }}
+                </v-btn>
+
+                <v-btn size="small" variant="tonal" color="warning" class="me-1"
+                    prepend-icon="mdi-swap-horizontal"
+                    :loading="batchOperation === 'invert'"
+                    :disabled="isBatchBusy"
+                    @click="applyBatchOperation(selectedItems, 'invert', clearSelection)">
+                    {{ $t('manage.invertSelected') }}
+                </v-btn>
+
+                <v-btn size="small" variant="tonal" color="error" class="me-1"
+                    prepend-icon="mdi-delete"
+                    :disabled="isBatchBusy"
+                    @click="openDeleteDialog(selectedItems, clearSelection)">
+                    {{ $t('manage.deleteSelected') }}
+                </v-btn>
+
                 <v-btn size="small" variant="tonal" color="error"
                     prepend-icon="mdi-selection-off"
+                    :disabled="isBatchBusy"
                     @click="clearSelection()">
                     {{ $t('download.selection.deselectAll') }}
                 </v-btn>
             </template>
         </VirtualList>
+
+        <v-dialog v-model="deleteDialog" max-width="420">
+            <v-card>
+                <v-card-title>{{ $t("manage.confirmDelete.title") }}</v-card-title>
+                <v-card-text>
+                    {{ $t("manage.confirmDelete.body", { n: pendingDeleteCount }) }}
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer></v-spacer>
+                    <v-btn variant="text" :disabled="isBatchBusy" @click="deleteDialog = false">
+                        {{ $t("manage.confirmDelete.cancel") }}
+                    </v-btn>
+                    <v-btn color="error" variant="tonal" :loading="batchOperation === 'delete'" @click="confirmDelete">
+                        {{ $t("manage.confirmDelete.confirm") }}
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+        <v-snackbar v-model="showOperationError" color="error" timeout="5000">
+            {{ $t("manage.operationFailed") }}<span v-if="operationError">: {{ operationError }}</span>
+        </v-snackbar>
     </v-container>
 </template>
 
 <script setup>
-import { computed, onActivated } from "vue";
+import { computed, onActivated, ref } from "vue";
 import { storeToRefs } from "pinia";
 
 import VirtualList from "../components/VirtualList.vue";
 import { useMinecraftStore } from "../stores/minecraft";
+import { ApplyLocalModBatchOperation } from "../../wailsjs/go/main/App";
 
 const minecraftStore = useMinecraftStore();
 const { isRefreshing } = storeToRefs(minecraftStore);
+const batchOperation = ref("");
+const deleteDialog = ref(false);
+const pendingDeleteGroups = ref([]);
+const pendingDeleteCount = ref(0);
+const operationError = ref("");
+const showOperationError = ref(false);
+let pendingDeleteClearSelection = null;
+
+const isBatchBusy = computed(() => batchOperation.value !== "");
 
 const groupedMods = computed(() => {
     const raw = minecraftStore.mods;
@@ -213,6 +272,74 @@ const copyModNames = async (groups) => {
 const copyModIds = async (groups) => {
     const ids = groups.flatMap(strongModIds).join("\n");
     try { await navigator.clipboard.writeText(ids); } catch {}
+};
+
+const selectedGroupPaths = (groups) => {
+    const seen = new Set();
+    const paths = [];
+    for (const group of groups) {
+        const path = (group.primary?.path || "").trim();
+        if (!path || seen.has(path)) {
+            continue;
+        }
+        seen.add(path);
+        paths.push(path);
+    }
+    return paths;
+};
+
+const primaryBatchAction = (groups) => {
+    return groups.some((group) => group.primary?.enabled) ? "disable" : "enable";
+};
+
+const applyBatchOperation = async (groups, action, clearSelection) => {
+    const paths = selectedGroupPaths(groups);
+    if (!paths.length || batchOperation.value) {
+        return;
+    }
+    batchOperation.value = action;
+    operationError.value = "";
+    showOperationError.value = false;
+    try {
+        const version = await ApplyLocalModBatchOperation({ paths, action });
+        minecraftStore.applySelectedVersion(version);
+        clearSelection?.();
+    } catch (error) {
+        operationError.value = errorMessage(error);
+        showOperationError.value = true;
+        await minecraftStore.refreshSelectedMods();
+    } finally {
+        batchOperation.value = "";
+    }
+};
+
+const openDeleteDialog = (groups, clearSelection) => {
+    pendingDeleteGroups.value = [...groups];
+    pendingDeleteCount.value = selectedGroupPaths(groups).length;
+    pendingDeleteClearSelection = clearSelection;
+    deleteDialog.value = true;
+};
+
+const confirmDelete = async () => {
+    const groups = pendingDeleteGroups.value;
+    const clearSelection = pendingDeleteClearSelection;
+    await applyBatchOperation(groups, "delete", clearSelection);
+    if (!showOperationError.value) {
+        deleteDialog.value = false;
+        pendingDeleteGroups.value = [];
+        pendingDeleteCount.value = 0;
+        pendingDeleteClearSelection = null;
+    }
+};
+
+const errorMessage = (error) => {
+    if (!error) {
+        return "";
+    }
+    if (typeof error === "string") {
+        return error;
+    }
+    return error.message || String(error);
 };
 
 onActivated(() => {
