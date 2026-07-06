@@ -1,10 +1,10 @@
 <template>
-    <v-navigation-drawer permanent expand-on-hover :rail="!isPinned" @mouseenter="isHovered = true"
+    <v-navigation-drawer permanent expand-on-hover :rail="!drawerExpanded" @mouseenter="isHovered = true"
         @mouseleave="isHovered = false" @contextmenu.prevent>
         <div style="user-select: none;">
             <v-list>
                 <v-list-item title="Mod Downloader">
-                    <template #append><v-btn v-show="isHovered || isPinned" class="md-btn-press md-hover-scale" :icon="isPinned ? 'mdi-pin-off' : 'mdi-pin'"
+                    <template #append><v-btn v-show="!xs && (isHovered || isPinned)" class="md-btn-press md-hover-scale" :icon="isPinned ? 'mdi-pin-off' : 'mdi-pin'"
                             variant="text" density="compact"
                             @click.stop="isPinned = !isPinned"></v-btn></template></v-list-item>
             </v-list>
@@ -26,7 +26,7 @@
             <v-divider></v-divider>
         </div>
         <template #append>
-            <VersionChoose :isExpanded="isHovered || isPinned"/>
+            <VersionChoose :isExpanded="drawerExpanded"/>
         </template>
     </v-navigation-drawer>
 </template>
@@ -34,11 +34,14 @@
 <script setup>
 import { computed, ref } from "vue";
 import { useRoute } from "vue-router";
+import { useDisplay } from "vuetify";
 import VersionChoose from "./VersionChoose.vue";
 
 const isPinned = ref(true);
 const isHovered = ref(false);
 const route = useRoute();
+const { xs } = useDisplay();
 const activeNav = computed(() => [route.path]);
+const drawerExpanded = computed(() => isHovered.value || (isPinned.value && !xs.value));
 </script>
 <style scoped></style>
