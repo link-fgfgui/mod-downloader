@@ -30,15 +30,17 @@
             {{ $t('unpin.empty') }}
         </v-alert>
 
-        <v-data-table v-else :items="pinnedModsStore.filteredPins" :headers="headers" density="compact"
-            class="elevation-1" hide-default-footer :items-per-page="-1">
-            <template #[actionsSlotName]="{ item }">
-                <v-btn :loading="pinnedModsStore.pendingUnpinKeys.has(pinnedModsStore.pinKey(item))"
-                    variant="outlined" size="small" prepend-icon="mdi-pin-off" @click="unpin(item as database.PinnedMod)">
-                    {{ $t('unpin.unpin') }}
-                </v-btn>
-            </template>
-        </v-data-table>
+        <div v-else class="unpin-table-wrap">
+            <v-data-table :items="pinnedModsStore.filteredPins" :headers="headers" density="compact"
+                class="unpin-table elevation-1" hide-default-footer :items-per-page="-1">
+                <template #[actionsSlotName]="{ item }">
+                    <v-btn :loading="pinnedModsStore.pendingUnpinKeys.has(pinnedModsStore.pinKey(item))"
+                        variant="outlined" size="small" prepend-icon="mdi-pin-off" @click="unpin(item as database.PinnedMod)">
+                        {{ $t('unpin.unpin') }}
+                    </v-btn>
+                </template>
+            </v-data-table>
+        </div>
 
         <v-dialog v-model="confirmAll" max-width="420">
             <v-card>
@@ -107,5 +109,14 @@ async function unpinAll() {
 <style scoped>
 .gap-2 {
     gap: 8px;
+}
+
+.unpin-table-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.unpin-table {
+    min-width: max-content;
 }
 </style>
