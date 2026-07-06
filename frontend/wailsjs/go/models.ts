@@ -109,11 +109,11 @@ export namespace main {
 	    animationMode: string;
 	    animationEnabled: boolean;
 	    animationDurationMultiplier: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SaveAnimationSettingsRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.animationMode = source["animationMode"];
@@ -165,6 +165,7 @@ export namespace main {
 	}
 
 }
+
 export namespace models {
 	
 	export class ModDependency {
@@ -407,11 +408,11 @@ export namespace structs {
 	export class LocalModBatchOperationRequest {
 	    paths: string[];
 	    action: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new LocalModBatchOperationRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.paths = source["paths"];
