@@ -42,6 +42,7 @@ import { useMinecraftStore } from "./stores/minecraft";
 import { initTheme, applyVuetifyTheme, stopThemeListener } from "./composables/useTheme";
 import {
     animationModeGsap,
+    animateGsapPageContent,
     applyAnimationSettings,
     beforeGsapFabEnter,
     beforeGsapRouteEnter,
@@ -62,6 +63,11 @@ const minecraftStore = useMinecraftStore();
 const activeAnimationMode = useActiveAnimationMode();
 
 const gsapAnimationsActive = computed(() => activeAnimationMode.value === animationModeGsap);
+
+function afterGsapRouteEnter(el: Element) {
+    animateGsapPageContent(el, { from: "up" });
+}
+
 const routeTransitionProps = computed(() => (
     gsapAnimationsActive.value
         ? {
@@ -70,6 +76,7 @@ const routeTransitionProps = computed(() => (
             onBeforeEnter: beforeGsapRouteEnter,
             onEnter: enterGsapRoute,
             onLeave: leaveGsapRoute,
+            onAfterEnter: afterGsapRouteEnter,
         }
         : { name: "slide-fade", mode: "out-in" as const }
 ));

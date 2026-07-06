@@ -1,5 +1,5 @@
 <template>
-    <div class="virtual-list-wrapper" @keydown="onKeydown">
+    <div ref="wrapperRef" class="virtual-list-wrapper" @keydown="onKeydown">
         <v-virtual-scroll ref="scrollRef" :items="virtualItems" class="virtual-list-scroll px-2" :item-height="itemHeight"
             tabindex="0">
             <template #default="{ item }">
@@ -32,7 +32,12 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from "vue";
+import {
+    animateGsapPageContent,
+    animationModeGsap,
+    useActiveAnimationMode,
+} from "../composables/useAnimationSettings";
 
 const props = defineProps({
     items: {
@@ -67,9 +72,11 @@ const props = defineProps({
 
 const emit = defineEmits(["load-more", "item-click"]);
 
+const wrapperRef = ref(null);
 const loadMoreTarget = ref(null);
 let observer = null;
 let lastLoadMoreResultCount = 0;
+let hasAnimatedListItems = false;
 
 const scrollRef = ref(null);
 let lastScrollTop = 0;
@@ -77,6 +84,7 @@ let currentDirection = "down";
 
 const selectedIndices = reactive(new Set());
 let lastClickedIndex = null;
+const activeAnimationMode = useActiveAnimationMode();
 
 const handleScroll = (e) => {
     const el = e.currentTarget;
@@ -218,6 +226,16 @@ watch(() => props.items, (next, previous) => {
     }
     if (next !== previousItemsRef && next.length <= (previous?.length || 0)) {
         clearSelection();
+    }
+    if (activeAnimationMode.value === animationModeGsap && wrapperRef.value) {
+        if (next.length === 0) {
+            hasAnimatedListItems = false;
+        } else if (!hasAnimatedListItems && (previous?.length || 0) === 0) {
+            hasAnimatedListItems = true;
+            void nextTick(() => {
+                animateGsapPageContent(wrapperRef.value, { selector: ".v-list-item" });
+            });
+        }
     }
     previousItemsRef = next;
 });
