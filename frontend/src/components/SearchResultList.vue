@@ -33,6 +33,11 @@
                             {{ item.platform }}
                         </v-chip>
 
+                        <v-btn class="md-btn-press md-hover-scale transition-btn" icon="mdi-playlist-plus"
+                            variant="tonal" rounded="xl" size="small" color="secondary"
+                            @click.stop="emit('add-favorite', [item])">
+                        </v-btn>
+
                         <v-btn class="md-btn-press md-hover-scale transition-btn" icon variant="tonal" rounded="xl"
                             size="small" :color="colorFor(index)" :loading="loadingFor(index)"
                             :disabled="disabledFor(index)" @click.stop="onInstall(index, true)"
@@ -51,6 +56,12 @@
                 prepend-icon="mdi-download-multiple"
                 @click="emit('batch-download', selectedItems)">
                 {{ $t('download.selection.downloadAll') }}
+            </v-btn>
+
+            <v-btn size="small" variant="tonal" color="secondary" class="me-1"
+                prepend-icon="mdi-playlist-plus"
+                @click="emit('add-favorite', selectedItems)">
+                {{ $t('favorites.addToFavorites') }}
             </v-btn>
 
             <v-btn size="small" variant="tonal" color="secondary" class="me-1"
@@ -100,7 +111,7 @@ const props = defineProps({
     },
 });
 
-const emit = defineEmits(["install", "load-more", "show-versions", "batch-download", "batch-unpin"]);
+const emit = defineEmits(["install", "load-more", "show-versions", "batch-download", "batch-unpin", "add-favorite"]);
 
 const itemKey = (item, index) => item.id || `${item.platform}-${item.slug}-${index}`;
 

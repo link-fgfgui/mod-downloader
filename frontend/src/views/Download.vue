@@ -83,6 +83,7 @@
             @show-versions="openVersionsOverlay"
             @batch-download="batchDownload"
             @batch-unpin="batchUnpin"
+            @add-favorite="openAddFavorites"
         ></SearchResultList>
 
         <v-overlay
@@ -225,21 +226,26 @@
                 </v-card-actions>
             </v-card>
         </v-dialog>
+
+        <AddToFavoriteDialog ref="addFavoriteDialog" @added="onFavoritesAdded"></AddToFavoriteDialog>
     </v-container>
 </template>
 
 <script setup lang="ts">
-import { computed, onActivated, onDeactivated, watch } from "vue";
+import { computed, onActivated, onDeactivated, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 
 import SearchResultList from "../components/SearchResultList.vue";
+import AddToFavoriteDialog from "../components/AddToFavoriteDialog.vue";
 import { ValidateMinecraftDir } from "../../wailsjs/go/main/App";
 import { useDownloadSearchStore } from "../stores/downloadSearch";
 import { useMinecraftStore } from "../stores/minecraft";
+import type { FavoriteModDraft } from "../stores/favorites";
 import type { structs, models } from "../../wailsjs/go/models";
 
 const downloadStore = useDownloadSearchStore();
 const minecraftStore = useMinecraftStore();
+const addFavoriteDialog = ref<InstanceType<typeof AddToFavoriteDialog> | null>(null);
 
 const {
     searchText,
@@ -298,6 +304,34 @@ const batchDownload = (results: models.ModProject[]) => {
 
 const batchUnpin = (results: models.ModProject[]) => {
     downloadStore.batchUnpin(results);
+};
+
+const modIDFromResult = (result: models.ModProject) => {
+    const id = result?.id || "";
+    return id.includes(":") ? id.split(":").slice(1).join(":") : (result.projectId || id);
+};
+
+const favoriteDraftFromResult = (result: models.ModProject): FavoriteModDraft => ({
+    platform: result.platform,
+    modId: modIDFromResult(result),
+    minecraftVersion: selectedVersion.value,
+    modLoader: selectedModLoader.value,
+    title: result.title,
+    slug: result.slug,
+    iconUrl: result.iconUrl,
+    description: result.description,
+    categories: result.categories || [],
+});
+
+const openAddFavorites = (results: models.ModProject[]) => {
+    const drafts = results.map(favoriteDraftFromResult).filter((draft) => draft.platform && draft.modId);
+    if (drafts.length) {
+        addFavoriteDialog.value?.open(drafts);
+    }
+};
+
+const onFavoritesAdded = () => {
+    downloadStore.showSnackbar("favorites.added", "success");
 };
 
 const checkMinecraftDir = async () => {

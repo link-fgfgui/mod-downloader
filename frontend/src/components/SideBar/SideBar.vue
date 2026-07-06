@@ -17,6 +17,8 @@
 
                 <v-list-item value="/manage" prepend-icon="mdi-list-status" :title="$t('nav.manage')" to="/manage"></v-list-item>
 
+                <v-list-item value="/favorites" prepend-icon="mdi-playlist-star" :title="$t('nav.favorites')" to="/favorites"></v-list-item>
+
                 <v-list-item value="/unpin" prepend-icon="mdi-pin-off" :title="$t('nav.unpin')" to="/unpin"></v-list-item>
 
                 <v-list-item value="/settings" prepend-icon="mdi-cog" :title="$t('nav.settings')" to="/settings"></v-list-item>

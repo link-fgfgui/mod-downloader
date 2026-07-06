@@ -1,5 +1,65 @@
 export namespace database {
 	
+	export class FavoriteList {
+	    id: string;
+	    name: string;
+	    createdAt: number;
+	    updatedAt: number;
+	    sortOrder: number;
+	    system?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new FavoriteList(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	        this.sortOrder = source["sortOrder"];
+	        this.system = source["system"];
+	    }
+	}
+	export class FavoriteMod {
+	    id: string;
+	    listId: string;
+	    platform: string;
+	    modId: string;
+	    versionId?: string;
+	    minecraftVersion?: string;
+	    modLoader?: string;
+	    title?: string;
+	    slug?: string;
+	    iconUrl?: string;
+	    description?: string;
+	    categories?: string[];
+	    createdAt: number;
+	    updatedAt: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new FavoriteMod(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.listId = source["listId"];
+	        this.platform = source["platform"];
+	        this.modId = source["modId"];
+	        this.versionId = source["versionId"];
+	        this.minecraftVersion = source["minecraftVersion"];
+	        this.modLoader = source["modLoader"];
+	        this.title = source["title"];
+	        this.slug = source["slug"];
+	        this.iconUrl = source["iconUrl"];
+	        this.description = source["description"];
+	        this.categories = source["categories"];
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	}
 	export class PinnedMod {
 	    id: string;
 	    platform: string;

@@ -490,6 +490,13 @@ func (a *App) ApplyLocalModBatchOperation(req structs.LocalModBatchOperationRequ
 - `modbridge.ApplyProjectMetadataToModInfo` may fill `OnlineName`, `IconURL`, platform/project fields, and `Categories`.
 - Display enrichment must not overwrite `ModInfo.ID`, `Name`, `Version`, `SHA1`, `Path`, `Enabled`, or `JijMods`.
 - Frontend display should prefer `onlineName || name || id`; technical subtitles may keep JAR-derived IDs/version/file details.
+- Every selected-version local-mod refresh path must use the same enrichment pipeline:
+  scan local jars, apply cached platform metadata, asynchronously resolve missed
+  SHA1s, update `global.SetSelectedVersion`, and emit
+  `EventSelectedVersionChanged` after async metadata changes. `SelectVersion`
+  and `RefreshSelectedVersionMods` must not diverge.
+- Async metadata writeback must verify the selected instance still matches the
+  refreshed instance before mutating global selected-version state.
 
 #### 4. Validation & Error Matrix
 
@@ -497,6 +504,8 @@ func (a *App) ApplyLocalModBatchOperation(req structs.LocalModBatchOperationRequ
 - Duplicate categories with different casing -> one lowercase category.
 - SHA1 maps to only partial platform metadata without title/icon/categories -> treat as a display miss and allow hash resolution to try fuller metadata.
 - No platform metadata -> keep existing JAR-derived display fallback.
+- Instance changed while async hash resolution is in flight -> drop the async
+  metadata update.
 
 #### 5. Good/Base/Bad Cases
 
@@ -508,6 +517,9 @@ func (a *App) ApplyLocalModBatchOperation(req structs.LocalModBatchOperationRequ
 
 - Provider converter tests assert unified categories are populated for Modrinth and CurseForge.
 - Enrichment tests assert online display fields are applied while JAR-derived identity and JiJ fields are preserved.
+- Service tests or focused regressions assert selected-version refresh paths
+  share enrichment behavior and emit updated selected-version state after async
+  metadata changes where practical.
 - Frontend build/type check must pass after adding response fields consumed by Vue.
 
 #### 7. Wrong vs Correct
@@ -524,6 +536,22 @@ Correct:
 ```go
 info = modbridge.ApplyProjectMetadataToModInfo(info, project)
 // UI uses info.OnlineName || info.Name || info.ID
+```
+
+Wrong:
+
+```go
+// SelectVersion scans jars but skips cached/async online metadata enrichment.
+version = s.refreshVersionMods(version, mcDir)
+global.SetSelectedVersion(version)
+s.emit(EventSelectedVersionChanged, version)
+```
+
+Correct:
+
+```go
+// Selection and explicit refresh share one enrichment/event path.
+return s.refreshAndSelectVersionMods(version, mcDir), nil
 ```
 
 ### Scenario: Download Queue State And Actions
