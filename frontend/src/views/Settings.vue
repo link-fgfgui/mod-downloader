@@ -1,5 +1,5 @@
 <template>
-    <v-container fluid>
+    <v-container class="settings-page" fluid>
         <h1 class="text-h5 mb-4">{{ $t('settings.title') }}</h1>
 
         <v-progress-linear v-if="settingsStore.isLoading" indeterminate class="mb-4" />
@@ -211,6 +211,20 @@ function clearModrinth() {
 
 .settings-action-row--center {
     align-items: center;
+}
+
+.settings-page :deep(.v-card-title) {
+    line-height: 1.35;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+
+.settings-page :deep(.v-card-subtitle) {
+    line-height: 1.4;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    white-space: normal;
 }
 
 .multiplier-input {
