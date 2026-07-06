@@ -241,6 +241,7 @@ onActivated(() => {
 .favorites-rail,
 .favorites-main {
     min-height: 0;
+    min-width: 0;
 }
 
 .favorites-rail {
@@ -257,6 +258,29 @@ onActivated(() => {
     justify-content: space-between;
     gap: 12px;
     margin-bottom: 16px;
+    min-width: 0;
+}
+
+.favorites-main-header {
+    flex-wrap: wrap;
+}
+
+.favorites-main-header > div {
+    flex: 1 1 220px;
+    min-width: 0;
+}
+
+.favorites-main-header h2 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.favorites-list :deep(.v-list-item-title),
+.favorites-items :deep(.v-list-item-title),
+.favorites-items :deep(.v-list-item-subtitle) {
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .favorites-list {
@@ -307,6 +331,21 @@ onActivated(() => {
         max-height: 260px;
         padding-block-end: 16px;
         padding-inline-end: 0;
+    }
+}
+
+@media (max-width: 599.98px) {
+    .favorites-page {
+        gap: 16px;
+        padding: 16px !important;
+    }
+
+    .favorites-items :deep(.v-list-item__prepend) {
+        display: none;
+    }
+
+    .favorites-items :deep(.v-list-item__append) {
+        margin-inline-start: 8px;
     }
 }
 </style>
