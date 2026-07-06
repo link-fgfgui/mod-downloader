@@ -207,6 +207,8 @@ export namespace structs {
 	    minecraftVersion: string;
 	    modLoader: string;
 	    cancelable: boolean;
+	    retryable: boolean;
+	    reason?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new DownloadQueueItem(source);
@@ -223,6 +225,8 @@ export namespace structs {
 	        this.minecraftVersion = source["minecraftVersion"];
 	        this.modLoader = source["modLoader"];
 	        this.cancelable = source["cancelable"];
+	        this.retryable = source["retryable"];
+	        this.reason = source["reason"];
 	    }
 	}
 	export class DownloadQueueState {
@@ -265,6 +269,8 @@ export namespace structs {
 	    results: models.ModProject[];
 	    minecraftVersion: string;
 	    modLoader: string;
+	    targetDir?: string;
+	    instanceId?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new DownloadStatesRequest(source);
@@ -275,6 +281,8 @@ export namespace structs {
 	        this.results = this.convertValues(source["results"], models.ModProject);
 	        this.minecraftVersion = source["minecraftVersion"];
 	        this.modLoader = source["modLoader"];
+	        this.targetDir = source["targetDir"];
+	        this.instanceId = source["instanceId"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -337,6 +345,8 @@ export namespace structs {
 	    minecraftVersion: string;
 	    modLoader: string;
 	    versionId?: string;
+	    targetDir?: string;
+	    instanceId?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ModDownloadRequest(source);
@@ -349,6 +359,8 @@ export namespace structs {
 	        this.minecraftVersion = source["minecraftVersion"];
 	        this.modLoader = source["modLoader"];
 	        this.versionId = source["versionId"];
+	        this.targetDir = source["targetDir"];
+	        this.instanceId = source["instanceId"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -529,3 +541,4 @@ export namespace structs {
 	}
 
 }
+

@@ -204,6 +204,10 @@ func (a *App) CancelDownload(id string) bool {
 	return a.service().CancelDownload(id)
 }
 
+func (a *App) RetryDownload(id string) bool {
+	return a.service().RetryDownload(id)
+}
+
 func (a *App) GetDownloadStates(req appstructs.DownloadStatesRequest) []appstructs.ModDownloadButtonState {
 	return a.service().GetDownloadStates(req)
 }

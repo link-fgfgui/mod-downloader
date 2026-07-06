@@ -69,6 +69,19 @@ const messages = {
       selectDirDesc: "当前目录为空或不可用，请先在左侧底部选择 .minecraft folder。",
       noMatchingVersions: "没有匹配当前 Minecraft 版本和 Mod Loader 的版本。",
       queued: "已加入下载队列",
+      queue: {
+        title: "下载队列",
+        summary: "运行 {running} · 等待 {pending}",
+        close: "关闭",
+        cancel: "取消下载",
+        retry: "重试下载",
+        status: {
+          running: "下载中",
+          pending: "等待中",
+          failed: "失败",
+          canceled: "已取消",
+        },
+      },
       selection: {
         count: "已选 {n} 项",
         downloadAll: "全部下载",
@@ -167,6 +180,19 @@ const messages = {
       noMatchingVersions:
         "No versions match the current Minecraft version and Mod Loader.",
       queued: "Added to download queue",
+      queue: {
+        title: "Download Queue",
+        summary: "Running {running} · Pending {pending}",
+        close: "Close",
+        cancel: "Cancel download",
+        retry: "Retry download",
+        status: {
+          running: "Running",
+          pending: "Pending",
+          failed: "Failed",
+          canceled: "Canceled",
+        },
+      },
       selection: {
         count: "{n} selected",
         downloadAll: "Download All",

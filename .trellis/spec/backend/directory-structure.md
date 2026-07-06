@@ -305,6 +305,115 @@ info = modbridge.ApplyProjectMetadataToModInfo(info, project)
 // UI uses info.OnlineName || info.Name || info.ID
 ```
 
+### Scenario: Download Queue State And Actions
+
+#### 1. Scope / Trigger
+
+Use this pattern when the Wails frontend needs to inspect or mutate individual
+download queue items. The queue is app-independent runtime state, so ownership
+belongs in `core/downloader`; Wails and Vue render a projection and call
+adapter methods by queue item ID.
+
+#### 2. Signatures
+
+Core queue API:
+
+```go
+func QueueModDownload(ctx context.Context, req structs.ModDownloadRequest, curseForgeAPIKey string, events ...downloader.Events) structs.ModDownloadResult
+func GetDownloadQueueState() structs.DownloadQueueState
+func CancelDownload(ctx context.Context, id string, events ...downloader.Events) bool
+func RetryDownload(ctx context.Context, id string, events ...downloader.Events) bool
+```
+
+App service / Wails adapter:
+
+```go
+func (s *Service) GetDownloadQueueState() structs.DownloadQueueState
+func (s *Service) CancelDownload(id string) bool
+func (s *Service) RetryDownload(id string) bool
+
+func (a *App) GetDownloadQueueState() structs.DownloadQueueState
+func (a *App) CancelDownload(id string) bool
+func (a *App) RetryDownload(id string) bool
+```
+
+Queue item projection:
+
+```go
+type DownloadQueueItem struct {
+    ID         string `json:"id"`
+    Status     string `json:"status"` // running, pending, failed, canceled
+    Cancelable bool   `json:"cancelable"`
+    Retryable  bool   `json:"retryable"`
+    Reason     string `json:"reason,omitempty"`
+}
+```
+
+#### 3. Contracts
+
+- `core/downloader` owns the full `downloadJob`, including resolved version,
+  target directory, instance ID, mod loader, Minecraft version, project metadata,
+  and API key.
+- Frontend code must never reconstruct retry requests from queue display fields.
+  Retry goes through `RetryDownload(id)` so backend-owned job context is replayed.
+- `download-queue-updated` carries `DownloadQueueState`; Wails event name
+  mapping stays in `app.go`.
+- `DownloadQueueState.Pending` and `Running` count active work only. Retryable
+  failed/canceled history may keep `Active` true but must not inflate active
+  count badges.
+- Failed/canceled retry history is memory-only and bounded. It is not persisted
+  to BoltDB.
+
+#### 4. Validation & Error Matrix
+
+- Empty action ID -> `false`.
+- Unknown action ID -> `false`.
+- Cancel pending item -> remove from pending, append `canceled` retryable item,
+  emit queue state.
+- Cancel running item -> request context cancellation, suppress
+  `download-failed`, append `canceled` retryable item after the job exits, emit
+  queue state.
+- Download failure -> append `failed` retryable item and emit
+  `download-failed`.
+- Retry failed/canceled item -> remove history row, enqueue a copy with a fresh
+  queue ID, emit queue state.
+
+#### 5. Good/Base/Bad Cases
+
+- Good: Vue calls `RetryDownload(item.id)` and refreshes from
+  `GetDownloadQueueState`.
+- Base: A successful download disappears from queue state after completion.
+- Bad: Vue builds a new `ModDownloadRequest` from `DownloadQueueItem.Platform`,
+  `VersionID`, and `FileName`; this loses resolved target and dependency/API-key
+  context.
+
+#### 6. Tests Required
+
+- Downloader unit test: canceling a pending item produces one `canceled`,
+  retryable queue item.
+- Downloader unit test: retrying a retryable item removes the history row and
+  requeues the job with a fresh ID.
+- Frontend type check/build must pass after Wails binding regeneration when
+  queue fields or Wails methods change.
+
+#### 7. Wrong vs Correct
+
+Wrong:
+
+```typescript
+await QueueModDownload({
+  projectId: item.platform + ":" + item.versionId,
+  minecraftVersion: item.minecraftVersion,
+  modLoader: item.modLoader,
+});
+```
+
+Correct:
+
+```typescript
+await RetryDownload(item.id);
+```
+
 ---
 
 ## Naming Conventions
