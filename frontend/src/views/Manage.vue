@@ -1,7 +1,7 @@
 <template>
     <v-container class="manage-page pa-6 md-page" fluid>
         <div class="manage-header md-stagger">
-            <div>
+            <div class="manage-header-copy">
                 <h1 class="text-h5 font-weight-medium">{{ $t("manage.title") }}</h1>
                 <div class="text-body-2 text-medium-emphasis">
                     {{ selectedInstanceLabel }}
@@ -420,10 +420,16 @@ onActivated(async () => {
 .manage-header {
     align-items: center;
     display: flex;
+    flex-wrap: wrap;
     gap: 16px;
     justify-content: space-between;
     margin-bottom: 24px;
     flex: 0 0 auto;
+}
+
+.manage-header-copy {
+    flex: 1 1 220px;
+    min-width: 0;
 }
 
 .empty-state {
@@ -489,5 +495,36 @@ onActivated(async () => {
     align-items: center;
     display: flex;
     gap: 8px;
+}
+
+@media (max-width: 599.98px) {
+    .manage-page {
+        padding: 16px !important;
+    }
+
+    .manage-header {
+        align-items: flex-start;
+    }
+
+    .manage-header h1 {
+        font-size: 1.25rem !important;
+        line-height: 1.75rem;
+    }
+
+    .manage-header-copy {
+        flex-basis: 100%;
+    }
+
+    .manage-actions {
+        gap: 4px;
+    }
+
+    .manage-actions :deep(.v-chip) {
+        display: none;
+    }
+
+    .manage-list :deep(.v-list-item__prepend) {
+        display: none;
+    }
 }
 </style>
