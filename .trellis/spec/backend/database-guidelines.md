@@ -134,6 +134,94 @@ project, ok := db.cacheState.ModProjects[key]
 
 **Why composite keys**: Supports multiple platforms (CurseForge, Modrinth) without ID collisions. Platform-agnostic caller code.
 
+### Scenario: Favorite Lists Persistent Collections
+
+#### 1. Scope / Trigger
+
+Use this pattern for user-owned collections of platform mods, such as named
+favorite lists. These records are persistent user data, not local JAR scan
+cache, so they belong in `database.cacheState` and require a `cacheVersion`
+bump when the schema changes.
+
+#### 2. Signatures
+
+```go
+type FavoriteList struct {
+    ID        string `json:"id"`
+    Name      string `json:"name"`
+    CreatedAt int64  `json:"createdAt"`
+    UpdatedAt int64  `json:"updatedAt"`
+    SortOrder int    `json:"sortOrder"`
+}
+
+type FavoriteMod struct {
+    ID               string   `json:"id"`
+    ListID           string   `json:"listId"`
+    Platform         string   `json:"platform"`
+    ModID            string   `json:"modId"`
+    VersionID        string   `json:"versionId,omitempty"`
+    MinecraftVersion string   `json:"minecraftVersion,omitempty"`
+    ModLoader        string   `json:"modLoader,omitempty"`
+    Title            string   `json:"title,omitempty"`
+    Slug             string   `json:"slug,omitempty"`
+    IconURL          string   `json:"iconUrl,omitempty"`
+    Categories       []string `json:"categories,omitempty"`
+}
+```
+
+#### 3. Contracts
+
+- `PinnedMod` and `FavoriteMod` are separate concepts. Pinned mods affect
+  download version resolution; favorites are user collections.
+- Favorite membership is keyed by
+  `listID/platform/modID/minecraftVersion/modLoader`.
+- `platform`, `modID`, and `modLoader` are normalized to lowercase. Display
+  metadata is copied from platform metadata and may be empty.
+- Deleting a favorite list cascades its favorite mods only. It must not touch
+  pinned-version records.
+
+#### 4. Validation & Error Matrix
+
+- Empty list name -> no list created.
+- Missing list ID or missing platform/mod ID -> no favorite mod persisted.
+- Favorite mod for missing list -> no favorite mod persisted.
+- Duplicate favorite mod key -> update existing row while preserving ID and
+  creation time.
+
+#### 5. Good/Base/Bad Cases
+
+- Good: Add Modrinth Sodium to two different lists; each list owns its own row.
+- Base: Add Sodium twice to the same list/version scope; the existing row is
+  updated.
+- Bad: Reuse `PinnedMod` to represent favorites; this couples UI collections to
+  the download resolver.
+
+#### 6. Tests Required
+
+- Database tests for create, rename, delete cascade, list sorting, item upsert,
+  duplicate update, persistence after reopen, and returned-copy behavior.
+- Service tests that call the appcore favorite methods rather than only database
+  functions.
+
+#### 7. Wrong vs Correct
+
+Wrong:
+
+```go
+// Favorites accidentally modify download pin behavior.
+database.UpsertPinnedMod(database.PinnedMod{Platform: platform, ModID: modID})
+```
+
+Correct:
+
+```go
+database.UpsertFavoriteMod(database.FavoriteMod{
+    ListID: listID,
+    Platform: platform,
+    ModID: modID,
+})
+```
+
 ---
 
 ## Migrations

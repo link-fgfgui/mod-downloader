@@ -133,6 +133,34 @@ func (a *App) UnpinMod(platform, modID, mcVersion, modLoader string) bool {
 	return a.service().UnpinMod(platform, modID, mcVersion, modLoader)
 }
 
+func (a *App) ListFavoriteLists() []database.FavoriteList {
+	return a.service().ListFavoriteLists()
+}
+
+func (a *App) CreateFavoriteList(name string) database.FavoriteList {
+	return a.service().CreateFavoriteList(name)
+}
+
+func (a *App) RenameFavoriteList(id, name string) database.FavoriteList {
+	return a.service().RenameFavoriteList(id, name)
+}
+
+func (a *App) DeleteFavoriteList(id string) bool {
+	return a.service().DeleteFavoriteList(id)
+}
+
+func (a *App) ListFavoriteMods(listID string) []database.FavoriteMod {
+	return a.service().ListFavoriteMods(listID)
+}
+
+func (a *App) AddFavoriteMod(mod database.FavoriteMod) database.FavoriteMod {
+	return a.service().AddFavoriteMod(mod)
+}
+
+func (a *App) RemoveFavoriteMod(listID, platform, modID, mcVersion, modLoader string) bool {
+	return a.service().RemoveFavoriteMod(listID, platform, modID, mcVersion, modLoader)
+}
+
 func (a *App) GetMinecraftReleaseVersions() []string {
 	return a.service().GetMinecraftReleaseVersions()
 }

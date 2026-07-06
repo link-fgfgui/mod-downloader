@@ -75,14 +75,37 @@
                     </v-list-item-subtitle>
 
                     <template #append>
-                        <v-chip :color="group.primary.enabled ? 'success' : 'warning'" size="small" variant="tonal">
-                            {{ group.primary.enabled ? $t("manage.enabled") : $t("manage.disabled") }}
-                        </v-chip>
+                        <div class="manage-actions">
+                            <v-btn
+                                icon="mdi-playlist-plus"
+                                variant="tonal"
+                                color="secondary"
+                                size="small"
+                                :disabled="!canFavoriteGroup(group)"
+                                @click.stop="openAddFavorites([group])"
+                            ></v-btn>
+                            <v-chip :color="group.primary.enabled ? 'success' : 'warning'" size="small" variant="tonal">
+                                {{ group.primary.enabled ? $t("manage.enabled") : $t("manage.disabled") }}
+                            </v-chip>
+                        </div>
                     </template>
                 </v-list-item>
             </template>
 
             <template #actions="{ selectedItems, clearSelection }">
+                <v-tooltip :disabled="canFavoriteSelection(selectedItems)" :text="$t('favorites.invalidSelection')" location="top">
+                    <template #activator="{ props: tip }">
+                        <span v-bind="tip" class="d-inline-flex me-1">
+                            <v-btn size="small" variant="tonal" color="secondary"
+                                prepend-icon="mdi-playlist-plus"
+                                :disabled="!canFavoriteSelection(selectedItems)"
+                                @click="openAddFavorites(selectedItems)">
+                                {{ $t('favorites.addToFavorites') }}
+                            </v-btn>
+                        </span>
+                    </template>
+                </v-tooltip>
+
                 <v-btn size="small" variant="tonal" class="me-1"
                     prepend-icon="mdi-content-copy"
                     @click="copyModNames(selectedItems)">
@@ -102,18 +125,27 @@
                 </v-btn>
             </template>
         </VirtualList>
+
+        <AddToFavoriteDialog ref="addFavoriteDialog" @added="onFavoritesAdded"></AddToFavoriteDialog>
+
+        <v-snackbar v-model="snackbar.show" color="success" timeout="2000">
+            {{ $t(snackbar.key) }}
+        </v-snackbar>
     </v-container>
 </template>
 
 <script setup>
-import { computed, onActivated } from "vue";
+import { computed, onActivated, ref } from "vue";
 import { storeToRefs } from "pinia";
 
 import VirtualList from "../components/VirtualList.vue";
+import AddToFavoriteDialog from "../components/AddToFavoriteDialog.vue";
 import { useMinecraftStore } from "../stores/minecraft";
 
 const minecraftStore = useMinecraftStore();
 const { isRefreshing } = storeToRefs(minecraftStore);
+const addFavoriteDialog = ref(null);
+const snackbar = ref({ show: false, key: "" });
 
 const groupedMods = computed(() => {
     const raw = minecraftStore.mods;
@@ -168,6 +200,35 @@ const modCategories = (group) => {
 
 const categoryTooltip = (group) => modCategories(group).join(", ");
 
+const canFavoriteGroup = (group) => {
+    return Boolean(group?.primary?.onlinePlatform && group?.primary?.onlineProjectId);
+};
+
+const canFavoriteSelection = (groups) => {
+    return groups.length > 0 && groups.every(canFavoriteGroup);
+};
+
+const favoriteDraftFromGroup = (group) => ({
+    platform: group.primary.onlinePlatform,
+    modId: group.primary.onlineProjectId,
+    minecraftVersion: group.primary.minecraftVersion || minecraftStore.selectedVersion?.minecraftVersion || minecraftStore.selectedVersion?.MinecraftVersion || "",
+    modLoader: group.primary.modLoader || minecraftStore.selectedVersion?.modLoader || minecraftStore.selectedVersion?.ModLoader || "",
+    title: displayModName(group),
+    slug: group.primary.onlineSlug || "",
+    iconUrl: group.primary.iconUrl || "",
+    description: group.primary.description || "",
+    categories: modCategories(group),
+});
+
+const openAddFavorites = (groups) => {
+    if (!canFavoriteSelection(groups)) return;
+    addFavoriteDialog.value?.open(groups.map(favoriteDraftFromGroup));
+};
+
+const onFavoritesAdded = () => {
+    snackbar.value = { show: true, key: "favorites.added" };
+};
+
 const strongModIds = (group) => {
     return group.strong.map((m) => m.id).filter(Boolean);
 };
@@ -215,8 +276,9 @@ const copyModIds = async (groups) => {
     try { await navigator.clipboard.writeText(ids); } catch {}
 };
 
-onActivated(() => {
-    minecraftStore.refreshSelectedMods();
+onActivated(async () => {
+    await minecraftStore.start();
+    await minecraftStore.refreshSelectedMods();
 });
 </script>
 
@@ -294,5 +356,11 @@ onActivated(() => {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.manage-actions {
+    align-items: center;
+    display: flex;
+    gap: 8px;
 }
 </style>
