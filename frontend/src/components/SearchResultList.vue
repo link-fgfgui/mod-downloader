@@ -28,12 +28,13 @@
                 </template>
 
                 <template #append>
-                    <div class="d-flex align-center g-2">
-                        <v-chip size="small" variant="flat" color="surface-container-highest" class="text-caption">
+                    <div class="search-result-actions d-flex align-center g-2">
+                        <v-chip size="small" variant="flat" color="surface-container-highest"
+                            class="search-result-platform text-caption">
                             {{ item.platform }}
                         </v-chip>
 
-                        <v-btn class="md-btn-press md-hover-scale transition-btn" icon="mdi-playlist-plus"
+                        <v-btn class="search-result-favorite-btn md-btn-press md-hover-scale transition-btn" icon="mdi-playlist-plus"
                             variant="tonal" rounded="xl" size="small" color="secondary"
                             @click.stop="emit('add-favorite', [item])">
                         </v-btn>
@@ -176,5 +177,37 @@ const onCopyNames = async (selectedItems) => {
 .search-result-selected {
     background-color: rgba(var(--v-theme-primary), 0.12) !important;
     transition: background-color var(--md-transition-fast) ease;
+}
+
+@media (max-width: 599.98px) {
+    :deep(.v-list-item) {
+        padding-inline: 8px;
+    }
+
+    .cursor-pointer {
+        height: 40px !important;
+        width: 40px !important;
+    }
+
+    :deep(.v-list-item__append) {
+        margin-inline-start: 8px;
+    }
+
+    .search-result-actions {
+        gap: 4px;
+    }
+
+    .search-result-actions :deep(.v-btn) {
+        height: 36px;
+        width: 36px;
+    }
+
+    .search-result-favorite-btn {
+        display: none;
+    }
+
+    .search-result-platform {
+        display: none;
+    }
 }
 </style>

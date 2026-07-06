@@ -416,4 +416,10 @@ watch(
     max-height: calc(100vh - 128px);
     overflow-y: auto;
 }
+
+@media (max-width: 599.98px) {
+    .download-page {
+        padding-inline: 16px !important;
+    }
+}
 </style>
