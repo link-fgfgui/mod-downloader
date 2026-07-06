@@ -1,5 +1,5 @@
 <template>
-    <v-navigation-drawer permanent expand-on-hover :rail="!drawerExpanded" @mouseenter="isHovered = true"
+    <v-navigation-drawer permanent :expand-on-hover="!xs" :rail="!drawerExpanded" @mouseenter="isHovered = true"
         @mouseleave="isHovered = false" @contextmenu.prevent>
         <div style="user-select: none;">
             <v-list>
@@ -42,6 +42,6 @@ const isHovered = ref(false);
 const route = useRoute();
 const { xs } = useDisplay();
 const activeNav = computed(() => [route.path]);
-const drawerExpanded = computed(() => isHovered.value || (isPinned.value && !xs.value));
+const drawerExpanded = computed(() => !xs.value && (isHovered.value || isPinned.value));
 </script>
 <style scoped></style>
