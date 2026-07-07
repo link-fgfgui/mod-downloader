@@ -36,29 +36,6 @@
                     </v-btn>
                 </v-col>
             </v-row>
-
-            <v-row class="mt-4 md-stagger" density="comfortable">
-                <v-col cols="12" md="6">
-                    <v-select
-                        v-model="selectedVersion"
-                        :items="versionList"
-                        label="Minecraft Version"
-                        variant="outlined"
-                        density="comfortable"
-                        hide-details
-                    ></v-select>
-                </v-col>
-                <v-col cols="12" md="6">
-                    <v-select
-                        v-model="selectedModLoader"
-                        :items="modLoaderList"
-                        label="Mod Loader"
-                        variant="outlined"
-                        density="comfortable"
-                        hide-details
-                    ></v-select>
-                </v-col>
-            </v-row>
         </div>
 
         <div
@@ -249,16 +226,12 @@ const addFavoriteDialog = ref<InstanceType<typeof AddToFavoriteDialog> | null>(n
 
 const {
     searchText,
-    selectedVersion,
-    selectedModLoader,
     showDirOverlay,
     isSearching,
     isLoadingMore,
     hasMoreResults,
     showVersionsOverlay,
     isLoadingVersions,
-    versionList,
-    modLoaderList,
     searchResults,
     selectedMod,
     matchingVersions,
@@ -314,8 +287,8 @@ const modIDFromResult = (result: models.ModProject) => {
 const favoriteDraftFromResult = (result: models.ModProject): FavoriteModDraft => ({
     platform: result.platform,
     modId: modIDFromResult(result),
-    minecraftVersion: selectedVersion.value,
-    modLoader: selectedModLoader.value,
+    minecraftVersion: minecraftStore.selectedMinecraftVersion,
+    modLoader: minecraftStore.selectedModLoader,
     title: result.title,
     slug: result.slug,
     iconUrl: result.iconUrl,
@@ -341,8 +314,11 @@ const checkMinecraftDir = async () => {
 const syncDownloadPageState = async () => {
     await downloadStore.start();
     await checkMinecraftDir();
-    downloadStore.setVersionList(minecraftStore.releaseVersions);
-    downloadStore.applySelectedInstance(minecraftStore.selectedVersion);
+    downloadStore.setTargetTuple(
+        minecraftStore.selectedMinecraftVersion,
+        minecraftStore.selectedModLoader,
+        minecraftStore.hasSelectedInstance,
+    );
 };
 
 onActivated(syncDownloadPageState);
@@ -352,25 +328,18 @@ onDeactivated(() => {
 });
 
 watch(
-    () => minecraftStore.releaseVersions,
-    (versions) => {
-        downloadStore.setVersionList(versions);
+    () => [
+        minecraftStore.selectedMinecraftVersion,
+        minecraftStore.selectedModLoader,
+        minecraftStore.hasSelectedInstance,
+    ],
+    ([minecraftVersion, modLoader, hasSelectedInstance]) => {
+        downloadStore.setTargetTuple(
+            String(minecraftVersion || ""),
+            String(modLoader || ""),
+            Boolean(hasSelectedInstance),
+        );
     },
-);
-
-watch(
-    () => minecraftStore.selectedVersion,
-    (version) => {
-        downloadStore.applySelectedInstance(version);
-    },
-);
-
-watch(
-    [selectedVersion, selectedModLoader],
-    () => {
-        downloadStore.clearDownloadStates();
-    },
-    { deep: false },
 );
 </script>
 

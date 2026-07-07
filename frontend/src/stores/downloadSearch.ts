@@ -19,7 +19,6 @@ const downloadStatesUpdatedEvent = "download-states-updated";
 
 const searchPageSize = 10;
 
-type VersionInfoSnapshot = Partial<structs.VersionInfo> & Record<string, any>;
 type SearchModSnapshot = models.ModProject;
 type ProjectVersionSnapshot = models.ModVersion;
 type DownloadStateSnapshot = structs.ModDownloadButtonState;
@@ -36,14 +35,13 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
         searchText: "",
         selectedVersion: "",
         selectedModLoader: "Fabric",
+        hasSelectedInstance: false,
         showDirOverlay: false,
         isSearching: false,
         isLoadingMore: false,
         hasMoreResults: true,
         showVersionsOverlay: false,
         isLoadingVersions: false,
-        versionList: [] as string[],
-        modLoaderList: ["Fabric", "Forge", "NeoForge"],
         searchResults: [] as SearchModSnapshot[],
         activeSearchRequestID: "",
         nextSearchOffset: 0,
@@ -71,36 +69,45 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
         showSnackbar(key: string, color = "success", params: Record<string, string> = {}) {
             this.snackbar = { show: true, key, params, color };
         },
-        setVersionList(versions: string[]) {
-            this.versionList = versions;
-            if (!this.selectedVersion && versions.length > 0) {
-                this.selectedVersion = versions[0];
-            }
-        },
-        applySelectedInstance(version: VersionInfoSnapshot | null) {
-            const minecraftVersion = version?.minecraftVersion || version?.MinecraftVersion;
-            if (minecraftVersion) {
-                if (!this.versionList.includes(minecraftVersion)) {
-                    this.versionList = [minecraftVersion, ...this.versionList];
-                }
-                this.selectedVersion = minecraftVersion;
-            }
-
-            const modLoader = version?.modLoader || version?.ModLoader;
-            if (modLoader) {
-                const normalizedModLoader = modLoader.toLowerCase();
-                const matchingModLoader = this.modLoaderList.find((item) => item.toLowerCase() === normalizedModLoader);
-                if (matchingModLoader) {
-                    this.selectedModLoader = matchingModLoader;
-                }
+        setTargetTuple(minecraftVersion: string, modLoader: string, hasSelectedInstance: boolean) {
+            const nextVersion = minecraftVersion || "";
+            const nextLoader = modLoader || "";
+            const changed =
+                this.selectedVersion !== nextVersion ||
+                this.selectedModLoader !== nextLoader ||
+                this.hasSelectedInstance !== hasSelectedInstance;
+            this.selectedVersion = nextVersion;
+            this.selectedModLoader = nextLoader;
+            this.hasSelectedInstance = hasSelectedInstance;
+            if (changed) {
+                this.clearDownloadStates();
             }
         },
         clearDownloadStates() {
             this.downloadStates = [];
             void this.refreshDownloadStates();
         },
+        disabledDownloadStates(reason: "noSelectedVersion" | "invalidRequest" = "noSelectedVersion") {
+            const icon = reason === "noSelectedVersion" ? "mdi-cube-off-outline" : "mdi-alert-circle-outline";
+            return (this.searchResults || []).map((result) => ({
+                key: this.modIDFromResult(result) || result.id || result.slug || "",
+                status: reason,
+                disabled: true,
+                loading: false,
+                icon,
+                color: "surface-variant",
+            }) as DownloadStateSnapshot);
+        },
         async refreshDownloadStates() {
             if (this.isSearching || this.isLoadingMore) {
+                return;
+            }
+            if (!this.selectedVersion || !this.selectedModLoader) {
+                this.downloadStates = this.disabledDownloadStates("invalidRequest");
+                return;
+            }
+            if (!this.hasSelectedInstance) {
+                this.downloadStates = this.disabledDownloadStates("noSelectedVersion");
                 return;
             }
             const requestID = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -117,6 +124,12 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
             this.downloadStates = states;
         },
         async runSearch(options: { append?: boolean } = {}) {
+            if (!this.selectedVersion || !this.selectedModLoader) {
+                this.searchResults = [];
+                this.downloadStates = [];
+                this.hasMoreResults = false;
+                return;
+            }
             const append = Boolean(options.append);
             if (append && (this.isSearching || this.isLoadingMore || !this.hasMoreResults)) {
                 return;
@@ -165,7 +178,7 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
         },
         async installMod(payload: { result?: SearchModSnapshot; key?: string; status?: string; confirm?: boolean }) {
             const { result, key, status, confirm } = payload || {};
-            if (!key || this.downloadingKeys[key]) {
+            if (!key || this.downloadingKeys[key] || !this.hasSelectedInstance || !this.selectedVersion || !this.selectedModLoader) {
                 return;
             }
             if (confirm && this.confirmStatuses.has(status || "")) {
@@ -181,7 +194,7 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
         },
         async doInstall(payload: { result?: SearchModSnapshot; key?: string }) {
             const { result, key } = payload || {};
-            if (!key || this.downloadingKeys[key]) {
+            if (!key || this.downloadingKeys[key] || !this.hasSelectedInstance || !this.selectedVersion || !this.selectedModLoader) {
                 return;
             }
 

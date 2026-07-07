@@ -21,11 +21,22 @@ type VersionInfoSnapshot = Partial<structs.VersionInfo> & Record<string, any>;
 const valueOf = (source: VersionInfoSnapshot | null, lowerKey: string, upperKey: string) =>
     source?.[lowerKey] || source?.[upperKey] || "";
 
+const defaultModLoader = "Fabric";
+const modLoaderOptions = ["Fabric", "Forge", "NeoForge"];
+
+const matchingModLoader = (value: string) => {
+    const normalized = value.trim().toLowerCase();
+    return modLoaderOptions.find((item) => item.toLowerCase() === normalized) || value.trim();
+};
+
 export const useMinecraftStore = defineStore("minecraft", {
     state: () => ({
         selectedVersion: null as VersionInfoSnapshot | null,
+        selectedMinecraftVersion: "",
+        selectedModLoader: defaultModLoader,
         versions: [] as Array<string | VersionInfoSnapshot>,
         releaseVersions: [] as string[],
+        modLoaderList: modLoaderOptions,
         minecraftDir: "",
         isRefreshing: false,
         isLoading: false,
@@ -36,8 +47,8 @@ export const useMinecraftStore = defineStore("minecraft", {
         hasSelectedInstance: (state) => Boolean(valueOf(state.selectedVersion, "name", "Name") || valueOf(state.selectedVersion, "id", "ID")),
         selectedInstanceLabel: (state) => {
             const name = valueOf(state.selectedVersion, "name", "Name") || valueOf(state.selectedVersion, "id", "ID");
-            const minecraftVersion = valueOf(state.selectedVersion, "minecraftVersion", "MinecraftVersion");
-            const modLoader = valueOf(state.selectedVersion, "modLoader", "ModLoader");
+            const minecraftVersion = state.selectedMinecraftVersion;
+            const modLoader = state.selectedModLoader;
             return name ? [name, minecraftVersion, modLoader].filter(Boolean).join(" / ") : "";
         },
         mods: (state) => state.selectedVersion?.mods || state.selectedVersion?.Mods || [],
@@ -52,18 +63,18 @@ export const useMinecraftStore = defineStore("minecraft", {
                 const versions = (force ? await RefreshVersions() : await GetVersions()) || [];
                 this.versions = versions;
                 this.releaseVersions = await GetMinecraftReleaseVersions();
-                this.selectedVersion = await GetSelectedVersion();
+                this.applySelectedVersion(await GetSelectedVersion());
             } finally {
                 this.isRefreshing = false;
             }
         },
         async refreshSelectedMods() {
-            this.selectedVersion = await RefreshSelectedVersionMods();
+            this.applySelectedVersion(await RefreshSelectedVersionMods());
         },
         async selectVersion(version: string) {
             this.isLoading = true;
             try {
-                this.selectedVersion = await SelectVersion(version);
+                this.applySelectedVersion(await SelectVersion(version));
             } finally {
                 this.isLoading = false;
             }
@@ -83,6 +94,26 @@ export const useMinecraftStore = defineStore("minecraft", {
         },
         applySelectedVersion(version: VersionInfoSnapshot | null) {
             this.selectedVersion = version;
+            const minecraftVersion = valueOf(version, "minecraftVersion", "MinecraftVersion");
+            if (minecraftVersion) {
+                if (!this.releaseVersions.includes(minecraftVersion)) {
+                    this.releaseVersions = [minecraftVersion, ...this.releaseVersions];
+                }
+                this.selectedMinecraftVersion = minecraftVersion;
+            }
+
+            const modLoader = valueOf(version, "modLoader", "ModLoader");
+            if (modLoader) {
+                this.selectedModLoader = matchingModLoader(modLoader);
+            }
+        },
+        setSelectedMinecraftVersion(version: string) {
+            this.selectedMinecraftVersion = version || "";
+            this.selectedVersion = null;
+        },
+        setSelectedModLoader(modLoader: string) {
+            this.selectedModLoader = matchingModLoader(modLoader || "");
+            this.selectedVersion = null;
         },
         async start() {
             if (this.stopListeningMinecraftDirChanged || this.stopListeningSelectedVersionChanged) {
@@ -95,7 +126,7 @@ export const useMinecraftStore = defineStore("minecraft", {
             this.stopListeningSelectedVersionChanged = EventsOn(selectedVersionChangedEvent, this.applySelectedVersion);
             await this.refreshMinecraftDir();
             await this.refreshVersions();
-            this.selectedVersion = await GetSelectedVersion();
+            this.applySelectedVersion(await GetSelectedVersion());
         },
         stop() {
             this.stopListeningMinecraftDirChanged?.();

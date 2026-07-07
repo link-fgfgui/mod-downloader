@@ -23,18 +23,37 @@
                         @click="refreshSelectedMods"
                     ></v-btn>
                 </div>
-            <v-text-field
-                v-model="downloadFolder"
-                label=".minecraft folder"
-                density="compact"
-                hide-details
-                variant="outlined"
-                class="mt-2"
-                prepend-inner-icon="mdi-folder-open"
-                readonly
-                @click="selectFolder"
-            ></v-text-field>
-        </div>
+                <v-combobox
+                    v-model="selectedMinecraftVersion"
+                    :items="releaseVersionList"
+                    label="Minecraft Version"
+                    density="compact"
+                    hide-details
+                    variant="outlined"
+                    class="mt-2"
+                    clearable
+                ></v-combobox>
+                <v-select
+                    v-model="selectedModLoader"
+                    :items="modLoaderList"
+                    label="Mod Loader"
+                    density="compact"
+                    hide-details
+                    variant="outlined"
+                    class="mt-2"
+                ></v-select>
+                <v-text-field
+                    v-model="downloadFolder"
+                    label=".minecraft folder"
+                    density="compact"
+                    hide-details
+                    variant="outlined"
+                    class="mt-2"
+                    prepend-inner-icon="mdi-folder-open"
+                    readonly
+                    @click="selectFolder"
+                ></v-text-field>
+            </div>
         </transition>
         <div
             v-show="!isExpanded"
@@ -71,13 +90,22 @@ const props = defineProps({
 void props;
 
 const minecraftStore = useMinecraftStore();
-const { minecraftDir: downloadFolder, isRefreshing, isLoading } = storeToRefs(minecraftStore);
+const {
+    minecraftDir: downloadFolder,
+    isRefreshing,
+    isLoading,
+    selectedMinecraftVersion: storeMinecraftVersion,
+    selectedModLoader: storeModLoader,
+} = storeToRefs(minecraftStore);
 
 const versionList = computed(() =>
     minecraftStore.versions
         .map((version) => typeof version === "string" ? version : version.name || version.id)
         .filter(Boolean),
 );
+
+const releaseVersionList = computed(() => minecraftStore.releaseVersions);
+const modLoaderList = computed(() => minecraftStore.modLoaderList);
 
 const selectedVersionName = computed({
     get: () => {
@@ -86,6 +114,20 @@ const selectedVersionName = computed({
     },
     set: (version: string) => {
         void selectVersion(version);
+    },
+});
+
+const selectedMinecraftVersion = computed({
+    get: () => storeMinecraftVersion.value,
+    set: (version: string | null) => {
+        minecraftStore.setSelectedMinecraftVersion(version || "");
+    },
+});
+
+const selectedModLoader = computed({
+    get: () => storeModLoader.value,
+    set: (modLoader: string) => {
+        minecraftStore.setSelectedModLoader(modLoader);
     },
 });
 

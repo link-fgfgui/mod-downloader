@@ -270,8 +270,8 @@ const canFavoriteSelection = (groups) => {
 const favoriteDraftFromGroup = (group) => ({
     platform: group.primary.onlinePlatform,
     modId: group.primary.onlineProjectId,
-    minecraftVersion: group.primary.minecraftVersion || minecraftStore.selectedVersion?.minecraftVersion || minecraftStore.selectedVersion?.MinecraftVersion || "",
-    modLoader: group.primary.modLoader || minecraftStore.selectedVersion?.modLoader || minecraftStore.selectedVersion?.ModLoader || "",
+    minecraftVersion: minecraftStore.selectedMinecraftVersion || group.primary.minecraftVersion || minecraftStore.selectedVersion?.minecraftVersion || minecraftStore.selectedVersion?.MinecraftVersion || "",
+    modLoader: minecraftStore.selectedModLoader || group.primary.modLoader || minecraftStore.selectedVersion?.modLoader || minecraftStore.selectedVersion?.ModLoader || "",
     title: displayModName(group),
     slug: group.primary.onlineSlug || "",
     iconUrl: group.primary.iconUrl || "",
