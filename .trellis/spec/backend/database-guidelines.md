@@ -361,6 +361,120 @@ database.UpsertFavoriteMod(database.FavoriteMod{
 })
 ```
 
+### Scenario: Favorite Bulk Operations And Live References
+
+#### 1. Scope / Trigger
+
+Use this pattern when exposing operations that copy favorite mods between lists,
+copy one favorite list into another, or manage live favorite-list references.
+The storage relationship lives in SQLite, app-independent request handling lives
+in `core/appcore`, and Wails only delegates to the service.
+
+#### 2. Signatures
+
+Core service request/response types:
+
+```go
+type FavoriteBulkAddRequest struct {
+    TargetListIDs []string               `json:"targetListIds"`
+    Mods          []database.FavoriteMod `json:"mods"`
+}
+
+type FavoriteListCopyRequest struct {
+    SourceListID string `json:"sourceListId"`
+    TargetListID string `json:"targetListId"`
+}
+
+type FavoriteBulkOperationResult struct {
+    Added   int      `json:"added"`
+    Updated int      `json:"updated"`
+    Skipped int      `json:"skipped"`
+    Errors  []string `json:"errors,omitempty"`
+}
+```
+
+Core service methods:
+
+```go
+func (s *Service) AddFavoriteModsToLists(req FavoriteBulkAddRequest) FavoriteBulkOperationResult
+func (s *Service) CopyFavoriteListToList(req FavoriteListCopyRequest) FavoriteBulkOperationResult
+func (s *Service) AddFavoriteListReference(parentListID, childListID string) database.FavoriteListRef
+func (s *Service) RemoveFavoriteListReference(parentListID, childListID string) bool
+func (s *Service) ListFavoriteListRefs(parentListID string) []database.FavoriteListRef
+func (s *Service) ListFavoriteContents(listID string) database.FavoriteListContents
+```
+
+#### 3. Contracts
+
+- Bulk add deduplicates target list IDs and validates every target list before
+  writing rows for that target.
+- Copied `FavoriteMod` rows must clear `ID`, `CreatedAt`, and `UpdatedAt`
+  before upsert so a copied row never reuses the source row's primary key.
+- Duplicate membership in a target list is an update, not a second row.
+- Whole-list copy reads `database.ListFavoriteContents`, so live referenced
+  child-list mods are copied concretely into the target list.
+- Whole-list copy from a list to itself is skipped and reported; selected-mod
+  bulk add may target the source list because it is idempotent.
+- Reference add/remove delegates cycle prevention and persistence to
+  `database.CreateFavoriteListRef` / `DeleteFavoriteListRef`.
+- `app.go` methods are thin Wails-facing delegations only; no persistence or
+  copy semantics belong in the adapter.
+
+#### 4. Validation & Error Matrix
+
+- Empty target list IDs or empty mod list -> no writes; skipped count reflects
+  skipped mods where applicable.
+- Missing target list -> skip that target and append a readable error.
+- Invalid favorite mod key -> skip that mod.
+- Existing target favorite key -> upsert and increment `Updated`.
+- New target favorite key -> upsert and increment `Added`.
+- Reference cycle or storage error -> service returns an empty ref and logs the
+  error.
+
+#### 5. Good/Base/Bad Cases
+
+- Good: Copy selected Sodium and Lithium rows to two target lists through
+  `AddFavoriteModsToLists`; existing target Sodium is updated and target
+  Lithium is added.
+- Good: Copy a list containing a live child-list reference; the target receives
+  concrete rows for both direct and referenced mods.
+- Base: Add a live reference through `AddFavoriteListReference`; no favorite mod
+  rows are duplicated.
+- Bad: Frontend loops over selected mods and calls `AddFavoriteMod` one by one,
+  losing aggregate skipped/error reporting and duplicating target validation.
+- Bad: Wails adapter rewrites mod IDs or performs copy logic directly.
+
+#### 6. Tests Required
+
+- Appcore test for selected-mod bulk copy: added, updated, skipped missing
+  target, and copied row has a different ID than the source.
+- Appcore test for whole-list copy using resolved reference contents.
+- Appcore test for reference add/list/remove and cycle rejection behavior.
+- Wails binding regeneration after adding or changing Wails-visible method
+  signatures.
+
+#### 7. Wrong vs Correct
+
+Wrong:
+
+```go
+for _, mod := range selected {
+    mod.ListID = targetListID
+    database.UpsertFavoriteMod(mod) // reuses source ID and hides aggregate failures
+}
+```
+
+Correct:
+
+```go
+copied := mod
+copied.ID = ""
+copied.ListID = targetListID
+copied.CreatedAt = 0
+copied.UpdatedAt = 0
+database.UpsertFavoriteMod(copied)
+```
+
 ---
 
 ## Migrations
