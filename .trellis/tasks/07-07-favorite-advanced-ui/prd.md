@@ -15,13 +15,13 @@ Expose the advanced favorite operations in the Vue/Wails UI with efficient list 
 
 ## Acceptance Criteria
 
-- [ ] Favorites rail renders groups, pinned lists, custom icons, and current selected list correctly.
-- [ ] Dragging groups/lists persists order and survives reload.
-- [ ] Selected favorite mods can be added to another list from the Favorites page.
-- [ ] Whole-list copy and live-reference actions are available from list menus.
-- [ ] Migration dialog previews matches/conflicts before apply.
-- [ ] Existing Download/Manage add-to-favorite dialogs still work.
-- [ ] `npm run build --prefix frontend` passes.
+- [x] Favorites rail renders groups, pinned lists, custom icons, and current selected list correctly.
+- [x] Dragging groups/lists persists order and survives reload.
+- [x] Selected favorite mods can be added to another list from the Favorites page.
+- [x] Whole-list copy and live-reference actions are available from list menus.
+- [x] Migration dialog previews matches/conflicts before apply.
+- [x] Existing Download/Manage add-to-favorite dialogs still work.
+- [x] `npm run build --prefix frontend` passes.
 
 ## Dependencies
 

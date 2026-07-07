@@ -475,6 +475,91 @@ copied.UpdatedAt = 0
 database.UpsertFavoriteMod(copied)
 ```
 
+### Scenario: Favorite List Organization APIs
+
+#### 1. Scope / Trigger
+
+Use this pattern when the UI needs to organize favorite lists with groups,
+manual ordering, pinning, or custom icons. SQLite owns persistence in
+`core/database`; app-independent orchestration belongs in `core/appcore`; Wails
+methods in `app.go` remain thin delegates for generated frontend bindings.
+
+#### 2. Signatures
+
+Core service methods:
+
+```go
+func (s *Service) UpdateFavoriteListMetadata(list database.FavoriteList) database.FavoriteList
+func (s *Service) ReorderFavoriteLists(ids []string) bool
+func (s *Service) ListFavoriteGroups() []database.FavoriteGroup
+func (s *Service) CreateFavoriteGroup(name string) database.FavoriteGroup
+func (s *Service) RenameFavoriteGroup(id, name string) database.FavoriteGroup
+func (s *Service) DeleteFavoriteGroup(id string) bool
+func (s *Service) ReorderFavoriteGroups(ids []string) bool
+```
+
+Wails adapter methods expose the same signatures and must only call the matching
+service method.
+
+#### 3. Contracts
+
+- `UpdateFavoriteListMetadata` edits grouping, icon fields, pinning, and
+  `sortOrder`; it does not rename the list.
+- Renaming still goes through `RenameFavoriteList` so name validation remains
+  separate from display metadata.
+- `ListFavoriteLists` returns pinned lists before unpinned lists, preserving
+  manual order inside those sections.
+- Deleting a favorite group clears `groupId` from assigned lists rather than
+  deleting those lists.
+- Frontend icon customization stores `iconKind="mdi"` with an MDI value, or
+  `iconKind="project"` with a project slug and best-effort `iconUrl`.
+- Drag reorder writes ordered ID slices through `ReorderFavoriteLists` or
+  `ReorderFavoriteGroups`; the frontend reloads lists after a successful write.
+
+#### 4. Validation & Error Matrix
+
+- Empty group name -> no group is created or renamed.
+- Missing favorite list ID in metadata update -> returns an empty list.
+- Missing group/list ID during reorder -> ignored by the database reorder loop.
+- Delete missing group -> returns `false` and leaves lists unchanged.
+- Project slug icon lookup miss -> keep the slug and render a fallback icon.
+
+#### 5. Good/Base/Bad Cases
+
+- Good: UI pins a list by calling `UpdateFavoriteListMetadata` with the existing
+  list plus `Pinned=true`, then reloads `ListFavoriteLists`.
+- Good: UI deletes a group and reloads lists; former members appear ungrouped.
+- Base: UI reorders only the visible pinned section; pinned grouping still keeps
+  those lists before unpinned lists.
+- Bad: Frontend sorts pinned lists once locally and assumes persistence without
+  calling `ReorderFavoriteLists`.
+- Bad: Frontend stores group metadata in browser-only state instead of SQLite.
+
+#### 6. Tests Required
+
+- Appcore test for group create/rename/delete and list metadata update.
+- Appcore test for group and list reorder returning persisted order through
+  `ListFavoriteGroups` / `ListFavoriteLists`.
+- Frontend build after Wails binding regeneration.
+- Existing Download/Manage add-to-favorite flows must continue to call the
+  store `addDrafts` path.
+
+#### 7. Wrong vs Correct
+
+Wrong:
+
+```ts
+favoritesStore.lists.sort((a, b) => Number(b.pinned) - Number(a.pinned))
+// No backend write; order is lost after reload.
+```
+
+Correct:
+
+```ts
+await favoritesStore.reorderLists(visibleListIds)
+await favoritesStore.loadLists()
+```
+
 ### Scenario: Favorite Version / Modloader Migration
 
 #### 1. Scope / Trigger
