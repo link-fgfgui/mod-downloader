@@ -1,8 +1,82 @@
+export namespace appcore {
+	
+	export class FavoriteBulkAddRequest {
+	    targetListIds: string[];
+	    mods: database.FavoriteMod[];
+	
+	    static createFrom(source: any = {}) {
+	        return new FavoriteBulkAddRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.targetListIds = source["targetListIds"];
+	        this.mods = this.convertValues(source["mods"], database.FavoriteMod);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class FavoriteBulkOperationResult {
+	    added: number;
+	    updated: number;
+	    skipped: number;
+	    errors?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new FavoriteBulkOperationResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.added = source["added"];
+	        this.updated = source["updated"];
+	        this.skipped = source["skipped"];
+	        this.errors = source["errors"];
+	    }
+	}
+	export class FavoriteListCopyRequest {
+	    sourceListId: string;
+	    targetListId: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new FavoriteListCopyRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sourceListId = source["sourceListId"];
+	        this.targetListId = source["targetListId"];
+	    }
+	}
+
+}
+
 export namespace database {
 	
 	export class FavoriteList {
 	    id: string;
+	    groupId?: string;
 	    name: string;
+	    iconKind?: string;
+	    iconValue?: string;
+	    iconUrl?: string;
+	    pinned?: boolean;
 	    createdAt: number;
 	    updatedAt: number;
 	    sortOrder: number;
@@ -15,13 +89,119 @@ export namespace database {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
+	        this.groupId = source["groupId"];
 	        this.name = source["name"];
+	        this.iconKind = source["iconKind"];
+	        this.iconValue = source["iconValue"];
+	        this.iconUrl = source["iconUrl"];
+	        this.pinned = source["pinned"];
 	        this.createdAt = source["createdAt"];
 	        this.updatedAt = source["updatedAt"];
 	        this.sortOrder = source["sortOrder"];
 	        this.system = source["system"];
 	    }
 	}
+	export class FavoriteListRef {
+	    id: string;
+	    parentListId: string;
+	    childListId: string;
+	    createdAt: number;
+	    updatedAt: number;
+	    sortOrder: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new FavoriteListRef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.parentListId = source["parentListId"];
+	        this.childListId = source["childListId"];
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	        this.sortOrder = source["sortOrder"];
+	    }
+	}
+	export class FavoriteModEntry {
+	    id: string;
+	    listId: string;
+	    platform: string;
+	    modId: string;
+	    versionId?: string;
+	    minecraftVersion?: string;
+	    modLoader?: string;
+	    title?: string;
+	    slug?: string;
+	    iconUrl?: string;
+	    description?: string;
+	    categories?: string[];
+	    createdAt: number;
+	    updatedAt: number;
+	    sourceListId?: string;
+	    sourceListName?: string;
+	    referenced?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new FavoriteModEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.listId = source["listId"];
+	        this.platform = source["platform"];
+	        this.modId = source["modId"];
+	        this.versionId = source["versionId"];
+	        this.minecraftVersion = source["minecraftVersion"];
+	        this.modLoader = source["modLoader"];
+	        this.title = source["title"];
+	        this.slug = source["slug"];
+	        this.iconUrl = source["iconUrl"];
+	        this.description = source["description"];
+	        this.categories = source["categories"];
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	        this.sourceListId = source["sourceListId"];
+	        this.sourceListName = source["sourceListName"];
+	        this.referenced = source["referenced"];
+	    }
+	}
+	export class FavoriteListContents {
+	    listId: string;
+	    mods: FavoriteModEntry[];
+	    refs?: FavoriteListRef[];
+	
+	    static createFrom(source: any = {}) {
+	        return new FavoriteListContents(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.listId = source["listId"];
+	        this.mods = this.convertValues(source["mods"], FavoriteModEntry);
+	        this.refs = this.convertValues(source["refs"], FavoriteListRef);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class FavoriteMod {
 	    id: string;
 	    listId: string;
@@ -60,6 +240,7 @@ export namespace database {
 	        this.updatedAt = source["updatedAt"];
 	    }
 	}
+	
 	export class PinnedMod {
 	    id: string;
 	    platform: string;

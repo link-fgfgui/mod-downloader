@@ -156,8 +156,32 @@ func (a *App) ListFavoriteMods(listID string) []database.FavoriteMod {
 	return a.service().ListFavoriteMods(listID)
 }
 
+func (a *App) ListFavoriteContents(listID string) database.FavoriteListContents {
+	return a.service().ListFavoriteContents(listID)
+}
+
 func (a *App) AddFavoriteMod(mod database.FavoriteMod) database.FavoriteMod {
 	return a.service().AddFavoriteMod(mod)
+}
+
+func (a *App) AddFavoriteModsToLists(req appcore.FavoriteBulkAddRequest) appcore.FavoriteBulkOperationResult {
+	return a.service().AddFavoriteModsToLists(req)
+}
+
+func (a *App) CopyFavoriteListToList(req appcore.FavoriteListCopyRequest) appcore.FavoriteBulkOperationResult {
+	return a.service().CopyFavoriteListToList(req)
+}
+
+func (a *App) AddFavoriteListReference(parentListID, childListID string) database.FavoriteListRef {
+	return a.service().AddFavoriteListReference(parentListID, childListID)
+}
+
+func (a *App) RemoveFavoriteListReference(parentListID, childListID string) bool {
+	return a.service().RemoveFavoriteListReference(parentListID, childListID)
+}
+
+func (a *App) ListFavoriteListRefs(parentListID string) []database.FavoriteListRef {
+	return a.service().ListFavoriteListRefs(parentListID)
 }
 
 func (a *App) RemoveFavoriteMod(listID, platform, modID, mcVersion, modLoader string) bool {
