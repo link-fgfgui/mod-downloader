@@ -226,6 +226,133 @@ type SearchModResult = models.ModProject   // forbidden: third name for same typ
 // providers/model.go: type ModProject = models.ModProject  // forbidden: re-export file
 ```
 
+### Scenario: Download Queue Preflight Cancellation
+
+#### 1. Scope / Trigger
+
+Use this pattern when adding pre-download work to the install path, such as
+required-dependency hydration, precise install-state checks, remote metadata
+refreshes, or local analysis that runs before the actual JAR transfer. If the
+work can block after the user clicks install, it belongs inside the download
+queue lifecycle so existing queue cancellation can stop the attempt.
+
+#### 2. Signatures
+
+Core downloader entrypoints:
+
+```go
+func QueueModDownload(ctx context.Context, req appstructs.ModDownloadRequest, curseForgeAPIKey string, events ...Events) appstructs.ModDownloadResult
+func CancelDownload(ctx context.Context, id string, events ...Events) bool
+func RetryDownload(ctx context.Context, id string, events ...Events) bool
+func GetDownloadQueueState() appstructs.DownloadQueueState
+```
+
+Adapter-neutral service boundary:
+
+```go
+func (s *Service) QueueModDownload(req appstructs.ModDownloadRequest) appstructs.ModDownloadResult
+func (s *Service) CancelDownload(id string) bool
+func (s *Service) RetryDownload(id string) bool
+func (s *Service) GetDownloadQueueState() appstructs.DownloadQueueState
+```
+
+#### 3. Contracts
+
+- `QueueModDownload` may validate target, version, and download URL before
+  accepting the attempt, but accepted attempts must enter the queue before
+  dependency hydration or other blocking pre-download analysis.
+- Running queue jobs own a child `context.Context` and `context.CancelFunc`.
+  `CancelDownload(id)` cancels the active attempt and records the user cancel
+  request so the runner can append a retryable `canceled` item.
+- Pre-download helpers must check `ctx.Err()` after every provider/database/JAR
+  analysis boundary and before enqueueing dependencies or continuing to file
+  download.
+- Required dependencies discovered by an active job must be queued before that
+  job continues its own file download. Requeue the analyzed parent job after
+  the dependency jobs rather than downloading the parent first.
+- Queue item payload shape stays stable:
+  `DownloadQueueItem{ID, Status, Title, FileName, VersionID, Platform,
+  MinecraftVersion, ModLoader, Cancelable, Retryable, Reason}`.
+
+#### 4. Validation & Error Matrix
+
+- Invalid install target -> `ModDownloadResult{Skipped: true, Reason: "no install target"}`; do not enqueue.
+- Missing project/version/loader fields -> `Reason: "invalid request"`; do not enqueue.
+- No matching platform version -> `Reason: "no matching version"`; do not enqueue.
+- Missing download URL -> `Reason: "missing download url"`; do not enqueue.
+- User cancellation during pre-download analysis -> active context returns
+  `context.Canceled`; append retryable canceled item; do not enqueue dependency
+  jobs or continue to file download after cancellation is observed.
+- Dependency cycle or duplicate version key -> skip the duplicate using the
+  per-attempt visited map.
+
+#### 5. Good/Base/Bad Cases
+
+- Good: a search result install is accepted into the queue, appears as a
+  cancelable running item, hydrates dependencies inside the runner, then
+  requeues required dependency jobs before the parent download.
+- Base: a version already has required dependency metadata; no provider refresh
+  is needed, but cancellation checks still run before dependency queueing and
+  before file download.
+- Bad: `QueueModDownload` performs `RefreshMatchingProjectVersions` and
+  recursive dependency queueing synchronously before any queue item exists; the
+  frontend has no queue ID to cancel during that work.
+- Bad: a helper catches `context.Canceled` and returns nil, allowing a canceled
+  attempt to enqueue dependencies or download the parent.
+
+#### 6. Tests Required
+
+- Downloader unit test where dependency hydration blocks, the active queue item
+  is visible and cancelable, `CancelDownload` returns true, and the final item
+  is retryable canceled with no pending/running jobs.
+- Retry test for canceled pre-download attempts that asserts a fresh queue ID
+  and normal pending/cancelable state.
+- Regression coverage for existing pending cancel, running cancel/retry, and
+  stalled-download retry behavior.
+- Run `go test ./...` from `core/`; when Wails app embedding is available, run
+  app-level `go test ./...` as well.
+
+#### 7. Wrong vs Correct
+
+Wrong:
+
+```go
+func queueModDownload(ctx context.Context, req appstructs.ModDownloadRequest, apiKey string, visited map[string]bool, events Events) appstructs.ModDownloadResult {
+    version := hydrateRequiredDependencies(req, version)
+    queueMissingRequiredDependencies(ctx, req, version, apiKey, visited, events)
+    enqueueDownload(ctx, parentJob, events)
+    return appstructs.ModDownloadResult{Queued: true}
+}
+```
+
+Correct:
+
+```go
+func queueModDownload(ctx context.Context, req appstructs.ModDownloadRequest, apiKey string, visited map[string]bool, events Events) appstructs.ModDownloadResult {
+    job, result, ok := buildDownloadJob(req, apiKey, visited)
+    if !ok {
+        return result
+    }
+    enqueueDownload(ctx, job, events)
+    return result
+}
+
+func downloadModJob(ctx context.Context, job downloadJob, events Events) error {
+    deps, prepared, err := prepareDownloadDependencies(ctx, job)
+    if err != nil {
+        return err
+    }
+    if err := ctx.Err(); err != nil {
+        return err
+    }
+    if len(deps) > 0 {
+        prependPendingDownloads(append(deps, prepared), events)
+        return errDownloadRequeued
+    }
+    return downloadModToTarget(ctx, prepared, existing)
+}
+```
+
 ### Scenario: User Preference Settings Flow
 
 #### 1. Scope / Trigger
