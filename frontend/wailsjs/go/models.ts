@@ -64,6 +64,169 @@ export namespace appcore {
 	        this.targetListId = source["targetListId"];
 	    }
 	}
+	export class FavoriteMigrationConflict {
+	    source: database.FavoriteModEntry;
+	    reason: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new FavoriteMigrationConflict(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.source = this.convertValues(source["source"], database.FavoriteModEntry);
+	        this.reason = source["reason"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class FavoriteMigrationMatch {
+	    source: database.FavoriteModEntry;
+	    target: database.FavoriteMod;
+	    project: models.ModProject;
+	    version: models.ModVersion;
+	
+	    static createFrom(source: any = {}) {
+	        return new FavoriteMigrationMatch(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.source = this.convertValues(source["source"], database.FavoriteModEntry);
+	        this.target = this.convertValues(source["target"], database.FavoriteMod);
+	        this.project = this.convertValues(source["project"], models.ModProject);
+	        this.version = this.convertValues(source["version"], models.ModVersion);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class FavoriteMigrationPreview {
+	    sourceListId: string;
+	    targetListId: string;
+	    matched: FavoriteMigrationMatch[];
+	    conflicts: FavoriteMigrationConflict[];
+	    errors?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new FavoriteMigrationPreview(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sourceListId = source["sourceListId"];
+	        this.targetListId = source["targetListId"];
+	        this.matched = this.convertValues(source["matched"], FavoriteMigrationMatch);
+	        this.conflicts = this.convertValues(source["conflicts"], FavoriteMigrationConflict);
+	        this.errors = source["errors"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class FavoriteMigrationApplyResult {
+	    applied: boolean;
+	    preview: FavoriteMigrationPreview;
+	    result: FavoriteBulkOperationResult;
+	
+	    static createFrom(source: any = {}) {
+	        return new FavoriteMigrationApplyResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.applied = source["applied"];
+	        this.preview = this.convertValues(source["preview"], FavoriteMigrationPreview);
+	        this.result = this.convertValues(source["result"], FavoriteBulkOperationResult);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
+	
+	export class FavoriteMigrationRequest {
+	    sourceListId: string;
+	    targetListId: string;
+	    minecraftVersion: string;
+	    modLoader: string;
+	    ignoreConflicts?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new FavoriteMigrationRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sourceListId = source["sourceListId"];
+	        this.targetListId = source["targetListId"];
+	        this.minecraftVersion = source["minecraftVersion"];
+	        this.modLoader = source["modLoader"];
+	        this.ignoreConflicts = source["ignoreConflicts"];
+	    }
+	}
 
 }
 

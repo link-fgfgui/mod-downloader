@@ -172,6 +172,14 @@ func (a *App) CopyFavoriteListToList(req appcore.FavoriteListCopyRequest) appcor
 	return a.service().CopyFavoriteListToList(req)
 }
 
+func (a *App) PreviewFavoriteListMigration(req appcore.FavoriteMigrationRequest) appcore.FavoriteMigrationPreview {
+	return a.service().PreviewFavoriteListMigration(req)
+}
+
+func (a *App) ApplyFavoriteListMigration(req appcore.FavoriteMigrationRequest) appcore.FavoriteMigrationApplyResult {
+	return a.service().ApplyFavoriteListMigration(req)
+}
+
 func (a *App) AddFavoriteListReference(parentListID, childListID string) database.FavoriteListRef {
 	return a.service().AddFavoriteListReference(parentListID, childListID)
 }

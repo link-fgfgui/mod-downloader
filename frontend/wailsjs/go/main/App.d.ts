@@ -12,6 +12,8 @@ export function AddFavoriteMod(arg1:database.FavoriteMod):Promise<database.Favor
 
 export function AddFavoriteModsToLists(arg1:appcore.FavoriteBulkAddRequest):Promise<appcore.FavoriteBulkOperationResult>;
 
+export function ApplyFavoriteListMigration(arg1:appcore.FavoriteMigrationRequest):Promise<appcore.FavoriteMigrationApplyResult>;
+
 export function ApplyLocalModBatchOperation(arg1:structs.LocalModBatchOperationRequest):Promise<structs.VersionInfo>;
 
 export function CancelDownload(arg1:string):Promise<boolean>;
@@ -57,6 +59,8 @@ export function ListMatchingProjectVersions(arg1:models.ModProject,arg2:string,a
 export function ListPinnedMods():Promise<Array<database.PinnedMod>>;
 
 export function PinModVersion(arg1:structs.ModVersionPinRequest):Promise<database.PinnedMod>;
+
+export function PreviewFavoriteListMigration(arg1:appcore.FavoriteMigrationRequest):Promise<appcore.FavoriteMigrationPreview>;
 
 export function QueueModDownload(arg1:structs.ModDownloadRequest):Promise<structs.ModDownloadResult>;
 

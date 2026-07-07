@@ -14,6 +14,10 @@ export function AddFavoriteModsToLists(arg1) {
   return window['go']['main']['App']['AddFavoriteModsToLists'](arg1);
 }
 
+export function ApplyFavoriteListMigration(arg1) {
+  return window['go']['main']['App']['ApplyFavoriteListMigration'](arg1);
+}
+
 export function ApplyLocalModBatchOperation(arg1) {
   return window['go']['main']['App']['ApplyLocalModBatchOperation'](arg1);
 }
@@ -104,6 +108,10 @@ export function ListPinnedMods() {
 
 export function PinModVersion(arg1) {
   return window['go']['main']['App']['PinModVersion'](arg1);
+}
+
+export function PreviewFavoriteListMigration(arg1) {
+  return window['go']['main']['App']['PreviewFavoriteListMigration'](arg1);
 }
 
 export function QueueModDownload(arg1) {
