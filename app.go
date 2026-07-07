@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/link-fgfgui/mod-downloader-core/appcore"
@@ -336,24 +337,24 @@ func (a *App) RefreshSelectedVersionMods() structs.VersionInfo {
 	return a.service().RefreshSelectedVersionMods()
 }
 
-func (a *App) ApplyLocalModBatchOperation(req appstructs.LocalModBatchOperationRequest) structs.VersionInfo {
+func (a *App) ApplyLocalModBatchOperation(req appstructs.LocalModBatchOperationRequest) (structs.VersionInfo, error) {
 	version, err := a.service().ApplyLocalModBatchOperation(req)
 	if err != nil {
-		panic("local mod operation failed: " + err.Error())
+		return structs.VersionInfo{}, err
 	}
-	return version
+	return version, nil
 }
 
-func (a *App) SelectVersion(versionKey string) structs.VersionInfo {
+func (a *App) SelectVersion(versionKey string) (structs.VersionInfo, error) {
 	version, err := a.service().SelectVersion(versionKey)
 	if err == nil {
-		return version
+		return version, nil
 	}
 	message := err.Error()
 	if strings.HasPrefix(message, "version not found:") {
 		message = "version not found"
 	}
-	panic("select version failed: " + message)
+	return structs.VersionInfo{}, fmt.Errorf("select version failed: %s", message)
 }
 
 func settingsViewFromCore(sv appcore.SettingsView) SettingsView {
