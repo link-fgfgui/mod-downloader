@@ -217,3 +217,39 @@ Implemented favorite list version/modloader migration preview and apply APIs, ex
 ### Next Steps
 
 - None - task complete
+
+
+## Session 7: Favorite advanced UI
+
+**Date**: 2026-07-08
+**Task**: Favorite advanced UI
+**Package**: app
+**Branch**: `enhance-favorite-page`
+
+### Summary
+
+Implemented advanced favorites UI for grouped and pinned lists, icon customization, drag reorder, selected-mod copy, whole-list copy/reference, and migration preview/apply; exposed organization APIs and documented the contract.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8c5d2ac` | (see git log) |
+| `3539cf2` | (see git log) |
+| `5a7a290` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
