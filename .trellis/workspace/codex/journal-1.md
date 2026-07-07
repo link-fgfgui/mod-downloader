@@ -108,3 +108,37 @@ Implemented separate Favorites playlist management with persistent favorite list
 ### Next Steps
 
 - None - task complete
+
+
+## Session 4: GUI cache default path
+
+**Date**: 2026-07-07
+**Task**: GUI cache default path
+**Package**: app
+**Branch**: `true-tmp-path`
+
+### Summary
+
+Changed Wails GUI cache default to the process working directory via appcore DefaultCacheDir while preserving core/CLI temp-dir fallback. Core submodule work commit: 92727d9.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4823b72` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
