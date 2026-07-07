@@ -108,3 +108,39 @@ Implemented separate Favorites playlist management with persistent favorite list
 ### Next Steps
 
 - None - task complete
+
+
+## Session 4: Fix exit animation text clearing
+
+**Date**: 2026-07-07
+**Task**: Fix exit animation text clearing
+**Package**: app
+**Branch**: `element-gone-no-text`
+
+### Summary
+
+Preserved visible text/content snapshots during exit animations for queue FAB, selection action bars, and confirmation dialogs; added frontend UI lifecycle spec and task records.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `57f8e84` | (see git log) |
+| `a3d9f57` | (see git log) |
+| `8a3d84a` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
