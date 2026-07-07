@@ -108,3 +108,38 @@ Implemented separate Favorites playlist management with persistent favorite list
 ### Next Steps
 
 - None - task complete
+
+
+## Session 4: Packwiz favorite export
+
+**Date**: 2026-07-07
+**Task**: Packwiz favorite export
+**Package**: app
+**Branch**: `favorite-export-packwiz`
+
+### Summary
+
+Added packwiz ZIP export for single favorite lists, including core TOML/ZIP generation, appcore orchestration, Wails save dialog integration, frontend export action, and validation coverage.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e348bcb` | (see git log) |
+| `c97d2d1` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
