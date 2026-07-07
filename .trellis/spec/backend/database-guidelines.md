@@ -373,6 +373,99 @@ SQLite user-data schema is created idempotently by `userdb.go`. Legacy
 migrated into SQLite on `OpenAt`, then cleared from the active gob state before
 the next cache save.
 
+### Scenario: SQLite User-Data Schema Evolution
+
+#### 1. Scope / Trigger
+
+Use this pattern whenever `user-data.sqlite` needs a new table, index, or column
+for user-owned state. This includes favorite list metadata, groups, references,
+or any future collection data. SQLite schema evolution must preserve existing
+user data; unlike the gob platform cache, user data is not discardable.
+
+#### 2. Signatures
+
+Schema owner:
+
+```go
+func (s *userStore) ensureSchema() error
+func (s *userStore) ensureSchemaV2() error
+func (s *userStore) columnExists(table, column string) (bool, error)
+```
+
+Open path:
+
+```go
+func OpenAt(cachePath string) error // opens cache plus UserDataPathForCachePath(cachePath)
+```
+
+#### 3. Contracts
+
+- Base `CREATE TABLE IF NOT EXISTS` statements may create the current full table
+  shape for fresh databases.
+- Existing databases do not gain new columns from `CREATE TABLE IF NOT EXISTS`;
+  every added column must be applied with an explicit `ALTER TABLE ... ADD COLUMN`
+  guarded by `PRAGMA table_info`.
+- New migrations record an idempotent row in `schema_migrations`.
+- New columns on existing user tables must have `NOT NULL DEFAULT ...` whenever
+  old rows need to remain readable without backfill.
+- New relationship tables must use foreign keys and indexes that match their
+  query path.
+- Public read queries must select the current full column set after migrations
+  have run.
+
+#### 4. Validation & Error Matrix
+
+- Existing SQLite file missing a new column -> add the column before any read
+  query that selects it.
+- Existing SQLite file already containing the column -> skip `ALTER TABLE`.
+- Migration statement fails -> `OpenAt` returns an error; user-data writes must
+  not continue against a partially assumed schema.
+- Legacy gob user data and SQLite schema migration are independent: gob
+  migration inserts rows after SQLite schema creation has completed.
+
+#### 5. Good/Base/Bad Cases
+
+- Good: add `favorite_lists.pinned` through `columnExists("favorite_lists", "pinned")`
+  and `ALTER TABLE favorite_lists ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0`.
+- Base: a fresh install creates `favorite_lists` with all current columns and
+  records schema versions in `schema_migrations`.
+- Bad: add `pinned` to the `CREATE TABLE IF NOT EXISTS favorite_lists` text only;
+  existing databases keep the old table shape and later `SELECT pinned` fails.
+
+#### 6. Tests Required
+
+- Create a v1 SQLite database manually, open it through `OpenAt`, and assert old
+  favorite lists/mods remain readable.
+- Assert `schema_migrations` contains the new version after open.
+- Assert a row from the old schema can write/read the new fields after
+  migration.
+- Keep existing favorite persistence and legacy gob migration tests passing.
+
+#### 7. Wrong vs Correct
+
+Wrong:
+
+```go
+`CREATE TABLE IF NOT EXISTS favorite_lists (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    pinned INTEGER NOT NULL DEFAULT 0
+)`
+// Existing favorite_lists tables still do not have pinned.
+```
+
+Correct:
+
+```go
+if ok, err := s.columnExists("favorite_lists", "pinned"); err != nil {
+    return err
+} else if !ok {
+    if _, err := s.db.Exec(`ALTER TABLE favorite_lists ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0`); err != nil {
+        return err
+    }
+}
+```
+
 ---
 
 ## Naming Conventions
