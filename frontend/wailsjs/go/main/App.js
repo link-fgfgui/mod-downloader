@@ -38,8 +38,16 @@ export function CopyFavoriteListToList(arg1) {
   return window['go']['main']['App']['CopyFavoriteListToList'](arg1);
 }
 
+export function CreateFavoriteGroup(arg1) {
+  return window['go']['main']['App']['CreateFavoriteGroup'](arg1);
+}
+
 export function CreateFavoriteList(arg1) {
   return window['go']['main']['App']['CreateFavoriteList'](arg1);
+}
+
+export function DeleteFavoriteGroup(arg1) {
+  return window['go']['main']['App']['DeleteFavoriteGroup'](arg1);
 }
 
 export function DeleteFavoriteList(arg1) {
@@ -86,6 +94,10 @@ export function ListFavoriteContents(arg1) {
   return window['go']['main']['App']['ListFavoriteContents'](arg1);
 }
 
+export function ListFavoriteGroups() {
+  return window['go']['main']['App']['ListFavoriteGroups']();
+}
+
 export function ListFavoriteListRefs(arg1) {
   return window['go']['main']['App']['ListFavoriteListRefs'](arg1);
 }
@@ -104,6 +116,10 @@ export function ListMatchingProjectVersions(arg1, arg2, arg3) {
 
 export function ListPinnedMods() {
   return window['go']['main']['App']['ListPinnedMods']();
+}
+
+export function LookupProjectBySlug(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['LookupProjectBySlug'](arg1, arg2, arg3, arg4);
 }
 
 export function PinModVersion(arg1) {
@@ -134,8 +150,20 @@ export function RemoveFavoriteMod(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['RemoveFavoriteMod'](arg1, arg2, arg3, arg4, arg5);
 }
 
+export function RenameFavoriteGroup(arg1, arg2) {
+  return window['go']['main']['App']['RenameFavoriteGroup'](arg1, arg2);
+}
+
 export function RenameFavoriteList(arg1, arg2) {
   return window['go']['main']['App']['RenameFavoriteList'](arg1, arg2);
+}
+
+export function ReorderFavoriteGroups(arg1) {
+  return window['go']['main']['App']['ReorderFavoriteGroups'](arg1);
+}
+
+export function ReorderFavoriteLists(arg1) {
+  return window['go']['main']['App']['ReorderFavoriteLists'](arg1);
 }
 
 export function RetryDownload(arg1) {
@@ -168,6 +196,10 @@ export function SelectVersion(arg1) {
 
 export function UnpinMod(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['UnpinMod'](arg1, arg2, arg3, arg4);
+}
+
+export function UpdateFavoriteListMetadata(arg1) {
+  return window['go']['main']['App']['UpdateFavoriteListMetadata'](arg1);
 }
 
 export function ValidateMinecraftDir() {

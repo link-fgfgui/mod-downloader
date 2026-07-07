@@ -232,6 +232,26 @@ export namespace appcore {
 
 export namespace database {
 	
+	export class FavoriteGroup {
+	    id: string;
+	    name: string;
+	    createdAt: number;
+	    updatedAt: number;
+	    sortOrder: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new FavoriteGroup(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	        this.sortOrder = source["sortOrder"];
+	    }
+	}
 	export class FavoriteList {
 	    id: string;
 	    groupId?: string;

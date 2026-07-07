@@ -24,7 +24,11 @@ export function ChooseMinecraftDir():Promise<string>;
 
 export function CopyFavoriteListToList(arg1:appcore.FavoriteListCopyRequest):Promise<appcore.FavoriteBulkOperationResult>;
 
+export function CreateFavoriteGroup(arg1:string):Promise<database.FavoriteGroup>;
+
 export function CreateFavoriteList(arg1:string):Promise<database.FavoriteList>;
+
+export function DeleteFavoriteGroup(arg1:string):Promise<boolean>;
 
 export function DeleteFavoriteList(arg1:string):Promise<boolean>;
 
@@ -48,6 +52,8 @@ export function GetVersions():Promise<Array<structs.VersionInfo>>;
 
 export function ListFavoriteContents(arg1:string):Promise<database.FavoriteListContents>;
 
+export function ListFavoriteGroups():Promise<Array<database.FavoriteGroup>>;
+
 export function ListFavoriteListRefs(arg1:string):Promise<Array<database.FavoriteListRef>>;
 
 export function ListFavoriteLists():Promise<Array<database.FavoriteList>>;
@@ -57,6 +63,8 @@ export function ListFavoriteMods(arg1:string):Promise<Array<database.FavoriteMod
 export function ListMatchingProjectVersions(arg1:models.ModProject,arg2:string,arg3:string):Promise<Array<models.ModVersion>>;
 
 export function ListPinnedMods():Promise<Array<database.PinnedMod>>;
+
+export function LookupProjectBySlug(arg1:string,arg2:string,arg3:string,arg4:string):Promise<models.ModProject>;
 
 export function PinModVersion(arg1:structs.ModVersionPinRequest):Promise<database.PinnedMod>;
 
@@ -72,7 +80,13 @@ export function RemoveFavoriteListReference(arg1:string,arg2:string):Promise<boo
 
 export function RemoveFavoriteMod(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<boolean>;
 
+export function RenameFavoriteGroup(arg1:string,arg2:string):Promise<database.FavoriteGroup>;
+
 export function RenameFavoriteList(arg1:string,arg2:string):Promise<database.FavoriteList>;
+
+export function ReorderFavoriteGroups(arg1:Array<string>):Promise<boolean>;
+
+export function ReorderFavoriteLists(arg1:Array<string>):Promise<boolean>;
 
 export function RetryDownload(arg1:string):Promise<boolean>;
 
@@ -89,5 +103,7 @@ export function SearchMods(arg1:structs.SearchModsRequest):Promise<void>;
 export function SelectVersion(arg1:string):Promise<structs.VersionInfo>;
 
 export function UnpinMod(arg1:string,arg2:string,arg3:string,arg4:string):Promise<boolean>;
+
+export function UpdateFavoriteListMetadata(arg1:database.FavoriteList):Promise<database.FavoriteList>;
 
 export function ValidateMinecraftDir():Promise<boolean>;
