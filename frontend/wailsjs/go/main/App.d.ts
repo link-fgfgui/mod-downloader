@@ -19,6 +19,8 @@ export function CreateFavoriteList(arg1:string):Promise<database.FavoriteList>;
 
 export function DeleteFavoriteList(arg1:string):Promise<boolean>;
 
+export function ExportFavoriteListPackwizZip(arg1:string):Promise<main.ExportFavoritePackwizResult>;
+
 export function GetDownloadQueueState():Promise<structs.DownloadQueueState>;
 
 export function GetDownloadStates(arg1:structs.DownloadStatesRequest):Promise<Array<structs.ModDownloadButtonState>>;

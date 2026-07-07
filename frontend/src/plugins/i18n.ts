@@ -100,6 +100,7 @@ const messages = {
         cancel: "取消",
         create: "新建",
         delete: "删除",
+        exportPackwiz: "导出 packwiz",
         refresh: "刷新",
         removeSelected: "移除所选",
         rename: "重命名",
@@ -110,6 +111,11 @@ const messages = {
         list: "收藏夹",
         newList: "新建收藏夹",
         count: "将加入 {n} 个 Mod",
+      },
+      export: {
+        success: "packwiz 整合包已导出",
+        failed: "导出失败：{reason}",
+        unknownError: "未知错误",
       },
       dialog: {
         createTitle: "新建收藏夹",
@@ -264,6 +270,7 @@ const messages = {
         cancel: "Cancel",
         create: "Create",
         delete: "Delete",
+        exportPackwiz: "Export packwiz",
         refresh: "Refresh",
         removeSelected: "Remove Selected",
         rename: "Rename",
@@ -274,6 +281,11 @@ const messages = {
         list: "Favorite List",
         newList: "New Favorite List",
         count: "Adding {n} mods",
+      },
+      export: {
+        success: "packwiz modpack exported",
+        failed: "Export failed: {reason}",
+        unknownError: "Unknown error",
       },
       dialog: {
         createTitle: "Create Favorite List",

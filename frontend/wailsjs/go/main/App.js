@@ -30,6 +30,10 @@ export function DeleteFavoriteList(arg1) {
   return window['go']['main']['App']['DeleteFavoriteList'](arg1);
 }
 
+export function ExportFavoriteListPackwizZip(arg1) {
+  return window['go']['main']['App']['ExportFavoriteListPackwizZip'](arg1);
+}
+
 export function GetDownloadQueueState() {
   return window['go']['main']['App']['GetDownloadQueueState']();
 }

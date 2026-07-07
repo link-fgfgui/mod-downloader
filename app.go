@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 
 	"github.com/link-fgfgui/mod-downloader-core/appcore"
@@ -164,6 +165,34 @@ func (a *App) RemoveFavoriteMod(listID, platform, modID, mcVersion, modLoader st
 	return a.service().RemoveFavoriteMod(listID, platform, modID, mcVersion, modLoader)
 }
 
+func (a *App) ExportFavoriteListPackwizZip(listID string) ExportFavoritePackwizResult {
+	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:                "Export packwiz modpack",
+		DefaultFilename:      a.service().FavoriteListPackwizDefaultFilename(listID),
+		CanCreateDirectories: true,
+		Filters: []runtime.FileFilter{{
+			DisplayName: "ZIP archives (*.zip)",
+			Pattern:     "*.zip",
+		}},
+	})
+	if err != nil {
+		logging.Error("choose packwiz export path failed", "listID", listID, "error", err)
+		panic("export packwiz failed: " + err.Error())
+	}
+	if strings.TrimSpace(path) == "" {
+		return ExportFavoritePackwizResult{Canceled: true}
+	}
+	if filepath.Ext(path) == "" {
+		path += ".zip"
+	}
+	result, err := a.service().ExportFavoriteListPackwizZip(listID, path)
+	if err != nil {
+		logging.Error("export favorite packwiz zip failed", "listID", listID, "path", path, "error", err)
+		panic("export packwiz failed: " + err.Error())
+	}
+	return ExportFavoritePackwizResult{Path: result.Path}
+}
+
 func (a *App) GetMinecraftReleaseVersions() []string {
 	return a.service().GetMinecraftReleaseVersions()
 }
@@ -204,6 +233,11 @@ type SaveAnimationSettingsRequest struct {
 	AnimationMode               string  `json:"animationMode"`
 	AnimationEnabled            bool    `json:"animationEnabled"`
 	AnimationDurationMultiplier float64 `json:"animationDurationMultiplier"`
+}
+
+type ExportFavoritePackwizResult struct {
+	Path     string `json:"path"`
+	Canceled bool   `json:"canceled"`
 }
 
 // Convention: a field value of "<keep>" means do not modify the original value (since the frontend cannot access plaintext).
