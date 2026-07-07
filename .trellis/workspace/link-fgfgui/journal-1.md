@@ -441,3 +441,38 @@ Validated mod-downloader-cli against core 56f8e8b. No source-level compatibility
 ### Next Steps
 
 - None - task complete
+
+
+## Session 14: SQLite user data storage
+
+**Date**: 2026-07-07
+**Task**: SQLite user data storage
+**Package**: app
+**Branch**: `master`
+
+### Summary
+
+Moved pinned mod versions and favorites into SQLite user-data storage, exposed cache directory settings, regenerated Wails bindings, and updated database specs.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0f3e500` | (see git log) |
+| `175b83c` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
