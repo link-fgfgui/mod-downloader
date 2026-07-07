@@ -186,6 +186,8 @@ type SettingsView struct {
 	AnimationEnabled            bool    `json:"animationEnabled"`
 	AnimationDurationMultiplier float64 `json:"animationDurationMultiplier"`
 	MinecraftDir                string  `json:"minecraftDir"` // simplified path (with env vars)
+	CacheDir                    string  `json:"cacheDir"`
+	CachePath                   string  `json:"cachePath"`
 	HasCurseforgeKey            bool    `json:"hasCurseforgeKey"`
 	CurseforgeKeyMask           string  `json:"curseforgeKeyMask"` // e.g. "abcd****wxyz" or ""
 	HasModrinthKey              bool    `json:"hasModrinthKey"`
@@ -232,6 +234,12 @@ func (a *App) SaveAnimationSettings(req SaveAnimationSettingsRequest) SettingsVi
 		AnimationEnabled:            req.AnimationEnabled,
 		AnimationDurationMultiplier: req.AnimationDurationMultiplier,
 	})
+	a.config = a.core.Config()
+	return settingsViewFromCore(next)
+}
+
+func (a *App) SaveCacheDirPreference(dir string) SettingsView {
+	next := a.service().SaveCacheDirPreference(dir)
 	a.config = a.core.Config()
 	return settingsViewFromCore(next)
 }
@@ -287,6 +295,21 @@ func (a *App) ChooseMinecraftDir() string {
 	return a.service().SetMinecraftDir(dir)
 }
 
+func (a *App) ChooseCacheDir() SettingsView {
+	dir, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+		Title:           "Choose cache folder",
+		ShowHiddenFiles: true,
+	})
+	if err != nil {
+		logging.Error("choose cache dir failed", "error", err)
+		return a.GetSettings()
+	}
+	if strings.TrimSpace(dir) == "" {
+		return a.GetSettings()
+	}
+	return a.SaveCacheDirPreference(dir)
+}
+
 func (a *App) GetMinecraftDir() string {
 	return a.service().GetMinecraftDir()
 }
@@ -340,6 +363,8 @@ func settingsViewFromCore(sv appcore.SettingsView) SettingsView {
 		AnimationEnabled:            sv.AnimationEnabled,
 		AnimationDurationMultiplier: sv.AnimationDurationMultiplier,
 		MinecraftDir:                sv.MinecraftDir,
+		CacheDir:                    sv.CacheDir,
+		CachePath:                   sv.CachePath,
 		HasCurseforgeKey:            sv.HasCurseforgeKey,
 		CurseforgeKeyMask:           sv.CurseforgeKeyMask,
 		HasModrinthKey:              sv.HasModrinthKey,

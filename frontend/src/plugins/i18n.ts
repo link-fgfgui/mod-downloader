@@ -49,6 +49,7 @@ const messages = {
         saved: "动画设置已应用",
       },
       minecraftDir: { label: ".minecraft 目录", choose: "选择目录", valid: "目录有效", invalid: "目录无效或为空" },
+      cacheDir: { label: "缓存目录", path: "实际路径", choose: "选择目录", reset: "恢复默认", default: "默认位置", saved: "缓存目录已保存" },
       apiKeys: {
         curseforge: { label: "CurseForge API Key", status: "已设置", statusEmpty: "未设置", placeholder: "输入新的 API Key", save: "保存", clear: "清除", hint: "配置后可搜索 CurseForge 资源" },
         modrinth: { label: "Modrinth API Key", status: "已设置", statusEmpty: "未设置", placeholder: "输入新的 API Key", save: "保存", clear: "清除", hint: "当前未启用，保留供未来使用" },
@@ -212,6 +213,7 @@ const messages = {
         saved: "Animation settings applied",
       },
       minecraftDir: { label: ".minecraft Directory", choose: "Choose Directory", valid: "Directory valid", invalid: "Directory invalid or empty" },
+      cacheDir: { label: "Cache Directory", path: "Resolved Path", choose: "Choose Directory", reset: "Reset", default: "Default location", saved: "Cache directory saved" },
       apiKeys: {
         curseforge: { label: "CurseForge API Key", status: "Set", statusEmpty: "Not set", placeholder: "Enter new API Key", save: "Save", clear: "Clear", hint: "Required to search CurseForge resources" },
         modrinth: { label: "Modrinth API Key", status: "Set", statusEmpty: "Not set", placeholder: "Enter new API Key", save: "Save", clear: "Clear", hint: "Not currently enabled; reserved for future use" },

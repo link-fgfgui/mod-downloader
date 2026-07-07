@@ -28,7 +28,7 @@ mod-downloader/
 │   ├── models/                  # Canonical data types (single source of truth)
 │   ├── structs/                 # Request/response structs + Minecraft manifest types
 │   ├── providers/               # CurseForge/Modrinth platform abstraction layer
-│   ├── database/                # BoltDB persistence
+│   ├── database/                # Platform cache and SQLite user-data storage
 │   ├── downloader/              # Download queue + state machine
 │   ├── modbridge/               # Cross-domain bridge
 │   ├── global/                  # Global clients and in-memory indexes

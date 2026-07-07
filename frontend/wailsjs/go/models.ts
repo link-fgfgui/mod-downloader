@@ -141,6 +141,8 @@ export namespace main {
 	    animationEnabled: boolean;
 	    animationDurationMultiplier: number;
 	    minecraftDir: string;
+	    cacheDir: string;
+	    cachePath: string;
 	    hasCurseforgeKey: boolean;
 	    curseforgeKeyMask: string;
 	    hasModrinthKey: boolean;
@@ -157,6 +159,8 @@ export namespace main {
 	        this.animationEnabled = source["animationEnabled"];
 	        this.animationDurationMultiplier = source["animationDurationMultiplier"];
 	        this.minecraftDir = source["minecraftDir"];
+	        this.cacheDir = source["cacheDir"];
+	        this.cachePath = source["cachePath"];
 	        this.hasCurseforgeKey = source["hasCurseforgeKey"];
 	        this.curseforgeKeyMask = source["curseforgeKeyMask"];
 	        this.hasModrinthKey = source["hasModrinthKey"];

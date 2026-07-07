@@ -70,6 +70,28 @@
                         </div>
                     </v-card-text>
                 </v-card>
+
+                <v-card class="mb-4">
+                    <v-card-title>{{ $t('settings.cacheDir.label') }}</v-card-title>
+                    <v-card-text>
+                        <v-text-field :model-value="settingsStore.view?.cacheDir || $t('settings.cacheDir.default')"
+                            readonly density="compact" hide-details class="mb-2" />
+                        <v-text-field :model-value="settingsStore.view?.cachePath"
+                            :label="$t('settings.cacheDir.path')" readonly density="compact" hide-details
+                            class="mb-2" />
+                        <div class="settings-action-row">
+                            <v-btn :loading="settingsStore.isChoosingCacheDir" variant="outlined"
+                                prepend-icon="mdi-folder-open" @click="chooseCacheDir">
+                                {{ $t('settings.cacheDir.choose') }}
+                            </v-btn>
+                            <v-btn :disabled="!settingsStore.view?.cacheDir"
+                                :loading="settingsStore.isSavingCacheDir" variant="text" prepend-icon="mdi-restore"
+                                @click="resetCacheDir">
+                                {{ $t('settings.cacheDir.reset') }}
+                            </v-btn>
+                        </div>
+                    </v-card-text>
+                </v-card>
             </v-col>
 
             <v-col cols="12" md="6">
@@ -174,6 +196,18 @@ async function saveAnimations() {
 
 async function chooseDir() {
     await settingsStore.chooseMinecraftDir();
+}
+
+async function chooseCacheDir() {
+    const changed = await settingsStore.chooseCacheDir();
+    if (changed) {
+        snackbar.value = { show: true, message: t('settings.cacheDir.saved'), color: "success" };
+    }
+}
+
+async function resetCacheDir() {
+    await settingsStore.resetCacheDir();
+    snackbar.value = { show: true, message: t('settings.cacheDir.saved'), color: "success" };
 }
 
 async function saveKeys() {

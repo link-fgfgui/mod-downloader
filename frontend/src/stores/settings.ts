@@ -4,6 +4,8 @@ import {
     SaveTheme,
     SaveAnimationSettings,
     SaveApiKeys,
+    SaveCacheDirPreference,
+    ChooseCacheDir,
     ChooseMinecraftDir,
     ValidateMinecraftDir,
 } from "../../wailsjs/go/main/App";
@@ -28,7 +30,9 @@ export const useSettingsStore = defineStore("settings", {
         isSavingTheme: false,
         isSavingAnimations: false,
         isSavingKeys: false,
+        isSavingCacheDir: false,
         isChoosingDir: false,
+        isChoosingCacheDir: false,
         isValidatingDir: false,
         dirValid: null as boolean | null,
         draftTheme: "",
@@ -127,6 +131,25 @@ export const useSettingsStore = defineStore("settings", {
                 return result;
             } finally {
                 this.isChoosingDir = false;
+            }
+        },
+        async chooseCacheDir() {
+            this.isChoosingCacheDir = true;
+            try {
+                const previous = this.view?.cacheDir || "";
+                this.view = await ChooseCacheDir();
+                return (this.view?.cacheDir || "") !== previous;
+            } finally {
+                this.isChoosingCacheDir = false;
+            }
+        },
+        async resetCacheDir() {
+            this.isSavingCacheDir = true;
+            try {
+                this.view = await SaveCacheDirPreference("");
+                return this.view;
+            } finally {
+                this.isSavingCacheDir = false;
             }
         },
         async validateDir() {

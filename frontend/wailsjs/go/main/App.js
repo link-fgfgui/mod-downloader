@@ -14,6 +14,10 @@ export function CancelDownload(arg1) {
   return window['go']['main']['App']['CancelDownload'](arg1);
 }
 
+export function ChooseCacheDir() {
+  return window['go']['main']['App']['ChooseCacheDir']();
+}
+
 export function ChooseMinecraftDir() {
   return window['go']['main']['App']['ChooseMinecraftDir']();
 }
@@ -112,6 +116,10 @@ export function SaveAnimationSettings(arg1) {
 
 export function SaveApiKeys(arg1) {
   return window['go']['main']['App']['SaveApiKeys'](arg1);
+}
+
+export function SaveCacheDirPreference(arg1) {
+  return window['go']['main']['App']['SaveCacheDirPreference'](arg1);
 }
 
 export function SaveTheme(arg1) {

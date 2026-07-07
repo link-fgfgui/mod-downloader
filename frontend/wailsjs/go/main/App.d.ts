@@ -11,6 +11,8 @@ export function ApplyLocalModBatchOperation(arg1:structs.LocalModBatchOperationR
 
 export function CancelDownload(arg1:string):Promise<boolean>;
 
+export function ChooseCacheDir():Promise<main.SettingsView>;
+
 export function ChooseMinecraftDir():Promise<string>;
 
 export function CreateFavoriteList(arg1:string):Promise<database.FavoriteList>;
@@ -60,6 +62,8 @@ export function RetryDownload(arg1:string):Promise<boolean>;
 export function SaveAnimationSettings(arg1:main.SaveAnimationSettingsRequest):Promise<main.SettingsView>;
 
 export function SaveApiKeys(arg1:main.SaveApiKeysRequest):Promise<main.SettingsView>;
+
+export function SaveCacheDirPreference(arg1:string):Promise<main.SettingsView>;
 
 export function SaveTheme(arg1:string):Promise<string>;
 

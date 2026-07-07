@@ -106,10 +106,11 @@ npm run build --prefix frontend
 
 ## Data Files
 
-The app stores local runtime data in the working directory:
+The app stores configuration and local runtime data separately:
 
-- `mod-downloader.toml` for configuration
-- `mods.gob.zst` for cached mod platform and jar metadata
+- `mod-downloader.toml` in the working directory for configuration
+- `mods.gob.zst` in the configured cache directory for rebuildable mod platform metadata cache
+- `user-data.sqlite` in the configured cache directory for user-owned data such as pinned mod versions and favorite lists
 
 ## CLI
 
