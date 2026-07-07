@@ -13,6 +13,33 @@ const messages = {
       unpin: "取消固定",
       settings: "设置",
     },
+    home: {
+      kicker: "Mod Downloader",
+      title: "从这里开始整理你的整合包",
+      subtitle: "快速进入下载、管理、收藏和固定版本工作流，减少在侧边栏里来回找入口的时间。",
+      workflows: {
+        download: {
+          title: "查找并下载 Mod",
+          description: "按当前 Minecraft 版本和加载器筛选可用版本，并加入下载队列。",
+        },
+        manage: {
+          title: "管理本地 Mod",
+          description: "查看已安装文件，批量启用、禁用、删除或加入收藏夹。",
+        },
+        favorites: {
+          title: "维护收藏夹",
+          description: "按列表保存常用 Mod，方便以后为不同实例复用。",
+        },
+        unpin: {
+          title: "检查固定版本",
+          description: "查看被固定的 Mod 版本，需要时恢复为自动选择最新匹配版本。",
+        },
+        settings: {
+          title: "配置应用",
+          description: "设置 .minecraft 目录、缓存目录、API Key、主题和动画模式。",
+        },
+      },
+    },
     search: {
       noMoreResults: "没有更多结果",
     },
@@ -176,6 +203,33 @@ const messages = {
       favorites: "Favorites",
       unpin: "Unpin",
       settings: "Settings",
+    },
+    home: {
+      kicker: "Mod Downloader",
+      title: "Start organizing your modpacks here",
+      subtitle: "Jump into downloading, local management, favorites, and pinned versions without hunting through the sidebar.",
+      workflows: {
+        download: {
+          title: "Find and download mods",
+          description: "Filter available versions for the current Minecraft version and loader, then add them to the download queue.",
+        },
+        manage: {
+          title: "Manage local mods",
+          description: "Review installed files and batch enable, disable, delete, or add them to favorites.",
+        },
+        favorites: {
+          title: "Maintain favorites",
+          description: "Save reusable mod lists for different instances and future downloads.",
+        },
+        unpin: {
+          title: "Review pinned versions",
+          description: "See pinned mod versions and return them to automatic latest-match selection when needed.",
+        },
+        settings: {
+          title: "Configure the app",
+          description: "Set the .minecraft directory, cache directory, API keys, theme, and animation mode.",
+        },
+      },
     },
     search: {
       noMoreResults: "No more results",
