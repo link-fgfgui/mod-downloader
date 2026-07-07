@@ -20,7 +20,7 @@
             />
         </v-main>
         <transition v-bind="fabTransitionProps">
-            <div v-if="downloadQueueStore.queue.active" class="download-fab">
+            <div v-if="queueSurfaceVisible" class="download-fab">
                 <v-menu
                     v-model="downloadQueueOpen"
                     :close-on-content-click="false"
@@ -29,8 +29,8 @@
                 >
                     <template #activator="{ props }">
                         <v-badge
-                            :model-value="activeDownloadCount > 1"
-                            :content="activeDownloadCount"
+                            :model-value="queueBadgeCount > 0"
+                            :content="queueBadgeCount"
                             color="error"
                             floating
                         >
@@ -41,8 +41,9 @@
                                 icon
                                 size="large"
                                 :aria-label="$t('download.queue.title')"
+                                @contextmenu.prevent.stop="clearQueueMessages"
                             >
-                                <v-icon :icon="downloadQueueOpen ? 'mdi-chevron-down' : 'mdi-download'"></v-icon>
+                                <v-icon :icon="downloadQueueOpen ? 'mdi-chevron-down' : queueFabIcon"></v-icon>
                             </v-btn>
                         </v-badge>
                     </template>
@@ -63,51 +64,127 @@
                             />
                         </div>
                         <v-divider />
-                        <div class="download-queue-items">
-                            <div v-for="item in downloadQueueItems" :key="item.id" class="download-queue-item">
-                                <div class="download-queue-status" :class="`download-queue-status--${item.status}`">
-                                    <v-icon :icon="queueStatusIcon(item.status)" size="20" />
-                                </div>
-                                <div class="download-queue-item-main">
-                                    <div class="download-queue-item-title">{{ item.title || item.fileName || item.versionId }}</div>
-                                    <div class="download-queue-item-meta">
-                                        <span>{{ $t(`download.queue.status.${item.status}`) }}</span>
-                                        <span v-if="queueItemMeta(item)"> · {{ queueItemMeta(item) }}</span>
+                        <v-tabs v-model="downloadQueueTab" density="compact" class="download-queue-tabs">
+                            <v-tab value="downloads">
+                                {{ $t("download.queue.tabs.downloads") }}
+                            </v-tab>
+                            <v-tab value="optional">
+                                {{ $t("download.queue.tabs.optional") }}
+                            </v-tab>
+                        </v-tabs>
+                        <v-divider />
+                        <v-window v-model="downloadQueueTab">
+                            <v-window-item value="downloads">
+                                <div class="download-queue-items">
+                                    <div v-if="!downloadQueueItems.length" class="download-queue-empty">
+                                        {{ $t("download.queue.emptyDownloads") }}
                                     </div>
-                                    <div v-if="item.reason" class="download-queue-item-reason">
-                                        {{ item.reason }}
+                                    <div v-for="item in downloadQueueItems" :key="item.id" class="download-queue-item">
+                                        <div class="download-queue-status" :class="`download-queue-status--${item.status}`">
+                                            <v-icon :icon="queueStatusIcon(item.status)" size="20" />
+                                        </div>
+                                        <div class="download-queue-item-main">
+                                            <div class="download-queue-item-title">{{ item.title || item.fileName || item.versionId }}</div>
+                                            <div class="download-queue-item-meta">
+                                                <span>{{ $t(`download.queue.status.${item.status}`) }}</span>
+                                                <span v-if="queueItemMeta(item)"> · {{ queueItemMeta(item) }}</span>
+                                            </div>
+                                            <div v-if="item.reason" class="download-queue-item-reason">
+                                                {{ item.reason }}
+                                            </div>
+                                        </div>
+                                        <div class="download-queue-actions">
+                                            <v-tooltip v-if="item.cancelable" :text="$t('download.queue.cancel')" location="top">
+                                                <template #activator="{ props: tip }">
+                                                    <v-btn
+                                                        v-bind="tip"
+                                                        icon="mdi-close-circle-outline"
+                                                        variant="text"
+                                                        color="error"
+                                                        size="small"
+                                                        :aria-label="$t('download.queue.cancel')"
+                                                        @click.stop="cancelQueueItem(item.id)"
+                                                    />
+                                                </template>
+                                            </v-tooltip>
+                                            <v-tooltip v-if="item.retryable" :text="$t('download.queue.retry')" location="top">
+                                                <template #activator="{ props: tip }">
+                                                    <v-btn
+                                                        v-bind="tip"
+                                                        icon="mdi-reload"
+                                                        variant="text"
+                                                        color="primary"
+                                                        size="small"
+                                                        :aria-label="$t('download.queue.retry')"
+                                                        @click.stop="retryQueueItem(item.id)"
+                                                    />
+                                                </template>
+                                            </v-tooltip>
+                                        </div>
                                     </div>
                                 </div>
-                                <div class="download-queue-actions">
-                                    <v-tooltip v-if="item.cancelable" :text="$t('download.queue.cancel')" location="top">
-                                        <template #activator="{ props: tip }">
-                                            <v-btn
-                                                v-bind="tip"
-                                                icon="mdi-close-circle-outline"
-                                                variant="text"
-                                                color="error"
-                                                size="small"
-                                                :aria-label="$t('download.queue.cancel')"
-                                                @click.stop="cancelQueueItem(item.id)"
-                                            />
-                                        </template>
-                                    </v-tooltip>
-                                    <v-tooltip v-if="item.retryable" :text="$t('download.queue.retry')" location="top">
-                                        <template #activator="{ props: tip }">
-                                            <v-btn
-                                                v-bind="tip"
-                                                icon="mdi-reload"
-                                                variant="text"
-                                                color="primary"
-                                                size="small"
-                                                :aria-label="$t('download.queue.retry')"
-                                                @click.stop="retryQueueItem(item.id)"
-                                            />
-                                        </template>
-                                    </v-tooltip>
+                            </v-window-item>
+                            <v-window-item value="optional">
+                                <div class="download-queue-items">
+                                    <div v-if="!downloadQueueReminders.length" class="download-queue-empty">
+                                        {{ $t("download.queue.emptyOptional") }}
+                                    </div>
+                                    <div v-for="reminder in downloadQueueReminders" :key="reminder.id" class="optional-reminder">
+                                        <div class="optional-reminder-header">
+                                            <div class="download-queue-item-main">
+                                                <div class="download-queue-item-title">{{ reminder.mainTitle || reminder.mainProjectKey }}</div>
+                                                <div class="download-queue-item-meta">
+                                                    {{ [reminder.minecraftVersion, reminder.modLoader].filter(Boolean).join(" · ") }}
+                                                </div>
+                                            </div>
+                                            <div class="download-queue-actions">
+                                                <v-tooltip :text="$t('download.queue.installOptional')" location="top">
+                                                    <template #activator="{ props: tip }">
+                                                        <v-btn
+                                                            v-bind="tip"
+                                                            icon="mdi-download-multiple"
+                                                            variant="text"
+                                                            color="primary"
+                                                            size="small"
+                                                            :aria-label="$t('download.queue.installOptional')"
+                                                            @click.stop="installOptionalDependencies(reminder.id)"
+                                                        />
+                                                    </template>
+                                                </v-tooltip>
+                                                <v-tooltip :text="$t('download.queue.dismissOptional')" location="top">
+                                                    <template #activator="{ props: tip }">
+                                                        <v-btn
+                                                            v-bind="tip"
+                                                            icon="mdi-bell-remove-outline"
+                                                            variant="text"
+                                                            size="small"
+                                                            :aria-label="$t('download.queue.dismissOptional')"
+                                                            @click.stop="dismissOptionalReminder(reminder.id)"
+                                                        />
+                                                    </template>
+                                                </v-tooltip>
+                                            </div>
+                                        </div>
+                                        <div class="optional-candidates">
+                                            <div
+                                                v-for="candidate in reminder.dependencies"
+                                                :key="candidate.projectKey"
+                                                class="optional-candidate"
+                                                :class="{ 'optional-candidate--disabled': candidate.disabled }"
+                                            >
+                                                <v-icon :icon="optionalStatusIcon(candidate.status)" size="18" />
+                                                <div class="download-queue-item-main">
+                                                    <div class="download-queue-item-title">{{ candidate.title || candidate.projectKey }}</div>
+                                                    <div class="download-queue-item-meta">
+                                                        {{ optionalCandidateMeta(candidate) }}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
+                            </v-window-item>
+                        </v-window>
                     </v-sheet>
                 </v-menu>
             </div>
@@ -146,8 +223,14 @@ const downloadQueueStore = useDownloadQueueStore();
 const minecraftStore = useMinecraftStore();
 const activeAnimationMode = useActiveAnimationMode();
 const downloadQueueOpen = ref(false);
+const downloadQueueTab = ref("downloads");
 const activeDownloadCount = computed(() => downloadQueueStore.activeCount);
+const queueBadgeCount = computed(() => activeDownloadCount.value + downloadQueueStore.messageCount);
+const queueSurfaceVisible = computed(() => downloadQueueStore.hasAnyQueueSurface);
+const reminderOnly = computed(() => downloadQueueStore.reminderOnly);
+const queueFabIcon = computed(() => (reminderOnly.value ? "mdi-bell-outline" : "mdi-download"));
 const downloadQueueItems = computed(() => downloadQueueStore.items);
+const downloadQueueReminders = computed(() => downloadQueueStore.optionalReminders);
 
 const gsapAnimationsActive = computed(() => activeAnimationMode.value === animationModeGsap);
 
@@ -192,6 +275,23 @@ const queueStatusIcon = (status: string) => {
 const queueItemMeta = (item: structs.DownloadQueueItem) =>
     [item.platform, item.minecraftVersion, item.modLoader, item.fileName].filter(Boolean).join(" · ");
 
+const optionalStatusIcon = (status: string) => {
+    switch (status) {
+        case "installed":
+            return "mdi-check";
+        case "update":
+            return "mdi-arrow-up-bold-circle";
+        case "conflict":
+        case "incompatible":
+            return "mdi-alert-octagon-outline";
+        default:
+            return "mdi-download";
+    }
+};
+
+const optionalCandidateMeta = (candidate: structs.OptionalDependencyCandidate) =>
+    [candidate.platform, candidate.versionId, candidate.status, candidate.reason].filter(Boolean).join(" · ");
+
 const cancelQueueItem = (id: string) => {
     void downloadQueueStore.cancel(id);
 };
@@ -200,11 +300,36 @@ const retryQueueItem = (id: string) => {
     void downloadQueueStore.retry(id);
 };
 
+const dismissOptionalReminder = (id: string) => {
+    void downloadQueueStore.dismissOptionalReminder(id);
+};
+
+const installOptionalDependencies = (id: string) => {
+    void downloadQueueStore.installOptionalDependencies(id);
+};
+
+const clearQueueMessages = () => {
+    if (reminderOnly.value) {
+        void downloadQueueStore.clearOptionalReminders();
+    }
+};
+
 watch(
     () => downloadQueueStore.hasVisibleItems,
     (hasVisibleItems) => {
         if (!hasVisibleItems) {
             downloadQueueOpen.value = false;
+        }
+    }
+);
+
+watch(
+    () => downloadQueueReminders.value.length,
+    (count) => {
+        if (count > 0 && !downloadQueueItems.value.length) {
+            downloadQueueTab.value = "optional";
+        } else if (count === 0 && downloadQueueTab.value === "optional") {
+            downloadQueueTab.value = "downloads";
         }
     }
 );
@@ -283,10 +408,21 @@ onUnmounted(() => {
     margin-top: 2px;
 }
 
+.download-queue-tabs {
+    min-height: 40px;
+}
+
 .download-queue-items {
     max-height: 340px;
     overflow-y: auto;
     padding: 6px;
+}
+
+.download-queue-empty {
+    color: rgba(var(--v-theme-on-surface), 0.62);
+    font-size: 0.82rem;
+    padding: 18px 12px;
+    text-align: center;
 }
 
 .download-queue-item {
@@ -368,6 +504,42 @@ onUnmounted(() => {
     align-items: center;
     display: flex;
     gap: 2px;
+}
+
+.optional-reminder {
+    border-radius: 6px;
+    padding: 8px;
+}
+
+.optional-reminder + .optional-reminder {
+    border-top: 1px solid rgba(var(--v-border-color), 0.22);
+}
+
+.optional-reminder-header {
+    align-items: center;
+    display: grid;
+    gap: 10px;
+    grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.optional-candidates {
+    display: grid;
+    gap: 4px;
+    margin-top: 8px;
+}
+
+.optional-candidate {
+    align-items: center;
+    border-radius: 6px;
+    display: grid;
+    gap: 8px;
+    grid-template-columns: 22px minmax(0, 1fr);
+    min-height: 42px;
+    padding: 6px 8px;
+}
+
+.optional-candidate--disabled {
+    opacity: 0.58;
 }
 
 .main-loading-overlay {

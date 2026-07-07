@@ -6,6 +6,10 @@ export function AddFavoriteMod(arg1) {
   return window['go']['main']['App']['AddFavoriteMod'](arg1);
 }
 
+export function AnalyzeBatchIncompatibleConflicts(arg1) {
+  return window['go']['main']['App']['AnalyzeBatchIncompatibleConflicts'](arg1);
+}
+
 export function ApplyLocalModBatchOperation(arg1) {
   return window['go']['main']['App']['ApplyLocalModBatchOperation'](arg1);
 }
@@ -22,12 +26,20 @@ export function ChooseMinecraftDir() {
   return window['go']['main']['App']['ChooseMinecraftDir']();
 }
 
+export function ClearOptionalDependencyReminders() {
+  return window['go']['main']['App']['ClearOptionalDependencyReminders']();
+}
+
 export function CreateFavoriteList(arg1) {
   return window['go']['main']['App']['CreateFavoriteList'](arg1);
 }
 
 export function DeleteFavoriteList(arg1) {
   return window['go']['main']['App']['DeleteFavoriteList'](arg1);
+}
+
+export function DismissOptionalDependencyReminder(arg1) {
+  return window['go']['main']['App']['DismissOptionalDependencyReminder'](arg1);
 }
 
 export function GetDownloadQueueState() {
@@ -64,6 +76,10 @@ export function GetSettings() {
 
 export function GetVersions() {
   return window['go']['main']['App']['GetVersions']();
+}
+
+export function InstallOptionalDependencies(arg1) {
+  return window['go']['main']['App']['InstallOptionalDependencies'](arg1);
 }
 
 export function ListFavoriteLists() {

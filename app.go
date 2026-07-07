@@ -271,6 +271,22 @@ func (a *App) RetryDownload(id string) bool {
 	return a.service().RetryDownload(id)
 }
 
+func (a *App) DismissOptionalDependencyReminder(id string) bool {
+	return a.service().DismissOptionalDependencyReminder(id)
+}
+
+func (a *App) ClearOptionalDependencyReminders() bool {
+	return a.service().ClearOptionalDependencyReminders()
+}
+
+func (a *App) InstallOptionalDependencies(id string) []appstructs.ModDownloadResult {
+	return a.service().InstallOptionalDependencies(id)
+}
+
+func (a *App) AnalyzeBatchIncompatibleConflicts(req appstructs.BatchDownloadRequest) appstructs.BatchIncompatibleAnalysis {
+	return a.service().AnalyzeBatchIncompatibleConflicts(req)
+}
+
 func (a *App) GetDownloadStates(req appstructs.DownloadStatesRequest) []appstructs.ModDownloadButtonState {
 	return a.service().GetDownloadStates(req)
 }

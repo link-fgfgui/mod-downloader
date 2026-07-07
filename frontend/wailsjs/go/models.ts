@@ -289,6 +289,167 @@ export namespace models {
 
 export namespace structs {
 	
+	export class BatchDownloadRequest {
+	    results: models.ModProject[];
+	    minecraftVersion: string;
+	    modLoader: string;
+	    targetDir?: string;
+	    instanceId?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BatchDownloadRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.results = this.convertValues(source["results"], models.ModProject);
+	        this.minecraftVersion = source["minecraftVersion"];
+	        this.modLoader = source["modLoader"];
+	        this.targetDir = source["targetDir"];
+	        this.instanceId = source["instanceId"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class IncompatibleLocalMod {
+	    path: string;
+	    fileName: string;
+	    sha1: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new IncompatibleLocalMod(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.fileName = source["fileName"];
+	        this.sha1 = source["sha1"];
+	    }
+	}
+	export class IncompatibleConflict {
+	    projectKey: string;
+	    projectTitle: string;
+	    incompatibleProjectKey: string;
+	    incompatibleTitle: string;
+	    incompatibleVersionId?: string;
+	    paths?: IncompatibleLocalMod[];
+	
+	    static createFrom(source: any = {}) {
+	        return new IncompatibleConflict(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.projectKey = source["projectKey"];
+	        this.projectTitle = source["projectTitle"];
+	        this.incompatibleProjectKey = source["incompatibleProjectKey"];
+	        this.incompatibleTitle = source["incompatibleTitle"];
+	        this.incompatibleVersionId = source["incompatibleVersionId"];
+	        this.paths = this.convertValues(source["paths"], IncompatibleLocalMod);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class BatchIncompatibleConflict {
+	    key: string;
+	    title: string;
+	    result: models.ModProject;
+	    conflicts?: IncompatibleConflict[];
+	
+	    static createFrom(source: any = {}) {
+	        return new BatchIncompatibleConflict(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.title = source["title"];
+	        this.result = this.convertValues(source["result"], models.ModProject);
+	        this.conflicts = this.convertValues(source["conflicts"], IncompatibleConflict);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class BatchIncompatibleAnalysis {
+	    conflicts?: BatchIncompatibleConflict[];
+	
+	    static createFrom(source: any = {}) {
+	        return new BatchIncompatibleAnalysis(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.conflicts = this.convertValues(source["conflicts"], BatchIncompatibleConflict);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class DownloadQueueItem {
 	    id: string;
 	    status: string;
@@ -321,11 +482,81 @@ export namespace structs {
 	        this.reason = source["reason"];
 	    }
 	}
+	export class OptionalDependencyCandidate {
+	    projectKey: string;
+	    platform: string;
+	    projectId: string;
+	    title: string;
+	    versionId?: string;
+	    status: string;
+	    disabled: boolean;
+	    reason?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new OptionalDependencyCandidate(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.projectKey = source["projectKey"];
+	        this.platform = source["platform"];
+	        this.projectId = source["projectId"];
+	        this.title = source["title"];
+	        this.versionId = source["versionId"];
+	        this.status = source["status"];
+	        this.disabled = source["disabled"];
+	        this.reason = source["reason"];
+	    }
+	}
+	export class OptionalDependencyReminder {
+	    id: string;
+	    mainProjectKey: string;
+	    mainTitle: string;
+	    mainVersionId: string;
+	    minecraftVersion: string;
+	    modLoader: string;
+	    dependencies?: OptionalDependencyCandidate[];
+	
+	    static createFrom(source: any = {}) {
+	        return new OptionalDependencyReminder(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.mainProjectKey = source["mainProjectKey"];
+	        this.mainTitle = source["mainTitle"];
+	        this.mainVersionId = source["mainVersionId"];
+	        this.minecraftVersion = source["minecraftVersion"];
+	        this.modLoader = source["modLoader"];
+	        this.dependencies = this.convertValues(source["dependencies"], OptionalDependencyCandidate);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class DownloadQueueState {
 	    active: boolean;
 	    pending: number;
 	    running: number;
+	    messageCount: number;
 	    items?: DownloadQueueItem[];
+	    optionalReminders?: OptionalDependencyReminder[];
 	
 	    static createFrom(source: any = {}) {
 	        return new DownloadQueueState(source);
@@ -336,7 +567,9 @@ export namespace structs {
 	        this.active = source["active"];
 	        this.pending = source["pending"];
 	        this.running = source["running"];
+	        this.messageCount = source["messageCount"];
 	        this.items = this.convertValues(source["items"], DownloadQueueItem);
+	        this.optionalReminders = this.convertValues(source["optionalReminders"], OptionalDependencyReminder);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -395,6 +628,8 @@ export namespace structs {
 		    return a;
 		}
 	}
+	
+	
 	export class JijModInfo {
 	    id: string;
 	    name: string;
@@ -585,6 +820,8 @@ export namespace structs {
 	        this.modLoader = source["modLoader"];
 	    }
 	}
+	
+	
 	export class SearchModsRequest {
 	    requestId: string;
 	    query: string;
