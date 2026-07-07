@@ -161,6 +161,12 @@ func OpenAt(cachePath string) error
 func Close()
 func UserDataPathForCachePath(cachePath string) string
 
+type RuntimeOptions struct {
+    CachePath       string
+    CacheDir        string
+    DefaultCacheDir string
+}
+
 func UpsertPinnedMod(p PinnedMod) error
 func GetPinnedMod(platform, modID, mcVersion, modLoader string) (PinnedMod, bool)
 func DeletePinnedMod(platform, modID, mcVersion, modLoader string) error
@@ -183,6 +189,12 @@ SQLite schema owner: `core/database/userdb.go`.
   `UserDataPathForCachePath(cachePath)`.
 - `Runtime.CachePath` is a precise cache-file override. `Runtime.CacheDir` and
   TOML `runtime.cache_dir` resolve to `filepath.Join(cacheDir, CacheFileName)`.
+- `Runtime.DefaultCacheDir` is an adapter-provided fallback only. It must be
+  lower priority than explicit runtime cache settings and TOML/env
+  `runtime.cache_dir`, and higher priority than `database.DefaultCachePath()`.
+- The Wails GUI sets `Runtime.DefaultCacheDir` to the process working
+  directory so GUI defaults colocate with `pwd/mod-downloader.toml`; CLI callers
+  leave it empty so core falls back to the OS temp directory.
 - `mod-downloader.toml` stores configuration only. Pins, favorites, and other
   user collections must not be serialized into TOML.
 - Legacy gob fields for `PinnedMods`, `FavoriteLists`, and `FavoriteMods`
@@ -199,6 +211,8 @@ SQLite schema owner: `core/database/userdb.go`.
 #### 4. Validation & Error Matrix
 
 - Empty cache path -> `OpenAt` returns an error.
+- Empty `Runtime.DefaultCacheDir` -> ignore it and continue to
+  `database.DefaultCachePath()`.
 - Missing gob cache -> start with an empty platform cache.
 - Missing SQLite file -> create parent directory, create schema, then continue.
 - SQLite open/schema failure -> `OpenAt` returns an error; callers must not
@@ -217,8 +231,14 @@ SQLite schema owner: `core/database/userdb.go`.
   `database.GetPinnedMod`.
 - Good: change `runtime.cache_dir`; service saves TOML config and reopens
   storage at `<cache_dir>/mods.gob.zst` plus `<cache_dir>/user-data.sqlite`.
+- Good: Wails startup sets `Runtime.DefaultCacheDir` to `os.Getwd()` so an
+  unset GUI cache preference resolves to `<pwd>/mods.gob.zst`.
 - Base: an existing gob cache containing legacy pins/favorites migrates once,
   then the next gob save clears those legacy maps.
+- Base: CLI/appcore callers with no cache override and no default cache dir use
+  `<os.TempDir()>/mod-downloader/mods.gob.zst`.
+- Bad: passing the GUI working directory as `Runtime.CacheDir`; that overrides a
+  saved `runtime.cache_dir` and ignores the user's explicit preference.
 - Bad: writing favorite lists to `mods.gob.zst`, because cache version bumps or
   cache deletion would destroy user data.
 - Bad: adding pin/favorite fields to `mod-downloader.toml`; TOML is config, not
@@ -232,6 +252,10 @@ SQLite schema owner: `core/database/userdb.go`.
 - Favorite tests for create, rename, delete cascade, duplicate upsert, sort
   order, missing list, and returned-copy behavior.
 - Appcore settings test for `runtime.cache_dir` save plus storage reopen.
+- Wails adapter test that unset GUI cache preference resolves to
+  `<pwd>/mods.gob.zst`.
+- Wails adapter test that configured `runtime.cache_dir` overrides the GUI
+  working-directory default.
 - Wails binding regeneration and frontend build after settings API fields or
   methods change.
 
@@ -271,6 +295,20 @@ Correct:
 type RuntimeConfig struct {
     CacheDir string `toml:"cache_dir" json:"cacheDir" env:"MOD_DOWNLOADER_CACHE_DIR"`
 }
+```
+
+Wrong:
+
+```go
+// GUI default passed as an explicit override; this wins over saved config.
+appcore.New(appcore.Options{Runtime: appcore.RuntimeOptions{CacheDir: wd}})
+```
+
+Correct:
+
+```go
+// GUI default is lower priority than user config/env.
+appcore.New(appcore.Options{Runtime: appcore.RuntimeOptions{DefaultCacheDir: wd}})
 ```
 
 ### Scenario: Favorite Lists Persistent Collections
