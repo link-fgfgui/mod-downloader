@@ -15,12 +15,12 @@ Let users migrate a favorite list to a different Minecraft version and modloader
 
 ## Acceptance Criteria
 
-- [ ] Preview returns matched and missing rows without writing favorite data.
-- [ ] Apply without ignore conflicts writes nothing when any conflict exists.
-- [ ] Apply with ignore conflicts writes matched rows and skips missing rows.
-- [ ] Migrated rows use target `minecraftVersion`, target `modLoader`, and matched `versionId`.
-- [ ] Source favorite rows remain unchanged.
-- [ ] Tests cover all-match, partial-conflict, all-conflict, missing project lookup, and referenced-list source contents.
+- [x] Preview returns matched and missing rows without writing favorite data.
+- [x] Apply without ignore conflicts writes nothing when any conflict exists.
+- [x] Apply with ignore conflicts writes matched rows and skips missing rows.
+- [x] Migrated rows use target `minecraftVersion`, target `modLoader`, and matched `versionId`.
+- [x] Source favorite rows remain unchanged.
+- [x] Tests cover all-match, partial-conflict, all-conflict, missing project lookup, and referenced-list source contents.
 
 ## Dependencies
 

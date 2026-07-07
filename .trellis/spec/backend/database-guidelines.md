@@ -475,6 +475,132 @@ copied.UpdatedAt = 0
 database.UpsertFavoriteMod(copied)
 ```
 
+### Scenario: Favorite Version / Modloader Migration
+
+#### 1. Scope / Trigger
+
+Use this pattern when migrating a favorite list's resolved contents to a
+different Minecraft version and modloader. The workflow spans SQLite favorite
+contents, cached platform project/version metadata, `core/appcore` service
+contracts, Wails bindings, and frontend conflict UI. Preview and apply semantics
+belong in `core/appcore`; Wails adapters only delegate.
+
+#### 2. Signatures
+
+Core service request/response types:
+
+```go
+type FavoriteMigrationRequest struct {
+    SourceListID     string `json:"sourceListId"`
+    TargetListID     string `json:"targetListId"`
+    MinecraftVersion string `json:"minecraftVersion"`
+    ModLoader        string `json:"modLoader"`
+    IgnoreConflicts  bool   `json:"ignoreConflicts,omitempty"`
+}
+
+type FavoriteMigrationPreview struct {
+    SourceListID string                      `json:"sourceListId"`
+    TargetListID string                      `json:"targetListId"`
+    Matched      []FavoriteMigrationMatch    `json:"matched"`
+    Conflicts    []FavoriteMigrationConflict `json:"conflicts"`
+    Errors       []string                    `json:"errors,omitempty"`
+}
+
+type FavoriteMigrationApplyResult struct {
+    Applied bool                        `json:"applied"`
+    Preview FavoriteMigrationPreview    `json:"preview"`
+    Result  FavoriteBulkOperationResult `json:"result"`
+}
+```
+
+Core service methods:
+
+```go
+func (s *Service) PreviewFavoriteListMigration(req FavoriteMigrationRequest) FavoriteMigrationPreview
+func (s *Service) ApplyFavoriteListMigration(req FavoriteMigrationRequest) FavoriteMigrationApplyResult
+```
+
+Wails adapter methods must use the same request/result types and delegate
+directly to the service.
+
+#### 3. Contracts
+
+- Preview reads `database.ListFavoriteContents(sourceListID)` so direct rows and
+  live referenced child-list rows are resolved the same way as whole-list copy.
+- Preview never writes favorite rows.
+- Apply always re-runs preview before writing, so stale UI previews cannot be
+  applied blindly.
+- Project lookup prefers cached SQLite/gob platform metadata by
+  `platform/modId`, then `platform/slug`, and only falls back to provider lookup
+  if the cache misses.
+- Version matching uses `providers.ListMatchingProjectVersions` so existing
+  provider cache, sorting, and loader/version filtering rules remain the source
+  of truth.
+- Matched target rows preserve display metadata and replace only target scope
+  fields: `listId`, `minecraftVersion`, `modLoader`, and `versionId`.
+- Apply writes through `AddFavoriteModsToLists`, not direct
+  `database.UpsertFavoriteMod`, so copied IDs/timestamps and aggregate
+  added/updated/skipped accounting stay consistent with other favorite copy
+  workflows.
+
+#### 4. Validation & Error Matrix
+
+- Missing source/target list ID -> preview `Errors`, apply writes nothing.
+- Missing Minecraft version or modloader -> preview `Errors`, apply writes
+  nothing.
+- Project lookup miss -> conflict reason `project not found`.
+- No matching target-scope version -> conflict reason
+  `matching version not found`.
+- Conflicts with `IgnoreConflicts=false` -> apply writes nothing and returns
+  `Applied=false`.
+- Conflicts with `IgnoreConflicts=true` -> apply writes matched rows and reports
+  conflict count as skipped.
+
+#### 5. Good/Base/Bad Cases
+
+- Good: Preview a list with a live child reference; matched/conflict rows include
+  resolved child-list entries without duplicating rows.
+- Good: Apply a partial migration with `IgnoreConflicts=true`; matching mods are
+  upserted into the target list and missing target versions are skipped.
+- Base: Preview an all-conflict migration; no rows are written and the UI can
+  show conflict reasons before asking the user to ignore.
+- Bad: Frontend loops over preview matches and calls `AddFavoriteMod` directly,
+  bypassing conflict handling and bulk result accounting.
+- Bad: Migration code hand-rolls version filtering instead of using provider
+  matching, causing different sort/version semantics from search and install.
+
+#### 6. Tests Required
+
+- Appcore test for all-match preview/apply, asserting preview writes no favorite
+  data and apply writes target-scope rows with matched `versionId`.
+- Appcore test for partial conflict: apply without ignore writes nothing, apply
+  with ignore writes matched rows and skips conflicts.
+- Appcore test for all-conflict migration writing nothing.
+- Appcore test for missing project lookup producing a conflict instead of a
+  panic.
+- Appcore test for source contents from a referenced favorite list.
+
+#### 7. Wrong vs Correct
+
+Wrong:
+
+```go
+preview := s.PreviewFavoriteListMigration(req)
+for _, match := range preview.Matched {
+    database.UpsertFavoriteMod(match.Target) // bypasses ignore-conflict rules and ID reset semantics
+}
+```
+
+Correct:
+
+```go
+preview := s.PreviewFavoriteListMigration(req)
+if len(preview.Conflicts) > 0 && !req.IgnoreConflicts {
+    return FavoriteMigrationApplyResult{Preview: preview}
+}
+return s.ApplyFavoriteListMigration(req) // re-previews and writes through bulk copy semantics
+```
+
 ---
 
 ## Migrations
