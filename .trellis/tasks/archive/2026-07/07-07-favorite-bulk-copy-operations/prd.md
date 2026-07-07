@@ -14,12 +14,12 @@ Expose backend operations for adding selected favorite mods, copying a whole fav
 
 ## Acceptance Criteria
 
-- [ ] Selected favorite mods can be copied to one or more target lists.
-- [ ] Copying a whole list writes concrete mod rows to the target list.
-- [ ] Adding a list reference creates a live relationship without duplicating source rows.
-- [ ] Removing a list reference does not remove source or target list mods.
-- [ ] Existing single-mod `AddFavoriteMod` and `RemoveFavoriteMod` behavior remains compatible.
-- [ ] Core service tests cover selected-mod copy, whole-list copy, reference add/remove, duplicate handling, and missing-list behavior.
+- [x] Selected favorite mods can be copied to one or more target lists.
+- [x] Copying a whole list writes concrete mod rows to the target list.
+- [x] Adding a list reference creates a live relationship without duplicating source rows.
+- [x] Removing a list reference does not remove source or target list mods.
+- [x] Existing single-mod `AddFavoriteMod` and `RemoveFavoriteMod` behavior remains compatible.
+- [x] Core service tests cover selected-mod copy, whole-list copy, reference add/remove, duplicate handling, and missing-list behavior.
 
 ## Dependencies
 
