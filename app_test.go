@@ -295,6 +295,57 @@ func TestGetSettingsMasksKeys(t *testing.T) {
 	}
 }
 
+func TestAppServiceDefaultsCachePathToCurrentWorkingDirectory(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		database.Close()
+		if err := os.Chdir(oldwd); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	app := &App{config: &configs.Config{}}
+	settings := app.GetSettings()
+	want := filepath.Join(tmp, database.CacheFileName)
+	if got := settings.CachePath; got != want {
+		t.Fatalf("CachePath = %q, want %q", got, want)
+	}
+}
+
+func TestAppServiceConfiguredCacheDirOverridesGUIDefault(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		database.Close()
+		if err := os.Chdir(oldwd); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	cacheDir := filepath.Join(t.TempDir(), "custom-cache")
+	app := &App{config: &configs.Config{
+		Runtime: configs.RuntimeConfig{CacheDir: cacheDir},
+	}}
+	settings := app.GetSettings()
+	want := filepath.Join(cacheDir, database.CacheFileName)
+	if got := settings.CachePath; got != want {
+		t.Fatalf("CachePath = %q, want %q", got, want)
+	}
+}
+
 func TestSaveThemePersistsAndNormalizes(t *testing.T) {
 	oldwd, err := os.Getwd()
 	if err != nil {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"os"
 	"strings"
 
 	"github.com/link-fgfgui/mod-downloader-core/appcore"
@@ -47,6 +48,7 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.core = appcore.New(appcore.Options{
 		Config:                a.config,
+		Runtime:               appRuntimeOptions(),
 		LoadMinecraftReleases: true,
 		OnEvent:               a.emitCoreEvent,
 	})
@@ -66,11 +68,21 @@ func (a *App) service() *appcore.Service {
 	if a.core == nil {
 		a.core = appcore.New(appcore.Options{
 			Config:  a.config,
+			Runtime: appRuntimeOptions(),
 			OnEvent: a.emitCoreEvent,
 		})
 	}
 	a.config = a.core.Config()
 	return a.core
+}
+
+func appRuntimeOptions() appcore.RuntimeOptions {
+	dir, err := os.Getwd()
+	if err != nil {
+		logging.Error("resolve gui default cache dir failed", "error", err)
+		return appcore.RuntimeOptions{}
+	}
+	return appcore.RuntimeOptions{DefaultCacheDir: dir}
 }
 
 func (a *App) emitCoreEvent(event appcore.Event) {
