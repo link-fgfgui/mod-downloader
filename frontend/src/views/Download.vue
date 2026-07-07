@@ -173,6 +173,7 @@
             v-model="confirmDialog.show"
             transition="scale-fade"
             max-width="420"
+            @after-leave="clearClosedConfirmDialog"
         >
             <v-card class="md-animate-scale">
                 <v-card-title class="text-h6">
@@ -191,7 +192,7 @@
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer></v-spacer>
-                    <v-btn variant="text" @click="confirmDialog.show = false">{{
+                    <v-btn variant="text" @click="closeConfirmDialog">{{
                         $t("download.confirmReplace.cancel")
                     }}</v-btn>
                     <v-btn
@@ -255,6 +256,8 @@ const installMod = (payload: {
     confirm?: boolean;
 }) => downloadStore.installMod(payload);
 const confirmInstall = () => downloadStore.confirmInstall();
+const closeConfirmDialog = () => downloadStore.closeConfirmDialog();
+const clearClosedConfirmDialog = () => downloadStore.clearClosedConfirmDialog();
 const openVersionsOverlay = (result: models.ModProject) =>
     downloadStore.openVersionsOverlay(result);
 const pinVersion = (version: models.ModVersion) =>

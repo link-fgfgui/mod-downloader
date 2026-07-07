@@ -189,8 +189,16 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
         },
         async confirmInstall() {
             const { result, key } = this.confirmDialog;
-            this.confirmDialog = { show: false, status: "", result: null, key: "" };
+            this.closeConfirmDialog();
             await this.doInstall({ result: result || undefined, key });
+        },
+        closeConfirmDialog() {
+            this.confirmDialog = { ...this.confirmDialog, show: false };
+        },
+        clearClosedConfirmDialog() {
+            if (!this.confirmDialog.show) {
+                this.confirmDialog = { show: false, status: "", result: null, key: "" };
+            }
         },
         async doInstall(payload: { result?: SearchModSnapshot; key?: string }) {
             const { result, key } = payload || {};

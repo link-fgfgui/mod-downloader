@@ -29,8 +29,8 @@
                 >
                     <template #activator="{ props }">
                         <v-badge
-                            :model-value="activeDownloadCount > 1"
-                            :content="activeDownloadCount"
+                            :model-value="visibleActiveDownloadCount > 1"
+                            :content="visibleActiveDownloadCount"
                             color="error"
                             floating
                         >
@@ -51,7 +51,7 @@
                             <div>
                                 <div class="download-queue-title">{{ $t("download.queue.title") }}</div>
                                 <div class="download-queue-summary">
-                                    {{ $t("download.queue.summary", { running: downloadQueueStore.queue.running, pending: downloadQueueStore.queue.pending }) }}
+                                    {{ $t("download.queue.summary", { running: visibleDownloadQueue.running, pending: visibleDownloadQueue.pending }) }}
                                 </div>
                             </div>
                             <v-btn
@@ -64,7 +64,7 @@
                         </div>
                         <v-divider />
                         <div class="download-queue-items">
-                            <div v-for="item in downloadQueueItems" :key="item.id" class="download-queue-item">
+                            <div v-for="item in visibleDownloadQueueItems" :key="item.id" class="download-queue-item">
                                 <div class="download-queue-status" :class="`download-queue-status--${item.status}`">
                                     <v-icon :icon="queueStatusIcon(item.status)" size="20" />
                                 </div>
@@ -146,8 +146,24 @@ const downloadQueueStore = useDownloadQueueStore();
 const minecraftStore = useMinecraftStore();
 const activeAnimationMode = useActiveAnimationMode();
 const downloadQueueOpen = ref(false);
-const activeDownloadCount = computed(() => downloadQueueStore.activeCount);
-const downloadQueueItems = computed(() => downloadQueueStore.items);
+const visibleQueueSnapshot = ref<DownloadQueueSnapshot | null>(null);
+
+type DownloadQueueSnapshot = Pick<structs.DownloadQueueState, "active" | "pending" | "running" | "items">;
+
+const cloneDownloadQueue = (queue: DownloadQueueSnapshot): DownloadQueueSnapshot => ({
+    active: Boolean(queue.active),
+    pending: queue.pending || 0,
+    running: queue.running || 0,
+    items: (queue.items || []).map((item) => ({ ...item })),
+});
+
+const visibleDownloadQueue = computed(() => (
+    downloadQueueStore.queue.active
+        ? downloadQueueStore.queue
+        : (visibleQueueSnapshot.value || downloadQueueStore.queue)
+));
+const visibleActiveDownloadCount = computed(() => (visibleDownloadQueue.value.pending || 0) + (visibleDownloadQueue.value.running || 0));
+const visibleDownloadQueueItems = computed(() => visibleDownloadQueue.value.items || []);
 
 const gsapAnimationsActive = computed(() => activeAnimationMode.value === animationModeGsap);
 
@@ -170,8 +186,9 @@ const fabTransitionProps = computed(() => (
             onBeforeEnter: beforeGsapFabEnter,
             onEnter: enterGsapFab,
             onLeave: leaveGsapFab,
+            onAfterLeave: clearDownloadQueueSnapshot,
         }
-        : { name: "md-fab" }
+        : { name: "md-fab", onAfterLeave: clearDownloadQueueSnapshot }
 ));
 
 const queueStatusIcon = (status: string) => {
@@ -208,6 +225,22 @@ watch(
         }
     }
 );
+
+watch(
+    () => downloadQueueStore.queue,
+    (queue) => {
+        if (queue.active) {
+            visibleQueueSnapshot.value = cloneDownloadQueue(queue);
+        }
+    },
+    { deep: true, immediate: true },
+);
+
+function clearDownloadQueueSnapshot() {
+    if (!downloadQueueStore.queue.active) {
+        visibleQueueSnapshot.value = null;
+    }
+}
 
 const isEditableTarget = (target: EventTarget | null) => {
     if (!(target instanceof HTMLElement)) return false;
