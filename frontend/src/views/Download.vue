@@ -176,18 +176,10 @@
         >
             <v-card class="md-animate-scale">
                 <v-card-title class="text-h6">
-                    {{
-                        confirmDialog.status === "update"
-                            ? $t("download.confirmReplace.updateTitle")
-                            : $t("download.confirmReplace.conflictTitle")
-                    }}
+                    {{ $t(confirmDialogTitleKey) }}
                 </v-card-title>
                 <v-card-text>
-                    {{
-                        confirmDialog.status === "update"
-                            ? $t("download.confirmReplace.updateBody")
-                            : $t("download.confirmReplace.conflictBody")
-                    }}
+                    {{ $t(confirmDialogBodyKey) }}
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer></v-spacer>
@@ -200,6 +192,53 @@
                         @click="confirmInstall"
                         >{{ $t("download.confirmReplace.confirm") }}</v-btn
                     >
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+        <v-dialog
+            :model-value="batchConfirmDialog.show"
+            transition="scale-fade"
+            max-width="560"
+            @update:model-value="onBatchDialogModel"
+        >
+            <v-card class="md-animate-scale">
+                <v-card-title class="text-h6">
+                    {{ $t("download.confirmReplace.batchIncompatibleTitle") }}
+                </v-card-title>
+                <v-card-text>
+                    <div class="mb-3">{{ $t("download.confirmReplace.batchIncompatibleBody") }}</div>
+                    <div class="batch-conflict-list">
+                        <div v-for="entry in batchConfirmDialog.conflicts" :key="entry.key" class="batch-conflict-entry">
+                            <div class="font-weight-bold">{{ entry.title || entry.key }}</div>
+                            <div
+                                v-for="conflict in entry.conflicts"
+                                :key="`${entry.key}-${conflict.incompatibleProjectKey}`"
+                                class="batch-conflict-detail"
+                            >
+                                <div>{{ conflict.incompatibleTitle || conflict.incompatibleProjectKey }}</div>
+                                <div
+                                    v-for="path in conflict.paths"
+                                    :key="path.path"
+                                    class="text-medium-emphasis text-caption"
+                                >
+                                    {{ path.fileName || path.path }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer></v-spacer>
+                    <v-btn variant="text" @click="cancelBatchInstall">{{
+                        $t("download.confirmReplace.cancel")
+                    }}</v-btn>
+                    <v-btn variant="tonal" color="warning" @click="skipConflictedBatchInstall">{{
+                        $t("download.confirmReplace.skipConflicted")
+                    }}</v-btn>
+                    <v-btn color="warning" variant="flat" @click="confirmBatchInstall">{{
+                        $t("download.confirmReplace.confirm")
+                    }}</v-btn>
                 </v-card-actions>
             </v-card>
         </v-dialog>
@@ -240,6 +279,7 @@ const {
     downloadingKeys,
     snackbar,
     confirmDialog,
+    batchConfirmDialog,
 } = storeToRefs(downloadStore);
 
 const isEmptySearch = computed(
@@ -255,6 +295,9 @@ const installMod = (payload: {
     confirm?: boolean;
 }) => downloadStore.installMod(payload);
 const confirmInstall = () => downloadStore.confirmInstall();
+const confirmBatchInstall = () => downloadStore.confirmBatchInstall();
+const skipConflictedBatchInstall = () => downloadStore.skipConflictedBatchInstall();
+const cancelBatchInstall = () => downloadStore.cancelBatchInstall();
 const openVersionsOverlay = (result: models.ModProject) =>
     downloadStore.openVersionsOverlay(result);
 const pinVersion = (version: models.ModVersion) =>
@@ -267,11 +310,34 @@ const versionFileName = (version: models.ModVersion) =>
     downloadStore.versionFileName(version);
 
 const batchDownload = (results: models.ModProject[]) => {
-    for (const result of results) {
-        const index = searchResults.value.indexOf(result);
-        if (index === -1) continue;
-        const state = downloadStates.value[index];
-        installMod({ result, key: state?.key, status: state?.status, confirm: false });
+    void downloadStore.batchInstall(results);
+};
+
+const confirmDialogTitleKey = computed(() => {
+    switch (confirmDialog.value.status) {
+        case "update":
+            return "download.confirmReplace.updateTitle";
+        case "incompatible":
+            return "download.confirmReplace.incompatibleTitle";
+        default:
+            return "download.confirmReplace.conflictTitle";
+    }
+});
+
+const confirmDialogBodyKey = computed(() => {
+    switch (confirmDialog.value.status) {
+        case "update":
+            return "download.confirmReplace.updateBody";
+        case "incompatible":
+            return "download.confirmReplace.incompatibleBody";
+        default:
+            return "download.confirmReplace.conflictBody";
+    }
+});
+
+const onBatchDialogModel = (value: boolean) => {
+    if (!value && batchConfirmDialog.value.show) {
+        cancelBatchInstall();
     }
 };
 
@@ -384,6 +450,23 @@ watch(
 .version-list {
     max-height: calc(100vh - 128px);
     overflow-y: auto;
+}
+
+.batch-conflict-list {
+    display: grid;
+    gap: 10px;
+    max-height: min(320px, 52vh);
+    overflow-y: auto;
+}
+
+.batch-conflict-entry {
+    border: 1px solid rgba(var(--v-border-color), 0.3);
+    border-radius: 6px;
+    padding: 10px;
+}
+
+.batch-conflict-detail {
+    margin-top: 6px;
 }
 
 @media (max-width: 599.98px) {

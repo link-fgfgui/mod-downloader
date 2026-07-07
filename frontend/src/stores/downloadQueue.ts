@@ -1,17 +1,25 @@
 import { defineStore } from "pinia";
 
-import { CancelDownload, GetDownloadQueueState, RetryDownload } from "../../wailsjs/go/main/App";
+import {
+    CancelDownload,
+    ClearOptionalDependencyReminders,
+    DismissOptionalDependencyReminder,
+    GetDownloadQueueState,
+    InstallOptionalDependencies,
+    RetryDownload,
+} from "../../wailsjs/go/main/App";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
 import type { structs } from "../../wailsjs/go/models";
 
 const downloadQueueUpdatedEvent = "download-queue-updated";
 
-type DownloadQueueSnapshot = Pick<structs.DownloadQueueState, "active" | "pending" | "running" | "items">;
+type DownloadQueueSnapshot = Pick<structs.DownloadQueueState, "active" | "pending" | "running" | "messageCount" | "items" | "optionalReminders">;
 
 const emptyQueue = (): DownloadQueueSnapshot => ({
     active: false,
     pending: 0,
     running: 0,
+    messageCount: 0,
 });
 
 export const useDownloadQueueStore = defineStore("downloadQueue", {
@@ -21,8 +29,16 @@ export const useDownloadQueueStore = defineStore("downloadQueue", {
     }),
     getters: {
         activeCount: (state) => (state.queue.pending || 0) + (state.queue.running || 0),
+        messageCount: (state) => state.queue.messageCount || state.queue.optionalReminders?.length || 0,
         items: (state) => state.queue.items || [],
-        hasVisibleItems: (state) => Boolean(state.queue.items?.length),
+        optionalReminders: (state) => state.queue.optionalReminders || [],
+        hasVisibleItems: (state) => Boolean(state.queue.items?.length || state.queue.optionalReminders?.length),
+        hasAnyQueueSurface(): boolean {
+            return Boolean(this.queue.active || this.messageCount);
+        },
+        reminderOnly(): boolean {
+            return Boolean(!this.activeCount && this.messageCount);
+        },
     },
     actions: {
         async refresh() {
@@ -47,6 +63,31 @@ export const useDownloadQueueStore = defineStore("downloadQueue", {
                 await this.refresh();
             }
             return retried;
+        },
+        async dismissOptionalReminder(id: string) {
+            if (!id) {
+                return false;
+            }
+            const dismissed = await DismissOptionalDependencyReminder(id);
+            if (dismissed) {
+                await this.refresh();
+            }
+            return dismissed;
+        },
+        async clearOptionalReminders() {
+            const cleared = await ClearOptionalDependencyReminders();
+            if (cleared) {
+                await this.refresh();
+            }
+            return cleared;
+        },
+        async installOptionalDependencies(id: string) {
+            if (!id) {
+                return [];
+            }
+            const results = await InstallOptionalDependencies(id);
+            await this.refresh();
+            return results || [];
         },
         async start() {
             if (this.stopListening) {

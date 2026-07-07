@@ -7,6 +7,8 @@ import {models} from '../models';
 
 export function AddFavoriteMod(arg1:database.FavoriteMod):Promise<database.FavoriteMod>;
 
+export function AnalyzeBatchIncompatibleConflicts(arg1:structs.BatchDownloadRequest):Promise<structs.BatchIncompatibleAnalysis>;
+
 export function ApplyLocalModBatchOperation(arg1:structs.LocalModBatchOperationRequest):Promise<structs.VersionInfo>;
 
 export function CancelDownload(arg1:string):Promise<boolean>;
@@ -15,9 +17,13 @@ export function ChooseCacheDir():Promise<main.SettingsView>;
 
 export function ChooseMinecraftDir():Promise<string>;
 
+export function ClearOptionalDependencyReminders():Promise<boolean>;
+
 export function CreateFavoriteList(arg1:string):Promise<database.FavoriteList>;
 
 export function DeleteFavoriteList(arg1:string):Promise<boolean>;
+
+export function DismissOptionalDependencyReminder(arg1:string):Promise<boolean>;
 
 export function GetDownloadQueueState():Promise<structs.DownloadQueueState>;
 
@@ -36,6 +42,8 @@ export function GetSelectedVersion():Promise<structs.VersionInfo>;
 export function GetSettings():Promise<main.SettingsView>;
 
 export function GetVersions():Promise<Array<structs.VersionInfo>>;
+
+export function InstallOptionalDependencies(arg1:string):Promise<Array<structs.ModDownloadResult>>;
 
 export function ListFavoriteLists():Promise<Array<database.FavoriteList>>;
 

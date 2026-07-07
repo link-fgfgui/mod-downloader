@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 
 import {
+    AnalyzeBatchIncompatibleConflicts,
     GetDownloadStates,
     GetPinnedModVersion,
     ListMatchingProjectVersions,
@@ -56,6 +57,11 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
         downloadingKeys: {} as Record<string, boolean>,
         snackbar: { show: false, key: "", params: {} as Record<string, string>, color: "success" },
         confirmDialog: { show: false, status: "", result: null as SearchModSnapshot | null, key: "" },
+        batchConfirmDialog: {
+            show: false,
+            conflicts: [] as structs.BatchIncompatibleConflict[],
+            pendingResults: [] as SearchModSnapshot[],
+        },
         stopListeningSearchModsUpdated: null as (() => void) | null,
         stopListeningDownloadQueueUpdated: null as (() => void) | null,
         stopListeningDownloadFailed: null as (() => void) | null,
@@ -63,7 +69,7 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
         stopListeningDownloadStatesUpdated: null as (() => void) | null,
     }),
     getters: {
-        confirmStatuses: () => new Set(["update", "conflict"]),
+        confirmStatuses: () => new Set(["update", "conflict", "incompatible"]),
     },
     actions: {
         showSnackbar(key: string, color = "success", params: Record<string, string> = {}) {
@@ -192,6 +198,47 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
             this.confirmDialog = { show: false, status: "", result: null, key: "" };
             await this.doInstall({ result: result || undefined, key });
         },
+        async batchInstall(results: SearchModSnapshot[]) {
+            const selected = (results || []).filter(Boolean);
+            if (!selected.length || !this.hasSelectedInstance || !this.selectedVersion || !this.selectedModLoader) {
+                return;
+            }
+            const analysis = await AnalyzeBatchIncompatibleConflicts({
+                results: selected,
+                minecraftVersion: this.selectedVersion,
+                modLoader: this.selectedModLoader,
+            } as structs.BatchDownloadRequest);
+            const conflicts = analysis?.conflicts || [];
+            if (conflicts.length > 0) {
+                this.batchConfirmDialog = { show: true, conflicts, pendingResults: selected };
+                return;
+            }
+            await this.installBatchResults(selected);
+        },
+        async confirmBatchInstall() {
+            const selected = [...this.batchConfirmDialog.pendingResults];
+            this.batchConfirmDialog = { show: false, conflicts: [], pendingResults: [] };
+            await this.installBatchResults(selected);
+        },
+        async skipConflictedBatchInstall() {
+            const conflicted = new Set((this.batchConfirmDialog.conflicts || []).map((conflict) => conflict.key));
+            const selected = this.batchConfirmDialog.pendingResults.filter((result) => {
+                const key = this.downloadKeyForResult(result);
+                return key && !conflicted.has(key);
+            });
+            this.batchConfirmDialog = { show: false, conflicts: [], pendingResults: [] };
+            await this.installBatchResults(selected);
+        },
+        cancelBatchInstall() {
+            this.batchConfirmDialog = { show: false, conflicts: [], pendingResults: [] };
+        },
+        async installBatchResults(results: SearchModSnapshot[]) {
+            for (const result of results) {
+                const key = this.downloadKeyForResult(result);
+                if (!key) continue;
+                await this.doInstall({ result, key });
+            }
+        },
         async doInstall(payload: { result?: SearchModSnapshot; key?: string }) {
             const { result, key } = payload || {};
             if (!key || this.downloadingKeys[key] || !this.hasSelectedInstance || !this.selectedVersion || !this.selectedModLoader) {
@@ -275,6 +322,11 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
         modIDFromResult(result: SearchModSnapshot) {
             const id = result?.id || "";
             return id.includes(":") ? id.split(":").slice(1).join(":") : id;
+        },
+        downloadKeyForResult(result: SearchModSnapshot) {
+            const index = this.searchResults.indexOf(result);
+            const stateKey = index >= 0 ? this.downloadStates[index]?.key : "";
+            return stateKey || result?.id || "";
         },
         isPinnedVersion(version: ProjectVersionSnapshot) {
             return this.pinnedVersion?.versionId === version.id;

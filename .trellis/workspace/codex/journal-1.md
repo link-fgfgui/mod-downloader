@@ -176,3 +176,38 @@ Made install-time dependency analysis visible and cancellable through the downlo
 ### Next Steps
 
 - None - task complete
+
+## Session 6: Optional dependency reminders and incompatible conflicts
+
+**Date**: 2026-07-07
+**Task**: Optional dependency reminders and incompatible conflicts
+**Package**: app
+**Branch**: `optional-conflict-incompatible-mods`
+
+### Summary
+
+Implemented optional dependency reminders in the download queue, incompatible dependency conflict analysis and archive handling, batch incompatible preflight dialog behavior, Wails bindings, tests, and related task/spec documentation.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6cc3941` | (see git log) |
+| `e5c2c27` | (see git log) |
+| `6ef5ad5` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
