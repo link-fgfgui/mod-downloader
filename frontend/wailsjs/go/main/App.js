@@ -126,6 +126,14 @@ export function SaveTheme(arg1) {
   return window['go']['main']['App']['SaveTheme'](arg1);
 }
 
+export function SaveUnusedDependencyCleanupSettings(arg1) {
+  return window['go']['main']['App']['SaveUnusedDependencyCleanupSettings'](arg1);
+}
+
+export function ScanUnusedDependencies(arg1) {
+  return window['go']['main']['App']['ScanUnusedDependencies'](arg1);
+}
+
 export function SearchMods(arg1) {
   return window['go']['main']['App']['SearchMods'](arg1);
 }

@@ -4,6 +4,7 @@ import {
     SaveTheme,
     SaveAnimationSettings,
     SaveApiKeys,
+    SaveUnusedDependencyCleanupSettings,
     SaveCacheDirPreference,
     ChooseCacheDir,
     ChooseMinecraftDir,
@@ -29,6 +30,7 @@ export const useSettingsStore = defineStore("settings", {
         isLoading: false,
         isSavingTheme: false,
         isSavingAnimations: false,
+        isSavingUnusedDependencyCleanup: false,
         isSavingKeys: false,
         isSavingCacheDir: false,
         isChoosingDir: false,
@@ -38,6 +40,7 @@ export const useSettingsStore = defineStore("settings", {
         draftTheme: "",
         draftAnimationMode: defaultAnimationMode,
         draftAnimationDurationMultiplier: defaultAnimationDurationMultiplier,
+        draftAutoScanUnusedDependencies: true,
         draftCurseforgeKey: "",
         draftModrinthKey: "",
         clearCurseforgeKey: false,
@@ -60,6 +63,7 @@ export const useSettingsStore = defineStore("settings", {
                 this.draftAnimationDurationMultiplier = normalizeAnimationDurationMultiplier(
                     this.view?.animationDurationMultiplier ?? defaultAnimationDurationMultiplier
                 );
+                this.draftAutoScanUnusedDependencies = this.view?.autoScanUnusedDependencies ?? true;
                 this.draftCurseforgeKey = "";
                 this.draftModrinthKey = "";
                 this.clearCurseforgeKey = false;
@@ -103,6 +107,18 @@ export const useSettingsStore = defineStore("settings", {
                 };
             } finally {
                 this.isSavingAnimations = false;
+            }
+        },
+        async saveUnusedDependencyCleanupSettings() {
+            this.isSavingUnusedDependencyCleanup = true;
+            try {
+                this.view = await SaveUnusedDependencyCleanupSettings({
+                    autoScanUnusedDependencies: this.draftAutoScanUnusedDependencies,
+                });
+                this.draftAutoScanUnusedDependencies = this.view.autoScanUnusedDependencies;
+                return this.view;
+            } finally {
+                this.isSavingUnusedDependencyCleanup = false;
             }
         },
         async saveApiKeys() {

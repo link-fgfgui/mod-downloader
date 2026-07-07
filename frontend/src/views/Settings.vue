@@ -52,6 +52,28 @@
                 </v-card>
 
                 <v-card class="mb-4">
+                    <v-card-title>{{ $t('settings.cleanup.label') }}</v-card-title>
+                    <v-card-text>
+                        <v-switch
+                            v-model="settingsStore.draftAutoScanUnusedDependencies"
+                            color="primary"
+                            density="comfortable"
+                            hide-details
+                            :label="$t('settings.cleanup.autoScan')"
+                        />
+                        <v-btn
+                            :loading="settingsStore.isSavingUnusedDependencyCleanup"
+                            variant="outlined"
+                            prepend-icon="mdi-content-save"
+                            class="mt-3"
+                            @click="saveCleanup"
+                        >
+                            {{ $t('settings.cleanup.save') }}
+                        </v-btn>
+                    </v-card-text>
+                </v-card>
+
+                <v-card class="mb-4">
                     <v-card-title>{{ $t('settings.minecraftDir.label') }}</v-card-title>
                     <v-card-text>
                         <v-text-field :model-value="settingsStore.view?.minecraftDir" readonly density="compact"
@@ -192,6 +214,11 @@ async function saveAnimations() {
     const next = await settingsStore.saveAnimationSettings();
     applyAnimationSettings(next);
     snackbar.value = { show: true, message: t('settings.animations.saved'), color: "success" };
+}
+
+async function saveCleanup() {
+    await settingsStore.saveUnusedDependencyCleanupSettings();
+    snackbar.value = { show: true, message: t('settings.cleanup.saved'), color: "success" };
 }
 
 async function chooseDir() {

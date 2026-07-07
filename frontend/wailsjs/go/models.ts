@@ -135,11 +135,24 @@ export namespace main {
 	        this.modrinthApiKey = source["modrinthApiKey"];
 	    }
 	}
+	export class SaveUnusedDependencyCleanupSettingsRequest {
+	    autoScanUnusedDependencies: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new SaveUnusedDependencyCleanupSettingsRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.autoScanUnusedDependencies = source["autoScanUnusedDependencies"];
+	    }
+	}
 	export class SettingsView {
 	    theme: string;
 	    animationMode: string;
 	    animationEnabled: boolean;
 	    animationDurationMultiplier: number;
+	    autoScanUnusedDependencies: boolean;
 	    minecraftDir: string;
 	    cacheDir: string;
 	    cachePath: string;
@@ -158,6 +171,7 @@ export namespace main {
 	        this.animationMode = source["animationMode"];
 	        this.animationEnabled = source["animationEnabled"];
 	        this.animationDurationMultiplier = source["animationDurationMultiplier"];
+	        this.autoScanUnusedDependencies = source["autoScanUnusedDependencies"];
 	        this.minecraftDir = source["minecraftDir"];
 	        this.cacheDir = source["cacheDir"];
 	        this.cachePath = source["cachePath"];
@@ -423,6 +437,20 @@ export namespace structs {
 	        this.action = source["action"];
 	    }
 	}
+	export class LocalModDependency {
+	    modId: string;
+	    type?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new LocalModDependency(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.modId = source["modId"];
+	        this.type = source["type"];
+	    }
+	}
 	export class ModDownloadButtonState {
 	    key: string;
 	    status: string;
@@ -523,6 +551,7 @@ export namespace structs {
 	    categories?: string[];
 	    enabled: boolean;
 	    jijMods?: JijModInfo[];
+	    dependencies?: LocalModDependency[];
 	
 	    static createFrom(source: any = {}) {
 	        return new ModInfo(source);
@@ -545,6 +574,7 @@ export namespace structs {
 	        this.categories = source["categories"];
 	        this.enabled = source["enabled"];
 	        this.jijMods = this.convertValues(source["jijMods"], JijModInfo);
+	        this.dependencies = this.convertValues(source["dependencies"], LocalModDependency);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -606,6 +636,70 @@ export namespace structs {
 	        this.offset = source["offset"];
 	        this.limit = source["limit"];
 	    }
+	}
+	export class UnusedDependencyCandidate {
+	    path: string;
+	    fileName: string;
+	    modIds: string[];
+	    name?: string;
+	    onlineName?: string;
+	    evidence?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new UnusedDependencyCandidate(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.fileName = source["fileName"];
+	        this.modIds = source["modIds"];
+	        this.name = source["name"];
+	        this.onlineName = source["onlineName"];
+	        this.evidence = source["evidence"];
+	    }
+	}
+	export class UnusedDependencyScanRequest {
+	    excludedPaths?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new UnusedDependencyScanRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.excludedPaths = source["excludedPaths"];
+	    }
+	}
+	export class UnusedDependencyScanResult {
+	    candidates: UnusedDependencyCandidate[];
+	
+	    static createFrom(source: any = {}) {
+	        return new UnusedDependencyScanResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.candidates = this.convertValues(source["candidates"], UnusedDependencyCandidate);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class VersionInfo {
 	    name: string;

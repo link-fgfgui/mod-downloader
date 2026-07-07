@@ -480,6 +480,144 @@ func (a *App) ApplyLocalModBatchOperation(req structs.LocalModBatchOperationRequ
 }
 ```
 
+### Scenario: Unused Dependency Cleanup Scan
+
+#### 1. Scope / Trigger
+
+Use this pattern when the app needs to suggest cleanup candidates for local
+dependency/library JARs. This is a cross-layer workflow: `minecraft` parses
+local dependency declarations, `appcore` builds the selected-instance graph,
+`app.go` exposes the Wails RPC, and Manage renders a confirmation dialog before
+deleting through the existing local file mutation API.
+
+#### 2. Signatures
+
+JAR-derived dependency metadata lives on local mod info:
+
+```go
+type LocalModDependency struct {
+    ModID string `json:"modId"`
+    Type  string `json:"type,omitempty"` // "required"
+}
+
+type ModInfo struct {
+    ID           string               `json:"id"`
+    Path         string               `json:"path"`
+    Enabled      bool                 `json:"enabled"`
+    Categories   []string             `json:"categories,omitempty"`
+    JijMods      []JijModInfo         `json:"jijMods,omitempty"`
+    Dependencies []LocalModDependency `json:"dependencies,omitempty"`
+}
+```
+
+Scan request/response lives in `core/structs`:
+
+```go
+type UnusedDependencyScanRequest struct {
+    ExcludedPaths []string `json:"excludedPaths,omitempty"`
+}
+
+type UnusedDependencyCandidate struct {
+    Path       string   `json:"path"`
+    FileName   string   `json:"fileName"`
+    ModIDs     []string `json:"modIds"`
+    Name       string   `json:"name,omitempty"`
+    OnlineName string   `json:"onlineName,omitempty"`
+    Evidence   []string `json:"evidence,omitempty"`
+}
+
+type UnusedDependencyScanResult struct {
+    Candidates []UnusedDependencyCandidate `json:"candidates"`
+}
+```
+
+Core and Wails adapters:
+
+```go
+func (s *Service) ScanUnusedDependencies(req structs.UnusedDependencyScanRequest) (structs.UnusedDependencyScanResult, error)
+func (a *App) ScanUnusedDependencies(req structs.UnusedDependencyScanRequest) structs.UnusedDependencyScanResult
+```
+
+#### 3. Contracts
+
+- `minecraft` parses only cleanup-relevant required dependencies:
+  - Fabric: `fabric.mod.json.depends`
+  - Forge/NeoForge: mandatory or typed-required `[[dependencies.<modid>]]`
+- Ignore pseudo-dependencies such as `minecraft`, `java`, `fabricloader`,
+  `forge`, and `neoforge`.
+- Strong install identities are top-level `ModInfo.ID` values only.
+- `JijMods` are display/diagnostic metadata and must not become dependency
+  graph nodes.
+- Disabled local mod files do not count as dependents; only enabled,
+  non-excluded top-level files keep a dependency alive.
+- `ExcludedPaths` removes files from the dependent set. Use it before a delete
+  action to answer "what becomes unused if these files are deleted?"
+- A cleanup candidate must have explicit dependency/library evidence, such as
+  online category/tag `library` or being required by an excluded file. Do not
+  suggest ordinary content mods just because nothing depends on them.
+- Candidate deletion must go through `ApplyLocalModBatchOperation(delete)` so
+  selected-instance path validation remains centralized.
+
+#### 4. Validation & Error Matrix
+
+- No selected version -> service returns an error; Wails adapter converts it to
+  a rejected frontend promise via panic.
+- Empty or nil `ExcludedPaths` -> manual scan of current selected mods.
+- Missing online metadata -> do not fail the scan; rely on local dependency
+  graph evidence where available.
+- Scan failure after a successful delete -> report cleanup scan failure
+  separately; do not report the delete as failed.
+- Candidate confirmation canceled -> leave all files unchanged.
+
+#### 5. Good/Base/Bad Cases
+
+- Good: user deletes `main.jar`; before deletion Manage scans with
+  `ExcludedPaths: ["main.jar"]`; `lib.jar` is suggested only if no remaining
+  enabled mod requires `lib` and it has library/dependency evidence.
+- Base: manual scan with no candidates shows an empty localized result.
+- Bad: scan expands `JijMods` into graph nodes and incorrectly preserves or
+  deletes a host JAR based on bundled weak references.
+- Bad: frontend deletes candidate paths directly instead of calling
+  `ApplyLocalModBatchOperation`.
+
+#### 6. Tests Required
+
+- Parser tests for Fabric, Forge, and NeoForge required dependencies.
+- Parser tests that optional/pseudo dependencies are ignored.
+- Service scan tests for:
+  - candidate required only by excluded enabled files;
+  - candidate still required by a remaining enabled file;
+  - disabled dependents ignored;
+  - ordinary non-library mods not suggested.
+- Frontend type-check/build after Wails binding regeneration.
+
+#### 7. Wrong vs Correct
+
+Wrong:
+
+```go
+// Treats every unreferenced mod as safe to delete.
+if !requiredByActive[mod.ID] {
+    candidates = append(candidates, mod)
+}
+```
+
+Correct:
+
+```go
+// Requires both "not used by enabled remaining mods" and explicit evidence.
+if !requiredByActive[id] && (hasOnlineLibraryTag(mod) || requiredByExcluded[id]) {
+    candidates = append(candidates, mod)
+}
+```
+
+### Gotcha: Wails Binding Generation Needs Embeddable Frontend Dist
+
+`wails generate module` type-checks the Go package that embeds
+`frontend/dist`. If `frontend/dist` is missing or empty, generation fails before
+bindings are written. Run `npm run build` first, or otherwise ensure
+`frontend/dist` contains at least one embeddable file, then rerun generation.
+
 #### 3. Contracts
 
 - Provider converters populate `models.ModProject.Categories` from provider-native categories/tags:
