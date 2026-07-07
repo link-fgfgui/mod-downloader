@@ -108,3 +108,38 @@ Implemented separate Favorites playlist management with persistent favorite list
 ### Next Steps
 
 - None - task complete
+
+
+## Session 4: Cancellable dependency analysis
+
+**Date**: 2026-07-07
+**Task**: Cancellable dependency analysis
+**Package**: app
+**Branch**: `cancel-analyse-in-download`
+
+### Summary
+
+Made install-time dependency analysis visible and cancellable through the download queue, added downloader cancellation regression tests, and recorded the queue preflight cancellation contract in backend specs.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2af58d9` | (see git log) |
+| `9af0fef` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
