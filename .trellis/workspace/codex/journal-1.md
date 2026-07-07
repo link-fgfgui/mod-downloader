@@ -108,3 +108,40 @@ Implemented separate Favorites playlist management with persistent favorite list
 ### Next Steps
 
 - None - task complete
+
+
+## Session 4: Favorite SQL storage references
+
+**Date**: 2026-07-07
+**Task**: Favorite SQL storage references
+**Package**: app
+**Branch**: `enhance-favorite-page`
+
+### Summary
+
+Implemented SQLite-backed favorite groups, list metadata, live list references, recursive content resolution, tests, and documented user-data schema migrations.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ec2bd67` | (see git log) |
+| `1f4da8b` | (see git log) |
+| `08e228e` | (see git log) |
+| `f232bf3` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
