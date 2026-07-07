@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 14
+- **Total Sessions**: 15
 - **Last Active**: 2026-07-07
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~478 | Active |
+| `journal-1.md` | ~512 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 15 | 2026-07-07 | Sidebar version tuple scoped mod state | `1c81ecc` | `master` |
 | 14 | 2026-07-07 | SQLite user data storage | `0f3e500`, `175b83c` | `master` |
 | 13 | 2026-07-07 | Check core CLI compatibility | `f42c5ae` | `master` |
 | 12 | 2026-07-05 | Use online metadata categories in Manage | `73939ca` | `master` |

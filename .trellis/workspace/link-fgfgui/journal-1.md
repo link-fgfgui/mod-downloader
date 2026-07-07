@@ -476,3 +476,37 @@ Moved pinned mod versions and favorites into SQLite user-data storage, exposed c
 ### Next Steps
 
 - None - task complete
+
+
+## Session 15: Sidebar version tuple scoped mod state
+
+**Date**: 2026-07-07
+**Task**: Sidebar version tuple scoped mod state
+**Package**: app
+**Branch**: `master`
+
+### Summary
+
+Moved download tuple controls into the sidebar, synchronized download/manage actions to the active Minecraft version and modloader tuple, and disabled downloads when no instance is selected.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1c81ecc` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
