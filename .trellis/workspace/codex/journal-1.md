@@ -181,3 +181,39 @@ Implemented favorite bulk-add, whole-list copy, live reference service methods, 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 6: Favorite version migration
+
+**Date**: 2026-07-08
+**Task**: Favorite version migration
+**Package**: app
+**Branch**: `enhance-favorite-page`
+
+### Summary
+
+Implemented favorite list version/modloader migration preview and apply APIs, exposed Wails bindings, added conflict tests, and documented the migration contract.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `168062f` | (see git log) |
+| `51fba0b` | (see git log) |
+| `21ff45e` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
