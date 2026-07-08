@@ -119,7 +119,6 @@ Implemented separate Favorites playlist management with persistent favorite list
 ### Summary
 
 Changed Wails GUI cache default to the process working directory via appcore DefaultCacheDir while preserving core/CLI temp-dir fallback. Core submodule work commit: 92727d9.
-
 ### Main Changes
 
 (Add details)
@@ -266,6 +265,39 @@ Implemented local JAR required-dependency parsing, unused dependency scan servic
 |------|---------|
 | `5311a4d` | (see git log) |
 | `8cb9e14` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+## Session 9: Add meaningful home panel
+
+**Date**: 2026-07-07
+**Task**: Add meaningful home panel
+**Package**: app
+**Branch**: `meaningful-homepage`
+
+### Summary
+
+Created and completed a Trellis task for replacing the generic home welcome card with a localized workflow panel linking to Download, Manage, Favorites, Unpin, and Settings. Verified with frontend build and lint.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `851e2f9` | (see git log) |
 
 ### Testing
 
