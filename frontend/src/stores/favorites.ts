@@ -48,8 +48,32 @@ export type FavoriteMigrationTarget = {
 };
 
 const normalizeKeyPart = (value?: string) => (value || "").trim().toLowerCase();
+const normalizeMinecraftVersion = (value?: string) => (value || "").trim();
 const favoriteKey = (mod: Pick<database.FavoriteMod, "platform" | "modId" | "minecraftVersion" | "modLoader">) =>
-    [normalizeKeyPart(mod.platform), normalizeKeyPart(mod.modId), mod.minecraftVersion || "", normalizeKeyPart(mod.modLoader)].join("|");
+    [normalizeKeyPart(mod.platform), normalizeKeyPart(mod.modId), normalizeMinecraftVersion(mod.minecraftVersion), normalizeKeyPart(mod.modLoader)].join("|");
+
+const hasFavoriteScope = (minecraftVersion: string, modLoader: string) => Boolean(minecraftVersion && modLoader);
+
+const favoriteMatchesScope = (
+    mod: Pick<database.FavoriteMod, "minecraftVersion" | "modLoader">,
+    minecraftVersion: string,
+    modLoader: string,
+) =>
+    hasFavoriteScope(minecraftVersion, modLoader) &&
+    normalizeMinecraftVersion(mod.minecraftVersion) === minecraftVersion &&
+    normalizeKeyPart(mod.modLoader) === modLoader;
+
+const favoriteContentsForScope = (
+    contents: database.FavoriteListContents | null,
+    minecraftVersion: string,
+    modLoader: string,
+): database.FavoriteListContents | null => {
+    if (!contents) return null;
+    return {
+        ...contents,
+        mods: (contents.mods || []).filter((mod) => favoriteMatchesScope(mod, minecraftVersion, modLoader)),
+    } as database.FavoriteListContents;
+};
 
 const listOrder = (a: database.FavoriteList, b: database.FavoriteList) =>
     Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || a.sortOrder - b.sortOrder || a.name.localeCompare(b.name);
@@ -62,6 +86,8 @@ export const useFavoritesStore = defineStore("favorites", {
         groups: [] as database.FavoriteGroup[],
         lists: [] as database.FavoriteList[],
         selectedListId: "",
+        displayMinecraftVersion: "",
+        displayModLoader: "",
         contents: null as database.FavoriteListContents | null,
         items: [] as database.FavoriteModEntry[],
         isLoadingLists: false,
@@ -72,7 +98,7 @@ export const useFavoritesStore = defineStore("favorites", {
     }),
     getters: {
         selectedList(state): database.FavoriteList | null {
-            return state.lists.find((list) => list.id === state.selectedListId) || state.lists[0] || null;
+            return state.lists.find((list) => list.id === state.selectedListId) || null;
         },
         itemKey: () => favoriteKey,
         pinnedLists(state): database.FavoriteList[] {
@@ -95,19 +121,36 @@ export const useFavoritesStore = defineStore("favorites", {
         },
     },
     actions: {
+        setDisplayScope(minecraftVersion: string, modLoader: string) {
+            const nextMinecraftVersion = normalizeMinecraftVersion(minecraftVersion);
+            const nextModLoader = normalizeKeyPart(modLoader);
+            if (this.displayMinecraftVersion === nextMinecraftVersion && this.displayModLoader === nextModLoader) {
+                return false;
+            }
+            this.displayMinecraftVersion = nextMinecraftVersion;
+            this.displayModLoader = nextModLoader;
+            this.closeSelectedList();
+            return true;
+        },
+        closeSelectedList() {
+            this.selectedListId = "";
+            this.contents = null;
+            this.items = [];
+        },
         async loadLists() {
             this.isLoadingLists = true;
             try {
                 const [groups, lists] = await Promise.all([ListFavoriteGroups(), ListFavoriteLists()]);
                 this.groups = (groups || []).sort(groupOrder);
                 this.lists = (lists || []).sort(listOrder);
-                if (!this.selectedListId || !this.lists.some((list) => list.id === this.selectedListId)) {
-                    this.selectedListId = this.lists[0]?.id || "";
+                if (this.selectedListId && !this.lists.some((list) => list.id === this.selectedListId)) {
+                    this.closeSelectedList();
                 }
                 if (this.selectedListId) {
                     await this.loadItems(this.selectedListId);
                 } else {
                     this.items = [];
+                    this.contents = null;
                 }
             } finally {
                 this.isLoadingLists = false;
@@ -122,7 +165,11 @@ export const useFavoritesStore = defineStore("favorites", {
             }
             this.isLoadingItems = true;
             try {
-                this.contents = (await ListFavoriteContents(targetListId)) || null;
+                this.contents = favoriteContentsForScope(
+                    (await ListFavoriteContents(targetListId)) || null,
+                    this.displayMinecraftVersion,
+                    this.displayModLoader,
+                );
                 this.items = this.contents?.mods || [];
             } finally {
                 this.isLoadingItems = false;
@@ -152,8 +199,7 @@ export const useFavoritesStore = defineStore("favorites", {
             if (!ok) return false;
             this.lists = this.lists.filter((list) => list.id !== listId);
             if (this.selectedListId === listId) {
-                this.selectedListId = this.lists[0]?.id || "";
-                await this.loadItems(this.selectedListId);
+                this.closeSelectedList();
             }
             return true;
         },
@@ -285,7 +331,7 @@ export const useFavoritesStore = defineStore("favorites", {
             if (!targetListId || this.isExportingPackwiz) return null;
             this.isExportingPackwiz = true;
             try {
-                return await ExportFavoriteListPackwizZip(targetListId);
+                return await ExportFavoriteListPackwizZip(targetListId, this.displayMinecraftVersion, this.displayModLoader);
             } finally {
                 this.isExportingPackwiz = false;
             }

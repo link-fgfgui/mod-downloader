@@ -407,12 +407,14 @@
 </template>
 
 <script setup>
-import { computed, onActivated, reactive, ref } from "vue";
+import { computed, onActivated, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import VirtualList from "../components/VirtualList.vue";
 import { useFavoritesStore } from "../stores/favorites";
+import { useMinecraftStore } from "../stores/minecraft";
 
 const favoritesStore = useFavoritesStore();
+const minecraftStore = useMinecraftStore();
 const { t } = useI18n();
 const selectedList = computed(() => favoritesStore.selectedList);
 const draggedListId = ref("");
@@ -456,6 +458,12 @@ const listIconUrl = (list) => (list?.iconKind === "project" ? list.iconUrl || ""
 const listIconName = (list) => (list?.iconKind === "mdi" && list.iconValue ? list.iconValue : "mdi-playlist-star");
 const showMessage = (message, color = "success") => {
     snackbar.value = { show: true, message, color };
+};
+const syncFavoriteDisplayScope = () => {
+    favoritesStore.setDisplayScope(
+        minecraftStore.selectedMinecraftVersion,
+        minecraftStore.selectedModLoader,
+    );
 };
 
 const openListEdit = (list = null) => {
@@ -629,7 +637,15 @@ const errorMessage = (error) => {
     return error.message || String(error);
 };
 
+watch(
+    () => [minecraftStore.selectedMinecraftVersion, minecraftStore.selectedModLoader],
+    ([minecraftVersion, modLoader]) => {
+        favoritesStore.setDisplayScope(String(minecraftVersion || ""), String(modLoader || ""));
+    },
+);
+
 onActivated(() => {
+    syncFavoriteDisplayScope();
     void favoritesStore.loadLists();
 });
 </script>

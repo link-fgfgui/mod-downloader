@@ -246,7 +246,7 @@ func (a *App) RemoveFavoriteMod(listID, platform, modID, mcVersion, modLoader st
 	return a.service().RemoveFavoriteMod(listID, platform, modID, mcVersion, modLoader)
 }
 
-func (a *App) ExportFavoriteListPackwizZip(listID string) ExportFavoritePackwizResult {
+func (a *App) ExportFavoriteListPackwizZip(listID, minecraftVersion, modLoader string) ExportFavoritePackwizResult {
 	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
 		Title:                "Export packwiz modpack",
 		DefaultFilename:      a.service().FavoriteListPackwizDefaultFilename(listID),
@@ -266,7 +266,7 @@ func (a *App) ExportFavoriteListPackwizZip(listID string) ExportFavoritePackwizR
 	if filepath.Ext(path) == "" {
 		path += ".zip"
 	}
-	result, err := a.service().ExportFavoriteListPackwizZip(listID, path)
+	result, err := a.service().ExportFavoriteListPackwizZipForScope(listID, path, minecraftVersion, modLoader)
 	if err != nil {
 		logging.Error("export favorite packwiz zip failed", "listID", listID, "path", path, "error", err)
 		panic("export packwiz failed: " + err.Error())
