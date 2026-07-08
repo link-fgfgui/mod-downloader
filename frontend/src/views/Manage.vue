@@ -164,7 +164,7 @@
             </template>
         </VirtualList>
 
-        <v-dialog v-model="deleteDialog" max-width="420">
+        <v-dialog v-model="deleteDialog" max-width="420" @after-leave="clearClosedDeleteDialog">
             <v-card>
                 <v-card-title>{{ $t("manage.confirmDelete.title") }}</v-card-title>
                 <v-card-text>
@@ -457,9 +457,6 @@ const confirmDelete = async () => {
     const ok = await applyBatchOperation(groups, "delete", clearSelection);
     if (ok) {
         deleteDialog.value = false;
-        pendingDeleteGroups.value = [];
-        pendingDeleteCount.value = 0;
-        pendingDeleteClearSelection = null;
         if (cleanupError) {
             showSnackbar("manage.cleanup.scanFailed", "warning");
         } else if (cleanupResult) {
@@ -546,6 +543,13 @@ const confirmCleanupDelete = async () => {
     } finally {
         cleanupOperation.value = false;
     }
+};
+
+const clearClosedDeleteDialog = () => {
+    if (deleteDialog.value) return;
+    pendingDeleteGroups.value = [];
+    pendingDeleteCount.value = 0;
+    pendingDeleteClearSelection = null;
 };
 
 const errorMessage = (error) => {

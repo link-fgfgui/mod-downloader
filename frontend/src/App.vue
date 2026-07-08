@@ -52,7 +52,7 @@
                             <div>
                                 <div class="download-queue-title">{{ $t("download.queue.title") }}</div>
                                 <div class="download-queue-summary">
-                                    {{ $t("download.queue.summary", { running: downloadQueueStore.queue.running, pending: downloadQueueStore.queue.pending }) }}
+                                    {{ $t("download.queue.summary", { running: visibleDownloadQueue.running, pending: visibleDownloadQueue.pending }) }}
                                 </div>
                             </div>
                             <v-btn
@@ -224,13 +224,37 @@ const minecraftStore = useMinecraftStore();
 const activeAnimationMode = useActiveAnimationMode();
 const downloadQueueOpen = ref(false);
 const downloadQueueTab = ref("downloads");
-const activeDownloadCount = computed(() => downloadQueueStore.activeCount);
-const queueBadgeCount = computed(() => activeDownloadCount.value + downloadQueueStore.messageCount);
+const visibleQueueSnapshot = ref<DownloadQueueSnapshot | null>(null);
+
+type DownloadQueueSnapshot = Pick<
+    structs.DownloadQueueState,
+    "active" | "pending" | "running" | "messageCount" | "items" | "optionalReminders"
+>;
+
+const cloneDownloadQueue = (queue: DownloadQueueSnapshot): DownloadQueueSnapshot => ({
+    active: Boolean(queue.active),
+    pending: queue.pending || 0,
+    running: queue.running || 0,
+    messageCount: queue.messageCount || 0,
+    items: (queue.items || []).map((item) => ({ ...item })),
+    optionalReminders: (queue.optionalReminders || []).map((reminder) => ({
+        ...reminder,
+        dependencies: (reminder.dependencies || []).map((candidate) => ({ ...candidate })),
+    })),
+});
+
+const visibleDownloadQueue = computed(() => (
+    downloadQueueStore.hasAnyQueueSurface
+        ? downloadQueueStore.queue
+        : (visibleQueueSnapshot.value || downloadQueueStore.queue)
+));
+const visibleActiveDownloadCount = computed(() => (visibleDownloadQueue.value.pending || 0) + (visibleDownloadQueue.value.running || 0));
+const queueBadgeCount = computed(() => visibleActiveDownloadCount.value + (visibleDownloadQueue.value.messageCount || 0));
 const queueSurfaceVisible = computed(() => downloadQueueStore.hasAnyQueueSurface);
 const reminderOnly = computed(() => downloadQueueStore.reminderOnly);
 const queueFabIcon = computed(() => (reminderOnly.value ? "mdi-bell-outline" : "mdi-download"));
-const downloadQueueItems = computed(() => downloadQueueStore.items);
-const downloadQueueReminders = computed(() => downloadQueueStore.optionalReminders);
+const downloadQueueItems = computed(() => visibleDownloadQueue.value.items || []);
+const downloadQueueReminders = computed(() => visibleDownloadQueue.value.optionalReminders || []);
 
 const gsapAnimationsActive = computed(() => activeAnimationMode.value === animationModeGsap);
 
@@ -253,8 +277,9 @@ const fabTransitionProps = computed(() => (
             onBeforeEnter: beforeGsapFabEnter,
             onEnter: enterGsapFab,
             onLeave: leaveGsapFab,
+            onAfterLeave: clearDownloadQueueSnapshot,
         }
-        : { name: "md-fab" }
+        : { name: "md-fab", onAfterLeave: clearDownloadQueueSnapshot }
 ));
 
 const queueStatusIcon = (status: string) => {
@@ -333,6 +358,22 @@ watch(
         }
     }
 );
+
+watch(
+    () => downloadQueueStore.queue,
+    (queue) => {
+        if (downloadQueueStore.hasAnyQueueSurface) {
+            visibleQueueSnapshot.value = cloneDownloadQueue(queue);
+        }
+    },
+    { deep: true, immediate: true },
+);
+
+function clearDownloadQueueSnapshot() {
+    if (!downloadQueueStore.hasAnyQueueSurface) {
+        visibleQueueSnapshot.value = null;
+    }
+}
 
 const isEditableTarget = (target: EventTarget | null) => {
     if (!(target instanceof HTMLElement)) return false;

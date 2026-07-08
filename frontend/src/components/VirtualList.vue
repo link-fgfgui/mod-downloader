@@ -17,13 +17,13 @@
             </template>
         </v-virtual-scroll>
 
-        <Transition name="action-bar">
+        <Transition name="action-bar" @after-leave="clearActionBarSnapshot">
             <div v-if="selectable && selectedIndices.size > 0" class="floating-action-bar">
                 <v-chip size="small" variant="tonal" color="primary" class="me-2">
-                    {{ selectedIndices.size }}
+                    {{ visibleSelectionCount }}
                 </v-chip>
 
-                <slot name="actions" :selected-items="selectedItemsList" :selected-indices="selectedIndices"
+                <slot name="actions" :selected-items="visibleSelectedItemsList" :selected-indices="visibleSelectedIndices"
                     :clear-selection="clearSelection">
                 </slot>
             </div>
@@ -83,6 +83,8 @@ let lastScrollTop = 0;
 let currentDirection = "down";
 
 const selectedIndices = reactive(new Set());
+const actionBarSnapshot = ref(null);
+const latestSelectedItems = ref([]);
 let lastClickedIndex = null;
 const activeAnimationMode = useActiveAnimationMode();
 
@@ -119,15 +121,34 @@ const itemEnterStyle = (index) => ({
     animationDelay: `${Math.min(index, 5) * 40}ms`,
 });
 
+const selectedItemsList = computed(() => {
+    return [...selectedIndices].sort((a, b) => a - b).map((i) => props.items[i]).filter(Boolean);
+});
+
+const refreshLatestSelectedItems = () => {
+    latestSelectedItems.value = selectedItemsList.value;
+};
+
+const snapshotActionBarSelection = () => {
+    if (selectedIndices.size === 0) return;
+    actionBarSnapshot.value = {
+        indices: new Set(selectedIndices),
+        items: latestSelectedItems.value.length ? latestSelectedItems.value : selectedItemsList.value,
+    };
+};
+
 const clearSelection = () => {
+    snapshotActionBarSelection();
     selectedIndices.clear();
     lastClickedIndex = null;
 };
 
 const selectAll = () => {
+    actionBarSnapshot.value = null;
     for (let i = 0; i < props.items.length; i++) {
         selectedIndices.add(i);
     }
+    refreshLatestSelectedItems();
 };
 
 const onItemClick = (index, event) => {
@@ -137,23 +158,36 @@ const onItemClick = (index, event) => {
         const from = Math.min(lastClickedIndex, index);
         const to = Math.max(lastClickedIndex, index);
         if (!event.ctrlKey && !event.metaKey) {
+            actionBarSnapshot.value = null;
             selectedIndices.clear();
         }
         for (let i = from; i <= to; i++) {
             selectedIndices.add(i);
         }
+        refreshLatestSelectedItems();
     } else if (event.ctrlKey || event.metaKey) {
         if (selectedIndices.has(index)) {
+            if (selectedIndices.size === 1) {
+                snapshotActionBarSelection();
+            }
             selectedIndices.delete(index);
+            if (selectedIndices.size > 0) {
+                refreshLatestSelectedItems();
+            }
         } else {
+            actionBarSnapshot.value = null;
             selectedIndices.add(index);
+            refreshLatestSelectedItems();
         }
     } else {
         if (selectedIndices.has(index) && selectedIndices.size === 1) {
+            snapshotActionBarSelection();
             selectedIndices.clear();
         } else {
+            actionBarSnapshot.value = null;
             selectedIndices.clear();
             selectedIndices.add(index);
+            refreshLatestSelectedItems();
         }
     }
     lastClickedIndex = index;
@@ -173,9 +207,24 @@ const onKeydown = (event) => {
     }
 };
 
-const selectedItemsList = computed(() => {
-    return [...selectedIndices].sort((a, b) => a - b).map((i) => props.items[i]).filter(Boolean);
-});
+const visibleSelectedIndices = computed(() => (
+    selectedIndices.size > 0 ? selectedIndices : (actionBarSnapshot.value?.indices || selectedIndices)
+));
+
+const visibleSelectedItemsList = computed(() => (
+    selectedIndices.size > 0 ? selectedItemsList.value : (actionBarSnapshot.value?.items || [])
+));
+
+const visibleSelectionCount = computed(() => (
+    selectedIndices.size > 0 ? selectedIndices.size : (actionBarSnapshot.value?.indices?.size || 0)
+));
+
+const clearActionBarSnapshot = () => {
+    if (selectedIndices.size === 0) {
+        actionBarSnapshot.value = null;
+        latestSelectedItems.value = [];
+    }
+};
 
 const setLoadMoreTarget = (element) => {
     if (loadMoreTarget.value === element) return;

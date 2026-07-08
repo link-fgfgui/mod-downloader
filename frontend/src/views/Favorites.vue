@@ -157,7 +157,7 @@
             </v-card>
         </v-dialog>
 
-        <v-dialog v-model="deleteDialog.show" max-width="420">
+        <v-dialog v-model="deleteDialog.show" max-width="420" @after-leave="clearClosedDeleteDialog">
             <v-card>
                 <v-card-title>{{ $t("favorites.dialog.deleteTitle") }}</v-card-title>
                 <v-card-text>{{ $t("favorites.dialog.deleteBody", { name: deleteDialog.list?.name || "" }) }}</v-card-text>
@@ -235,6 +235,10 @@ const deleteList = async () => {
     if (!deleteDialog.list) return;
     await favoritesStore.deleteList(deleteDialog.list.id);
     deleteDialog.show = false;
+};
+
+const clearClosedDeleteDialog = () => {
+    if (deleteDialog.show) return;
     deleteDialog.list = null;
 };
 
