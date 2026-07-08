@@ -1,19 +1,19 @@
 export namespace appcore {
-
+	
 	export class FavoriteBulkAddRequest {
 	    targetListIds: string[];
 	    mods: database.FavoriteMod[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new FavoriteBulkAddRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.targetListIds = source["targetListIds"];
 	        this.mods = this.convertValues(source["mods"], database.FavoriteMod);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -37,11 +37,11 @@ export namespace appcore {
 	    updated: number;
 	    skipped: number;
 	    errors?: string[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new FavoriteBulkOperationResult(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.added = source["added"];
@@ -53,11 +53,11 @@ export namespace appcore {
 	export class FavoriteListCopyRequest {
 	    sourceListId: string;
 	    targetListId: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new FavoriteListCopyRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.sourceListId = source["sourceListId"];
@@ -67,17 +67,17 @@ export namespace appcore {
 	export class FavoriteMigrationConflict {
 	    source: database.FavoriteModEntry;
 	    reason: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new FavoriteMigrationConflict(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.source = this.convertValues(source["source"], database.FavoriteModEntry);
 	        this.reason = source["reason"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -101,11 +101,11 @@ export namespace appcore {
 	    target: database.FavoriteMod;
 	    project: models.ModProject;
 	    version: models.ModVersion;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new FavoriteMigrationMatch(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.source = this.convertValues(source["source"], database.FavoriteModEntry);
@@ -113,7 +113,7 @@ export namespace appcore {
 	        this.project = this.convertValues(source["project"], models.ModProject);
 	        this.version = this.convertValues(source["version"], models.ModVersion);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -138,11 +138,11 @@ export namespace appcore {
 	    matched: FavoriteMigrationMatch[];
 	    conflicts: FavoriteMigrationConflict[];
 	    errors?: string[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new FavoriteMigrationPreview(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.sourceListId = source["sourceListId"];
@@ -151,7 +151,7 @@ export namespace appcore {
 	        this.conflicts = this.convertValues(source["conflicts"], FavoriteMigrationConflict);
 	        this.errors = source["errors"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -174,18 +174,18 @@ export namespace appcore {
 	    applied: boolean;
 	    preview: FavoriteMigrationPreview;
 	    result: FavoriteBulkOperationResult;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new FavoriteMigrationApplyResult(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.applied = source["applied"];
 	        this.preview = this.convertValues(source["preview"], FavoriteMigrationPreview);
 	        this.result = this.convertValues(source["result"], FavoriteBulkOperationResult);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -204,20 +204,20 @@ export namespace appcore {
 		    return a;
 		}
 	}
-
-
-
+	
+	
+	
 	export class FavoriteMigrationRequest {
 	    sourceListId: string;
 	    targetListId: string;
 	    minecraftVersion: string;
 	    modLoader: string;
 	    ignoreConflicts?: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new FavoriteMigrationRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.sourceListId = source["sourceListId"];
@@ -231,18 +231,18 @@ export namespace appcore {
 }
 
 export namespace database {
-
+	
 	export class FavoriteGroup {
 	    id: string;
 	    name: string;
 	    createdAt: number;
 	    updatedAt: number;
 	    sortOrder: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new FavoriteGroup(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -264,11 +264,11 @@ export namespace database {
 	    updatedAt: number;
 	    sortOrder: number;
 	    system?: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new FavoriteList(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -291,11 +291,11 @@ export namespace database {
 	    createdAt: number;
 	    updatedAt: number;
 	    sortOrder: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new FavoriteListRef(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -324,11 +324,11 @@ export namespace database {
 	    sourceListId?: string;
 	    sourceListName?: string;
 	    referenced?: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new FavoriteModEntry(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -354,18 +354,18 @@ export namespace database {
 	    listId: string;
 	    mods: FavoriteModEntry[];
 	    refs?: FavoriteListRef[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new FavoriteListContents(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.listId = source["listId"];
 	        this.mods = this.convertValues(source["mods"], FavoriteModEntry);
 	        this.refs = this.convertValues(source["refs"], FavoriteListRef);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -384,7 +384,7 @@ export namespace database {
 		    return a;
 		}
 	}
-
+	
 	export class FavoriteMod {
 	    id: string;
 	    listId: string;
@@ -400,11 +400,11 @@ export namespace database {
 	    categories?: string[];
 	    createdAt: number;
 	    updatedAt: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new FavoriteMod(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -423,7 +423,7 @@ export namespace database {
 	        this.updatedAt = source["updatedAt"];
 	    }
 	}
-
+	
 	export class PinnedMod {
 	    id: string;
 	    platform: string;
@@ -431,11 +431,11 @@ export namespace database {
 	    versionId: string;
 	    minecraftVersion: string;
 	    modLoader: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PinnedMod(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -450,17 +450,17 @@ export namespace database {
 }
 
 export namespace main {
-
+	
 	export class AppPreferences {
 	    theme: string;
 	    animationMode: string;
 	    animationEnabled: boolean;
 	    animationDurationMultiplier: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new AppPreferences(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.theme = source["theme"];
@@ -472,11 +472,11 @@ export namespace main {
 	export class ExportFavoritePackwizResult {
 	    path: string;
 	    canceled: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ExportFavoritePackwizResult(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.path = source["path"];
@@ -487,11 +487,11 @@ export namespace main {
 	    animationMode: string;
 	    animationEnabled: boolean;
 	    animationDurationMultiplier: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SaveAnimationSettingsRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.animationMode = source["animationMode"];
@@ -502,11 +502,11 @@ export namespace main {
 	export class SaveApiKeysRequest {
 	    curseforgeApiKey: string;
 	    modrinthApiKey: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SaveApiKeysRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.curseforgeApiKey = source["curseforgeApiKey"];
@@ -515,11 +515,11 @@ export namespace main {
 	}
 	export class SaveUnusedDependencyCleanupSettingsRequest {
 	    autoScanUnusedDependencies: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SaveUnusedDependencyCleanupSettingsRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.autoScanUnusedDependencies = source["autoScanUnusedDependencies"];
@@ -538,11 +538,11 @@ export namespace main {
 	    curseforgeKeyMask: string;
 	    hasModrinthKey: boolean;
 	    modrinthKeyMask: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SettingsView(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.theme = source["theme"];
@@ -563,18 +563,18 @@ export namespace main {
 }
 
 export namespace models {
-
+	
 	export class ModDependency {
 	    id?: string;
 	    platformVersionId?: string;
 	    projectId: string;
 	    versionId?: string;
 	    type?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ModDependency(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -597,11 +597,11 @@ export namespace models {
 	    categories?: string[];
 	    updatedAt: number;
 	    cachedAt: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ModProject(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -634,11 +634,11 @@ export namespace models {
 	    loaders: string[];
 	    dependencies?: ModDependency[];
 	    modIds?: string[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ModVersion(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -657,7 +657,7 @@ export namespace models {
 	        this.dependencies = this.convertValues(source["dependencies"], ModDependency);
 	        this.modIds = source["modIds"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -680,18 +680,18 @@ export namespace models {
 }
 
 export namespace structs {
-
+	
 	export class BatchDownloadRequest {
 	    results: models.ModProject[];
 	    minecraftVersion: string;
 	    modLoader: string;
 	    targetDir?: string;
 	    instanceId?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new BatchDownloadRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.results = this.convertValues(source["results"], models.ModProject);
@@ -700,7 +700,7 @@ export namespace structs {
 	        this.targetDir = source["targetDir"];
 	        this.instanceId = source["instanceId"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -723,11 +723,11 @@ export namespace structs {
 	    path: string;
 	    fileName: string;
 	    sha1: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new IncompatibleLocalMod(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.path = source["path"];
@@ -742,11 +742,11 @@ export namespace structs {
 	    incompatibleTitle: string;
 	    incompatibleVersionId?: string;
 	    paths?: IncompatibleLocalMod[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new IncompatibleConflict(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.projectKey = source["projectKey"];
@@ -756,7 +756,7 @@ export namespace structs {
 	        this.incompatibleVersionId = source["incompatibleVersionId"];
 	        this.paths = this.convertValues(source["paths"], IncompatibleLocalMod);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -780,11 +780,11 @@ export namespace structs {
 	    title: string;
 	    result: models.ModProject;
 	    conflicts?: IncompatibleConflict[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new BatchIncompatibleConflict(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.key = source["key"];
@@ -792,7 +792,7 @@ export namespace structs {
 	        this.result = this.convertValues(source["result"], models.ModProject);
 	        this.conflicts = this.convertValues(source["conflicts"], IncompatibleConflict);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -813,16 +813,16 @@ export namespace structs {
 	}
 	export class BatchIncompatibleAnalysis {
 	    conflicts?: BatchIncompatibleConflict[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new BatchIncompatibleAnalysis(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.conflicts = this.convertValues(source["conflicts"], BatchIncompatibleConflict);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -841,7 +841,7 @@ export namespace structs {
 		    return a;
 		}
 	}
-
+	
 	export class DownloadQueueItem {
 	    id: string;
 	    status: string;
@@ -854,11 +854,11 @@ export namespace structs {
 	    cancelable: boolean;
 	    retryable: boolean;
 	    reason?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new DownloadQueueItem(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -883,11 +883,11 @@ export namespace structs {
 	    status: string;
 	    disabled: boolean;
 	    reason?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new OptionalDependencyCandidate(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.projectKey = source["projectKey"];
@@ -908,11 +908,11 @@ export namespace structs {
 	    minecraftVersion: string;
 	    modLoader: string;
 	    dependencies?: OptionalDependencyCandidate[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new OptionalDependencyReminder(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -923,7 +923,7 @@ export namespace structs {
 	        this.modLoader = source["modLoader"];
 	        this.dependencies = this.convertValues(source["dependencies"], OptionalDependencyCandidate);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -949,11 +949,11 @@ export namespace structs {
 	    messageCount: number;
 	    items?: DownloadQueueItem[];
 	    optionalReminders?: OptionalDependencyReminder[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new DownloadQueueState(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.active = source["active"];
@@ -963,7 +963,7 @@ export namespace structs {
 	        this.items = this.convertValues(source["items"], DownloadQueueItem);
 	        this.optionalReminders = this.convertValues(source["optionalReminders"], OptionalDependencyReminder);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -988,11 +988,11 @@ export namespace structs {
 	    modLoader: string;
 	    targetDir?: string;
 	    instanceId?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new DownloadStatesRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.results = this.convertValues(source["results"], models.ModProject);
@@ -1001,7 +1001,7 @@ export namespace structs {
 	        this.targetDir = source["targetDir"];
 	        this.instanceId = source["instanceId"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1020,16 +1020,16 @@ export namespace structs {
 		    return a;
 		}
 	}
-
-
+	
+	
 	export class JijModInfo {
 	    id: string;
 	    name: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new JijModInfo(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -1039,11 +1039,11 @@ export namespace structs {
 	export class LocalModBatchOperationRequest {
 	    paths: string[];
 	    action: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new LocalModBatchOperationRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.paths = source["paths"];
@@ -1053,11 +1053,11 @@ export namespace structs {
 	export class LocalModDependency {
 	    modId: string;
 	    type?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new LocalModDependency(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.modId = source["modId"];
@@ -1071,11 +1071,11 @@ export namespace structs {
 	    loading: boolean;
 	    icon: string;
 	    color: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ModDownloadButtonState(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.key = source["key"];
@@ -1094,11 +1094,11 @@ export namespace structs {
 	    versionId?: string;
 	    targetDir?: string;
 	    instanceId?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ModDownloadRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.projectId = source["projectId"];
@@ -1109,7 +1109,7 @@ export namespace structs {
 	        this.targetDir = source["targetDir"];
 	        this.instanceId = source["instanceId"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1134,11 +1134,11 @@ export namespace structs {
 	    reason: string;
 	    fileName: string;
 	    versionId: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ModDownloadResult(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.queued = source["queued"];
@@ -1165,11 +1165,11 @@ export namespace structs {
 	    enabled: boolean;
 	    jijMods?: JijModInfo[];
 	    dependencies?: LocalModDependency[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ModInfo(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -1189,7 +1189,7 @@ export namespace structs {
 	        this.jijMods = this.convertValues(source["jijMods"], JijModInfo);
 	        this.dependencies = this.convertValues(source["dependencies"], LocalModDependency);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1214,11 +1214,11 @@ export namespace structs {
 	    versionId: string;
 	    minecraftVersion: string;
 	    modLoader: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ModVersionPinRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.platform = source["platform"];
@@ -1228,8 +1228,8 @@ export namespace structs {
 	        this.modLoader = source["modLoader"];
 	    }
 	}
-
-
+	
+	
 	export class SearchModsRequest {
 	    requestId: string;
 	    query: string;
@@ -1237,11 +1237,11 @@ export namespace structs {
 	    modLoader: string;
 	    offset: number;
 	    limit: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SearchModsRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.requestId = source["requestId"];
@@ -1259,11 +1259,11 @@ export namespace structs {
 	    name?: string;
 	    onlineName?: string;
 	    evidence?: string[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new UnusedDependencyCandidate(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.path = source["path"];
@@ -1276,11 +1276,11 @@ export namespace structs {
 	}
 	export class UnusedDependencyScanRequest {
 	    excludedPaths?: string[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new UnusedDependencyScanRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.excludedPaths = source["excludedPaths"];
@@ -1288,16 +1288,16 @@ export namespace structs {
 	}
 	export class UnusedDependencyScanResult {
 	    candidates: UnusedDependencyCandidate[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new UnusedDependencyScanResult(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.candidates = this.convertValues(source["candidates"], UnusedDependencyCandidate);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1322,11 +1322,11 @@ export namespace structs {
 	    minecraftVersion: string;
 	    modLoader: string;
 	    mods?: ModInfo[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new VersionInfo(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
@@ -1335,7 +1335,7 @@ export namespace structs {
 	        this.modLoader = source["modLoader"];
 	        this.mods = this.convertValues(source["mods"], ModInfo);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
