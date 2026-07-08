@@ -244,3 +244,37 @@ Added packwiz ZIP export for single favorite lists, including core TOML/ZIP gene
 ### Next Steps
 
 - None - task complete
+
+## Session 8: Unused dependency cleanup
+
+**Date**: 2026-07-08
+**Task**: Unused dependency cleanup
+**Package**: app
+**Branch**: `more-manage-page-button`
+
+### Summary
+
+Implemented local JAR required-dependency parsing, unused dependency scan service, persisted auto-scan setting, Wails bindings, and Manage/Settings cleanup UI.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5311a4d` | (see git log) |
+| `8cb9e14` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

@@ -227,6 +227,7 @@ type SettingsView struct {
 	AnimationMode               string  `json:"animationMode"`
 	AnimationEnabled            bool    `json:"animationEnabled"`
 	AnimationDurationMultiplier float64 `json:"animationDurationMultiplier"`
+	AutoScanUnusedDependencies  bool    `json:"autoScanUnusedDependencies"`
 	MinecraftDir                string  `json:"minecraftDir"` // simplified path (with env vars)
 	CacheDir                    string  `json:"cacheDir"`
 	CachePath                   string  `json:"cachePath"`
@@ -251,6 +252,10 @@ type SaveAnimationSettingsRequest struct {
 type ExportFavoritePackwizResult struct {
 	Path     string `json:"path"`
 	Canceled bool   `json:"canceled"`
+}
+
+type SaveUnusedDependencyCleanupSettingsRequest struct {
+	AutoScanUnusedDependencies bool `json:"autoScanUnusedDependencies"`
 }
 
 // Convention: a field value of "<keep>" means do not modify the original value (since the frontend cannot access plaintext).
@@ -280,6 +285,14 @@ func (a *App) SaveAnimationSettings(req SaveAnimationSettingsRequest) SettingsVi
 		AnimationMode:               req.AnimationMode,
 		AnimationEnabled:            req.AnimationEnabled,
 		AnimationDurationMultiplier: req.AnimationDurationMultiplier,
+	})
+	a.config = a.core.Config()
+	return settingsViewFromCore(next)
+}
+
+func (a *App) SaveUnusedDependencyCleanupSettings(req SaveUnusedDependencyCleanupSettingsRequest) SettingsView {
+	next := a.service().SaveUnusedDependencyCleanupSettings(appcore.SaveUnusedDependencyCleanupSettingsRequest{
+		AutoScanUnusedDependencies: req.AutoScanUnusedDependencies,
 	})
 	a.config = a.core.Config()
 	return settingsViewFromCore(next)
@@ -407,6 +420,14 @@ func (a *App) ApplyLocalModBatchOperation(req appstructs.LocalModBatchOperationR
 	return version, nil
 }
 
+func (a *App) ScanUnusedDependencies(req appstructs.UnusedDependencyScanRequest) (appstructs.UnusedDependencyScanResult, error) {
+	result, err := a.service().ScanUnusedDependencies(req)
+	if err != nil {
+		return appstructs.UnusedDependencyScanResult{}, err
+	}
+	return result, nil
+}
+
 func (a *App) SelectVersion(versionKey string) (structs.VersionInfo, error) {
 	version, err := a.service().SelectVersion(versionKey)
 	if err == nil {
@@ -425,6 +446,7 @@ func settingsViewFromCore(sv appcore.SettingsView) SettingsView {
 		AnimationMode:               sv.AnimationMode,
 		AnimationEnabled:            sv.AnimationEnabled,
 		AnimationDurationMultiplier: sv.AnimationDurationMultiplier,
+		AutoScanUnusedDependencies:  sv.AutoScanUnusedDependencies,
 		MinecraftDir:                sv.MinecraftDir,
 		CacheDir:                    sv.CacheDir,
 		CachePath:                   sv.CachePath,

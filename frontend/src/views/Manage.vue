@@ -10,6 +10,17 @@
             <v-btn class="md-btn-press md-hover-scale" color="primary" prepend-icon="mdi-refresh" :loading="isRefreshing" @click="refreshMods">
                 {{ $t("manage.refresh") }}
             </v-btn>
+            <v-btn
+                class="md-btn-press md-hover-scale"
+                color="secondary"
+                variant="tonal"
+                prepend-icon="mdi-broom"
+                :loading="isScanningUnusedDependencies"
+                :disabled="isBatchBusy || isRefreshing"
+                @click="scanUnusedDependencies"
+            >
+                {{ $t("manage.cleanup.scan") }}
+            </v-btn>
         </div>
 
         <v-alert v-if="!hasSelectedInstance" type="info" variant="tonal">
@@ -164,8 +175,37 @@
                     <v-btn variant="text" :disabled="isBatchBusy" @click="deleteDialog = false">
                         {{ $t("manage.confirmDelete.cancel") }}
                     </v-btn>
-                    <v-btn color="error" variant="tonal" :loading="batchOperation === 'delete'" @click="confirmDelete">
+                    <v-btn color="error" variant="tonal" :loading="isPreparingDelete || batchOperation === 'delete'" @click="confirmDelete">
                         {{ $t("manage.confirmDelete.confirm") }}
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+        <v-dialog v-model="cleanupDialog" max-width="640">
+            <v-card>
+                <v-card-title>{{ $t("manage.cleanup.dialogTitle") }}</v-card-title>
+                <v-card-text>
+                    <v-list density="compact" class="cleanup-candidate-list">
+                        <v-list-item
+                            v-for="candidate in cleanupCandidates"
+                            :key="candidate.path"
+                            :title="cleanupCandidateName(candidate)"
+                            :subtitle="cleanupCandidateSubtitle(candidate)"
+                        >
+                            <template #prepend>
+                                <v-icon icon="mdi-package-variant-remove" color="warning"></v-icon>
+                            </template>
+                        </v-list-item>
+                    </v-list>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer></v-spacer>
+                    <v-btn variant="text" :disabled="cleanupOperation" @click="cleanupDialog = false">
+                        {{ $t("manage.cleanup.cancel") }}
+                    </v-btn>
+                    <v-btn color="error" variant="tonal" :loading="cleanupOperation" @click="confirmCleanupDelete">
+                        {{ $t("manage.cleanup.deleteCandidates", { n: cleanupCandidates.length }) }}
                     </v-btn>
                 </v-card-actions>
             </v-card>
@@ -177,8 +217,8 @@
             {{ $t("manage.operationFailed") }}<span v-if="operationError">: {{ operationError }}</span>
         </v-snackbar>
 
-        <v-snackbar v-model="snackbar.show" color="success" timeout="2000">
-            {{ $t(snackbar.key) }}
+        <v-snackbar v-model="snackbar.show" :color="snackbar.color || 'success'" timeout="3000">
+            {{ $t(snackbar.key, snackbar.params || {}) }}
         </v-snackbar>
     </v-container>
 </template>
@@ -186,22 +226,31 @@
 <script setup>
 import { computed, onActivated, ref } from "vue";
 import { storeToRefs } from "pinia";
+import { useI18n } from "vue-i18n";
 
 import VirtualList from "../components/VirtualList.vue";
 import AddToFavoriteDialog from "../components/AddToFavoriteDialog.vue";
 import { useMinecraftStore } from "../stores/minecraft";
-import { ApplyLocalModBatchOperation } from "../../wailsjs/go/main/App";
+import { useSettingsStore } from "../stores/settings";
+import { ApplyLocalModBatchOperation, ScanUnusedDependencies } from "../../wailsjs/go/main/App";
 
 const minecraftStore = useMinecraftStore();
+const settingsStore = useSettingsStore();
+const { t } = useI18n();
 const { isRefreshing } = storeToRefs(minecraftStore);
 const batchOperation = ref("");
+const isScanningUnusedDependencies = ref(false);
+const isPreparingDelete = ref(false);
+const cleanupOperation = ref(false);
 const deleteDialog = ref(false);
+const cleanupDialog = ref(false);
+const cleanupCandidates = ref([]);
 const pendingDeleteGroups = ref([]);
 const pendingDeleteCount = ref(0);
 const operationError = ref("");
 const showOperationError = ref(false);
 const addFavoriteDialog = ref(null);
-const snackbar = ref({ show: false, key: "" });
+const snackbar = ref({ show: false, key: "", color: "success", params: {} });
 let pendingDeleteClearSelection = null;
 
 const isBatchBusy = computed(() => batchOperation.value !== "");
@@ -285,7 +334,7 @@ const openAddFavorites = (groups) => {
 };
 
 const onFavoritesAdded = () => {
-    snackbar.value = { show: true, key: "favorites.added" };
+    snackbar.value = { show: true, key: "favorites.added", color: "success", params: {} };
 };
 
 const strongModIds = (group) => {
@@ -323,6 +372,10 @@ const groupTooltip = (group) => {
 
 const refreshMods = async () => {
     await minecraftStore.refreshSelectedMods();
+};
+
+const showSnackbar = (key, color = "success", params = {}) => {
+    snackbar.value = { show: true, key, color, params };
 };
 
 const copyModNames = async (groups) => {
@@ -365,10 +418,12 @@ const applyBatchOperation = async (groups, action, clearSelection) => {
         const version = await ApplyLocalModBatchOperation({ paths, action });
         minecraftStore.applySelectedVersion(version);
         clearSelection?.();
+        return true;
     } catch (error) {
         operationError.value = errorMessage(error);
         showOperationError.value = true;
         await minecraftStore.refreshSelectedMods();
+        return false;
     } finally {
         batchOperation.value = "";
     }
@@ -384,12 +439,112 @@ const openDeleteDialog = (groups, clearSelection) => {
 const confirmDelete = async () => {
     const groups = pendingDeleteGroups.value;
     const clearSelection = pendingDeleteClearSelection;
-    await applyBatchOperation(groups, "delete", clearSelection);
-    if (!showOperationError.value) {
+    const paths = selectedGroupPaths(groups);
+    let cleanupResult = null;
+    let cleanupError = null;
+    isPreparingDelete.value = true;
+    try {
+        if (settingsStore.view?.autoScanUnusedDependencies !== false) {
+            try {
+                cleanupResult = await scanUnusedDependencyCandidates(paths, false);
+            } catch (error) {
+                cleanupError = errorMessage(error);
+            }
+        }
+    } finally {
+        isPreparingDelete.value = false;
+    }
+    const ok = await applyBatchOperation(groups, "delete", clearSelection);
+    if (ok) {
         deleteDialog.value = false;
         pendingDeleteGroups.value = [];
         pendingDeleteCount.value = 0;
         pendingDeleteClearSelection = null;
+        if (cleanupError) {
+            showSnackbar("manage.cleanup.scanFailed", "warning");
+        } else if (cleanupResult) {
+            showCleanupResult(cleanupResult, true);
+        } else {
+            showSnackbar("manage.cleanup.deleteComplete", "success");
+        }
+    }
+};
+
+const scanUnusedDependencyCandidates = async (excludedPaths = [], refreshFirst = true) => {
+    if (refreshFirst) {
+        await minecraftStore.refreshSelectedMods();
+    }
+    return await ScanUnusedDependencies({ excludedPaths });
+};
+
+const scanUnusedDependencies = async () => {
+    if (!hasSelectedInstance.value || isScanningUnusedDependencies.value) {
+        return;
+    }
+    isScanningUnusedDependencies.value = true;
+    try {
+        const result = await scanUnusedDependencyCandidates();
+        showCleanupResult(result, false);
+    } catch (error) {
+        operationError.value = errorMessage(error);
+        showOperationError.value = true;
+    } finally {
+        isScanningUnusedDependencies.value = false;
+    }
+};
+
+const showCleanupResult = (result, afterDelete) => {
+    const candidates = result?.candidates || [];
+    if (!candidates.length) {
+        showSnackbar(afterDelete ? "manage.cleanup.noneAfterDelete" : "manage.cleanup.none", "success");
+        return;
+    }
+    cleanupCandidates.value = candidates;
+    cleanupDialog.value = true;
+    showSnackbar("manage.cleanup.found", "warning", { n: candidates.length });
+};
+
+const cleanupCandidateName = (candidate) => {
+    return candidate.onlineName || candidate.name || candidate.fileName || candidate.path;
+};
+
+const cleanupEvidenceText = (candidate) => {
+    const evidence = candidate.evidence || [];
+    if (evidence.includes("online-library") && evidence.includes("required-by-excluded")) {
+        return t("manage.cleanup.evidence.onlineAndDeleted");
+    }
+    if (evidence.includes("required-by-excluded")) {
+        return t("manage.cleanup.evidence.deleted");
+    }
+    return t("manage.cleanup.evidence.online");
+};
+
+const cleanupCandidateSubtitle = (candidate) => {
+    const ids = (candidate.modIds || []).join(", ");
+    const detail = [ids, candidate.path].filter(Boolean).join(" · ");
+    return `${detail} · ${cleanupEvidenceText(candidate)}`;
+};
+
+const confirmCleanupDelete = async () => {
+    const paths = cleanupCandidates.value.map((candidate) => candidate.path).filter(Boolean);
+    if (!paths.length || cleanupOperation.value) {
+        return;
+    }
+    cleanupOperation.value = true;
+    operationError.value = "";
+    showOperationError.value = false;
+    try {
+        const version = await ApplyLocalModBatchOperation({ paths, action: "delete" });
+        minecraftStore.applySelectedVersion(version);
+        cleanupDialog.value = false;
+        cleanupCandidates.value = [];
+        showSnackbar("manage.cleanup.deleted", "success", { n: paths.length });
+    } catch (error) {
+        operationError.value = errorMessage(error);
+        showOperationError.value = true;
+        await minecraftStore.refreshSelectedMods();
+    } finally {
+        cleanupOperation.value = false;
     }
 };
 
@@ -405,6 +560,7 @@ const errorMessage = (error) => {
 
 onActivated(async () => {
     await minecraftStore.start();
+    await settingsStore.load();
     await minecraftStore.refreshSelectedMods();
 });
 </script>
@@ -444,6 +600,11 @@ onActivated(async () => {
 .manage-list {
     flex: 1 1 auto;
     max-height: calc(100vh - 176px);
+}
+
+.cleanup-candidate-list {
+    max-height: 360px;
+    overflow-y: auto;
 }
 
 .manage-item-selected {

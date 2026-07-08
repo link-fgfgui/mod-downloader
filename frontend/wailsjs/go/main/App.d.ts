@@ -77,6 +77,10 @@ export function SaveCacheDirPreference(arg1:string):Promise<main.SettingsView>;
 
 export function SaveTheme(arg1:string):Promise<string>;
 
+export function SaveUnusedDependencyCleanupSettings(arg1:main.SaveUnusedDependencyCleanupSettingsRequest):Promise<main.SettingsView>;
+
+export function ScanUnusedDependencies(arg1:structs.UnusedDependencyScanRequest):Promise<structs.UnusedDependencyScanResult>;
+
 export function SearchMods(arg1:structs.SearchModsRequest):Promise<void>;
 
 export function SelectVersion(arg1:string):Promise<structs.VersionInfo>;

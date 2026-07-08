@@ -48,6 +48,12 @@ const messages = {
         save: "保存",
         saved: "动画设置已应用",
       },
+      cleanup: {
+        label: "依赖清理",
+        autoScan: "删除 Mod 后自动扫描未使用依赖",
+        save: "保存",
+        saved: "依赖清理设置已保存",
+      },
       minecraftDir: { label: ".minecraft 目录", choose: "选择目录", valid: "目录有效", invalid: "目录无效或为空" },
       cacheDir: { label: "缓存目录", path: "实际路径", choose: "选择目录", reset: "恢复默认", default: "默认位置", saved: "缓存目录已保存" },
       apiKeys: {
@@ -76,6 +82,23 @@ const messages = {
         body: "将永久删除 {n} 个本地 Mod 文件。",
         confirm: "删除",
         cancel: "取消",
+      },
+      cleanup: {
+        scan: "扫描未使用依赖",
+        dialogTitle: "清理未使用依赖？",
+        cancel: "保留",
+        deleteCandidates: "删除 {n} 个依赖",
+        deleteComplete: "删除完成",
+        none: "没有发现未使用依赖",
+        noneAfterDelete: "删除完成，未发现未使用依赖",
+        found: "发现 {n} 个可能未使用的依赖",
+        deleted: "已删除 {n} 个未使用依赖",
+        scanFailed: "删除完成，但未使用依赖扫描失败",
+        evidence: {
+          online: "在线标签显示为 library",
+          deleted: "只被刚删除的 Mod 依赖",
+          onlineAndDeleted: "library 标签，且只被刚删除的 Mod 依赖",
+        },
       },
       columns: {
         mod: "Mod",
@@ -231,6 +254,12 @@ const messages = {
         save: "Save",
         saved: "Animation settings applied",
       },
+      cleanup: {
+        label: "Dependency Cleanup",
+        autoScan: "Scan for unused dependencies after deleting mods",
+        save: "Save",
+        saved: "Dependency cleanup settings saved",
+      },
       minecraftDir: { label: ".minecraft Directory", choose: "Choose Directory", valid: "Directory valid", invalid: "Directory invalid or empty" },
       cacheDir: { label: "Cache Directory", path: "Resolved Path", choose: "Choose Directory", reset: "Reset", default: "Default location", saved: "Cache directory saved" },
       apiKeys: {
@@ -259,6 +288,23 @@ const messages = {
         body: "This will permanently delete {n} local mod files.",
         confirm: "Delete",
         cancel: "Cancel",
+      },
+      cleanup: {
+        scan: "Scan Unused Dependencies",
+        dialogTitle: "Clean unused dependencies?",
+        cancel: "Keep",
+        deleteCandidates: "Delete {n} dependencies",
+        deleteComplete: "Delete complete",
+        none: "No unused dependencies found",
+        noneAfterDelete: "Delete complete. No unused dependencies found.",
+        found: "{n} possibly unused dependencies found",
+        deleted: "Deleted {n} unused dependencies",
+        scanFailed: "Delete complete, but unused dependency scan failed",
+        evidence: {
+          online: "Online tag is library",
+          deleted: "Only required by the deleted mod",
+          onlineAndDeleted: "Library tag and only required by the deleted mod",
+        },
       },
       columns: {
         mod: "Mod",
