@@ -42,6 +42,10 @@ export function DismissOptionalDependencyReminder(arg1) {
   return window['go']['main']['App']['DismissOptionalDependencyReminder'](arg1);
 }
 
+export function ExportFavoriteListPackwizZip(arg1) {
+  return window['go']['main']['App']['ExportFavoriteListPackwizZip'](arg1);
+}
+
 export function GetDownloadQueueState() {
   return window['go']['main']['App']['GetDownloadQueueState']();
 }

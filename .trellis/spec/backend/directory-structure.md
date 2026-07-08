@@ -208,6 +208,123 @@ func (a *App) emitCoreEvent(event appcore.Event) {
 }
 ```
 
+### Scenario: Wails File Export Workflows
+
+#### 1. Scope / Trigger
+
+Use this pattern when the frontend starts a user-selected file export, such as
+writing a ZIP or report to a destination chosen through a native save dialog.
+The workflow crosses frontend, Wails adapter, appcore, and usually a pure
+generator package.
+
+#### 2. Signatures
+
+Wails adapter:
+
+```go
+type ExportThingResult struct {
+    Path     string `json:"path"`
+    Canceled bool   `json:"canceled"`
+}
+
+func (a *App) ExportThing(id string) ExportThingResult
+```
+
+Core service:
+
+```go
+func (s *Service) ThingDefaultFilename(id string) string
+func (s *Service) ExportThing(id, destinationPath string) (ExportThingResult, error)
+```
+
+#### 3. Contracts
+
+- `app.go` owns `runtime.SaveFileDialog`; appcore and lower packages must not
+  import Wails runtime.
+- Cancellation returns `{ canceled: true }` and must not call the core export
+  method.
+- Core export methods receive an explicit destination path and return normal Go
+  errors. The Wails adapter translates those errors into rejected frontend
+  promises, preserving the existing `panic("...: " + err.Error())` adapter
+  style used for user-visible failures.
+- Pure file generation belongs in a lower package or isolated appcore helper
+  that accepts typed inputs and an `io.Writer` or path, so it can be unit tested
+  without Wails.
+- Use temp-file-then-rename when writing user-selected files; do not leave a
+  partial output on validation or generation failure.
+
+#### 4. Validation & Error Matrix
+
+- Empty or missing export ID -> core error.
+- Missing source record -> core error.
+- Empty export source set -> core error.
+- Invalid or empty destination -> core error.
+- Native dialog canceled -> Wails result with `Canceled: true`.
+- Native dialog failure -> Wails-visible failure.
+- Generation/write failure -> Wails-visible failure and temporary file cleanup.
+
+#### 5. Good/Base/Bad Cases
+
+- Good: `app.go` opens a save dialog, appends a default extension when useful,
+  then calls `svc.ExportThing(id, path)`.
+- Good: appcore validates all domain data before opening or committing the final
+  destination file.
+- Base: frontend disables duplicate export clicks while the promise is pending
+  and shows success/error state after it settles.
+- Bad: appcore imports Wails runtime to open a dialog.
+- Bad: the frontend passes a raw filesystem path chosen through a custom web UI
+  instead of using the Wails native dialog.
+- Bad: the generator writes directly to the final path before all inputs are
+  validated.
+
+#### 6. Tests Required
+
+- Unit tests for pure generated file contents and hashes when the export format
+  has internal references.
+- Service tests for empty/missing source data and domain validation errors.
+- At least one service-level success test that opens the generated output and
+  asserts expected file names or records.
+- Frontend type-check after regenerating Wails bindings.
+- App `go test ./...` / `go build ./...` after adding or changing the Wails
+  method signature.
+
+#### 7. Wrong vs Correct
+
+Wrong:
+
+```go
+// core/appcore/export.go
+func (s *Service) ExportThing(id string) error {
+    path, _ := runtime.SaveFileDialog(s.ctx, runtime.SaveDialogOptions{})
+    return writeDirectly(path)
+}
+```
+
+Correct:
+
+```go
+// app.go
+func (a *App) ExportThing(id string) ExportThingResult {
+    path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{})
+    if err != nil {
+        panic("export failed: " + err.Error())
+    }
+    if strings.TrimSpace(path) == "" {
+        return ExportThingResult{Canceled: true}
+    }
+    result, err := a.service().ExportThing(id, path)
+    if err != nil {
+        panic("export failed: " + err.Error())
+    }
+    return ExportThingResult{Path: result.Path}
+}
+
+// core/appcore/export.go
+func (s *Service) ExportThing(id, destinationPath string) (ExportThingResult, error) {
+    // validate, generate into temp file, then rename
+}
+```
+
 ### Convention: `models` is the single source of truth
 
 **What**: `github.com/link-fgfgui/mod-downloader-core/models` defines `ModProject`, `ModVersion`, `ModDependency`, and the composite-key helpers (`ProjectKey`, `ParseProjectKey`, `VersionKey`, `ParseVersionKey`). Every other package imports `models` directly — no type aliases, no re-export files.

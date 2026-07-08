@@ -50,9 +50,20 @@
                         {{ $t("favorites.itemCount", { n: favoritesStore.items.length }) }}
                     </div>
                 </div>
-                <v-btn prepend-icon="mdi-refresh" variant="tonal" :loading="favoritesStore.isLoadingItems" @click="favoritesStore.loadItems()">
-                    {{ $t("favorites.actions.refresh") }}
-                </v-btn>
+                <div class="favorites-main-actions">
+                    <v-btn
+                        prepend-icon="mdi-archive-arrow-down"
+                        variant="tonal"
+                        :disabled="favoritesStore.items.length === 0"
+                        :loading="favoritesStore.isExportingPackwiz"
+                        @click="exportPackwiz"
+                    >
+                        {{ $t("favorites.actions.exportPackwiz") }}
+                    </v-btn>
+                    <v-btn prepend-icon="mdi-refresh" variant="tonal" :loading="favoritesStore.isLoadingItems" @click="favoritesStore.loadItems()">
+                        {{ $t("favorites.actions.refresh") }}
+                    </v-btn>
+                </div>
             </div>
 
             <div v-if="!selectedList" class="empty-state">
@@ -157,15 +168,21 @@
                 </v-card-actions>
             </v-card>
         </v-dialog>
+
+        <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="3500">
+            {{ snackbar.message }}
+        </v-snackbar>
     </v-container>
 </template>
 
 <script setup>
-import { computed, onActivated, reactive } from "vue";
+import { computed, onActivated, reactive, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import VirtualList from "../components/VirtualList.vue";
 import { useFavoritesStore } from "../stores/favorites";
 
 const favoritesStore = useFavoritesStore();
+const { t } = useI18n();
 
 const selectedList = computed(() => favoritesStore.selectedList);
 
@@ -179,6 +196,7 @@ const deleteDialog = reactive({
     show: false,
     list: null,
 });
+const snackbar = ref({ show: false, message: "", color: "success" });
 
 const itemKey = (item) => favoritesStore.itemKey(item);
 const displayName = (item) => item.title || item.slug || item.modId;
@@ -225,6 +243,27 @@ const removeSelected = async (items, clearSelection) => {
     clearSelection();
 };
 
+const exportPackwiz = async () => {
+    if (!selectedList.value || favoritesStore.items.length === 0) return;
+    try {
+        const result = await favoritesStore.exportPackwiz(selectedList.value.id);
+        if (!result || result.canceled) return;
+        snackbar.value = { show: true, message: t("favorites.export.success"), color: "success" };
+    } catch (error) {
+        snackbar.value = {
+            show: true,
+            message: t("favorites.export.failed", { reason: errorMessage(error) }),
+            color: "error",
+        };
+    }
+};
+
+const errorMessage = (error) => {
+    if (!error) return t("favorites.export.unknownError");
+    if (typeof error === "string") return error;
+    return error.message || String(error);
+};
+
 onActivated(() => {
     void favoritesStore.loadLists();
 });
@@ -268,6 +307,14 @@ onActivated(() => {
 .favorites-main-header > div {
     flex: 1 1 220px;
     min-width: 0;
+}
+
+.favorites-main-actions {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
 }
 
 .favorites-main-header h2 {

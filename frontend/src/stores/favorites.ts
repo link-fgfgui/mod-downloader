@@ -3,12 +3,13 @@ import {
     AddFavoriteMod,
     CreateFavoriteList,
     DeleteFavoriteList,
+    ExportFavoriteListPackwizZip,
     ListFavoriteLists,
     ListFavoriteMods,
     RemoveFavoriteMod,
     RenameFavoriteList,
 } from "../../wailsjs/go/main/App";
-import type { database } from "../../wailsjs/go/models";
+import type { database, main } from "../../wailsjs/go/models";
 
 export type FavoriteModDraft = {
     platform: string;
@@ -33,6 +34,7 @@ export const useFavoritesStore = defineStore("favorites", {
         items: [] as database.FavoriteMod[],
         isLoadingLists: false,
         isLoadingItems: false,
+        isExportingPackwiz: false,
         pendingKeys: new Set<string>(),
     }),
     getters: {
@@ -153,6 +155,16 @@ export const useFavoritesStore = defineStore("favorites", {
         async removeMany(mods: database.FavoriteMod[]) {
             for (const mod of mods) {
                 await this.remove(mod);
+            }
+        },
+        async exportPackwiz(listId?: string): Promise<main.ExportFavoritePackwizResult | null> {
+            const targetListId = listId || this.selectedListId;
+            if (!targetListId || this.isExportingPackwiz) return null;
+            this.isExportingPackwiz = true;
+            try {
+                return await ExportFavoriteListPackwizZip(targetListId);
+            } finally {
+                this.isExportingPackwiz = false;
             }
         },
     },

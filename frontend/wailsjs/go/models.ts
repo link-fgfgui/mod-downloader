@@ -105,6 +105,20 @@ export namespace main {
 	        this.animationDurationMultiplier = source["animationDurationMultiplier"];
 	    }
 	}
+	export class ExportFavoritePackwizResult {
+	    path: string;
+	    canceled: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ExportFavoritePackwizResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.canceled = source["canceled"];
+	    }
+	}
 	export class SaveAnimationSettingsRequest {
 	    animationMode: string;
 	    animationEnabled: boolean;
