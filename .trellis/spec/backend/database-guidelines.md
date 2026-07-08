@@ -399,6 +399,331 @@ database.UpsertFavoriteMod(database.FavoriteMod{
 })
 ```
 
+### Scenario: Favorite Bulk Operations And Live References
+
+#### 1. Scope / Trigger
+
+Use this pattern when exposing operations that copy favorite mods between lists,
+copy one favorite list into another, or manage live favorite-list references.
+The storage relationship lives in SQLite, app-independent request handling lives
+in `core/appcore`, and Wails only delegates to the service.
+
+#### 2. Signatures
+
+Core service request/response types:
+
+```go
+type FavoriteBulkAddRequest struct {
+    TargetListIDs []string               `json:"targetListIds"`
+    Mods          []database.FavoriteMod `json:"mods"`
+}
+
+type FavoriteListCopyRequest struct {
+    SourceListID string `json:"sourceListId"`
+    TargetListID string `json:"targetListId"`
+}
+
+type FavoriteBulkOperationResult struct {
+    Added   int      `json:"added"`
+    Updated int      `json:"updated"`
+    Skipped int      `json:"skipped"`
+    Errors  []string `json:"errors,omitempty"`
+}
+```
+
+Core service methods:
+
+```go
+func (s *Service) AddFavoriteModsToLists(req FavoriteBulkAddRequest) FavoriteBulkOperationResult
+func (s *Service) CopyFavoriteListToList(req FavoriteListCopyRequest) FavoriteBulkOperationResult
+func (s *Service) AddFavoriteListReference(parentListID, childListID string) database.FavoriteListRef
+func (s *Service) RemoveFavoriteListReference(parentListID, childListID string) bool
+func (s *Service) ListFavoriteListRefs(parentListID string) []database.FavoriteListRef
+func (s *Service) ListFavoriteContents(listID string) database.FavoriteListContents
+```
+
+#### 3. Contracts
+
+- Bulk add deduplicates target list IDs and validates every target list before
+  writing rows for that target.
+- Copied `FavoriteMod` rows must clear `ID`, `CreatedAt`, and `UpdatedAt`
+  before upsert so a copied row never reuses the source row's primary key.
+- Duplicate membership in a target list is an update, not a second row.
+- Whole-list copy reads `database.ListFavoriteContents`, so live referenced
+  child-list mods are copied concretely into the target list.
+- Whole-list copy from a list to itself is skipped and reported; selected-mod
+  bulk add may target the source list because it is idempotent.
+- Reference add/remove delegates cycle prevention and persistence to
+  `database.CreateFavoriteListRef` / `DeleteFavoriteListRef`.
+- `app.go` methods are thin Wails-facing delegations only; no persistence or
+  copy semantics belong in the adapter.
+
+#### 4. Validation & Error Matrix
+
+- Empty target list IDs or empty mod list -> no writes; skipped count reflects
+  skipped mods where applicable.
+- Missing target list -> skip that target and append a readable error.
+- Invalid favorite mod key -> skip that mod.
+- Existing target favorite key -> upsert and increment `Updated`.
+- New target favorite key -> upsert and increment `Added`.
+- Reference cycle or storage error -> service returns an empty ref and logs the
+  error.
+
+#### 5. Good/Base/Bad Cases
+
+- Good: Copy selected Sodium and Lithium rows to two target lists through
+  `AddFavoriteModsToLists`; existing target Sodium is updated and target
+  Lithium is added.
+- Good: Copy a list containing a live child-list reference; the target receives
+  concrete rows for both direct and referenced mods.
+- Base: Add a live reference through `AddFavoriteListReference`; no favorite mod
+  rows are duplicated.
+- Bad: Frontend loops over selected mods and calls `AddFavoriteMod` one by one,
+  losing aggregate skipped/error reporting and duplicating target validation.
+- Bad: Wails adapter rewrites mod IDs or performs copy logic directly.
+
+#### 6. Tests Required
+
+- Appcore test for selected-mod bulk copy: added, updated, skipped missing
+  target, and copied row has a different ID than the source.
+- Appcore test for whole-list copy using resolved reference contents.
+- Appcore test for reference add/list/remove and cycle rejection behavior.
+- Wails binding regeneration after adding or changing Wails-visible method
+  signatures.
+
+#### 7. Wrong vs Correct
+
+Wrong:
+
+```go
+for _, mod := range selected {
+    mod.ListID = targetListID
+    database.UpsertFavoriteMod(mod) // reuses source ID and hides aggregate failures
+}
+```
+
+Correct:
+
+```go
+copied := mod
+copied.ID = ""
+copied.ListID = targetListID
+copied.CreatedAt = 0
+copied.UpdatedAt = 0
+database.UpsertFavoriteMod(copied)
+```
+
+### Scenario: Favorite List Organization APIs
+
+#### 1. Scope / Trigger
+
+Use this pattern when the UI needs to organize favorite lists with groups,
+manual ordering, pinning, or custom icons. SQLite owns persistence in
+`core/database`; app-independent orchestration belongs in `core/appcore`; Wails
+methods in `app.go` remain thin delegates for generated frontend bindings.
+
+#### 2. Signatures
+
+Core service methods:
+
+```go
+func (s *Service) UpdateFavoriteListMetadata(list database.FavoriteList) database.FavoriteList
+func (s *Service) ReorderFavoriteLists(ids []string) bool
+func (s *Service) ListFavoriteGroups() []database.FavoriteGroup
+func (s *Service) CreateFavoriteGroup(name string) database.FavoriteGroup
+func (s *Service) RenameFavoriteGroup(id, name string) database.FavoriteGroup
+func (s *Service) DeleteFavoriteGroup(id string) bool
+func (s *Service) ReorderFavoriteGroups(ids []string) bool
+```
+
+Wails adapter methods expose the same signatures and must only call the matching
+service method.
+
+#### 3. Contracts
+
+- `UpdateFavoriteListMetadata` edits grouping, icon fields, pinning, and
+  `sortOrder`; it does not rename the list.
+- Renaming still goes through `RenameFavoriteList` so name validation remains
+  separate from display metadata.
+- `ListFavoriteLists` returns pinned lists before unpinned lists, preserving
+  manual order inside those sections.
+- Deleting a favorite group clears `groupId` from assigned lists rather than
+  deleting those lists.
+- Frontend icon customization stores `iconKind="mdi"` with an MDI value, or
+  `iconKind="project"` with a project slug and best-effort `iconUrl`.
+- Drag reorder writes ordered ID slices through `ReorderFavoriteLists` or
+  `ReorderFavoriteGroups`; the frontend reloads lists after a successful write.
+
+#### 4. Validation & Error Matrix
+
+- Empty group name -> no group is created or renamed.
+- Missing favorite list ID in metadata update -> returns an empty list.
+- Missing group/list ID during reorder -> ignored by the database reorder loop.
+- Delete missing group -> returns `false` and leaves lists unchanged.
+- Project slug icon lookup miss -> keep the slug and render a fallback icon.
+
+#### 5. Good/Base/Bad Cases
+
+- Good: UI pins a list by calling `UpdateFavoriteListMetadata` with the existing
+  list plus `Pinned=true`, then reloads `ListFavoriteLists`.
+- Good: UI deletes a group and reloads lists; former members appear ungrouped.
+- Base: UI reorders only the visible pinned section; pinned grouping still keeps
+  those lists before unpinned lists.
+- Bad: Frontend sorts pinned lists once locally and assumes persistence without
+  calling `ReorderFavoriteLists`.
+- Bad: Frontend stores group metadata in browser-only state instead of SQLite.
+
+#### 6. Tests Required
+
+- Appcore test for group create/rename/delete and list metadata update.
+- Appcore test for group and list reorder returning persisted order through
+  `ListFavoriteGroups` / `ListFavoriteLists`.
+- Frontend build after Wails binding regeneration.
+- Existing Download/Manage add-to-favorite flows must continue to call the
+  store `addDrafts` path.
+
+#### 7. Wrong vs Correct
+
+Wrong:
+
+```ts
+favoritesStore.lists.sort((a, b) => Number(b.pinned) - Number(a.pinned))
+// No backend write; order is lost after reload.
+```
+
+Correct:
+
+```ts
+await favoritesStore.reorderLists(visibleListIds)
+await favoritesStore.loadLists()
+```
+
+### Scenario: Favorite Version / Modloader Migration
+
+#### 1. Scope / Trigger
+
+Use this pattern when migrating a favorite list's resolved contents to a
+different Minecraft version and modloader. The workflow spans SQLite favorite
+contents, cached platform project/version metadata, `core/appcore` service
+contracts, Wails bindings, and frontend conflict UI. Preview and apply semantics
+belong in `core/appcore`; Wails adapters only delegate.
+
+#### 2. Signatures
+
+Core service request/response types:
+
+```go
+type FavoriteMigrationRequest struct {
+    SourceListID     string `json:"sourceListId"`
+    TargetListID     string `json:"targetListId"`
+    MinecraftVersion string `json:"minecraftVersion"`
+    ModLoader        string `json:"modLoader"`
+    IgnoreConflicts  bool   `json:"ignoreConflicts,omitempty"`
+}
+
+type FavoriteMigrationPreview struct {
+    SourceListID string                      `json:"sourceListId"`
+    TargetListID string                      `json:"targetListId"`
+    Matched      []FavoriteMigrationMatch    `json:"matched"`
+    Conflicts    []FavoriteMigrationConflict `json:"conflicts"`
+    Errors       []string                    `json:"errors,omitempty"`
+}
+
+type FavoriteMigrationApplyResult struct {
+    Applied bool                        `json:"applied"`
+    Preview FavoriteMigrationPreview    `json:"preview"`
+    Result  FavoriteBulkOperationResult `json:"result"`
+}
+```
+
+Core service methods:
+
+```go
+func (s *Service) PreviewFavoriteListMigration(req FavoriteMigrationRequest) FavoriteMigrationPreview
+func (s *Service) ApplyFavoriteListMigration(req FavoriteMigrationRequest) FavoriteMigrationApplyResult
+```
+
+Wails adapter methods must use the same request/result types and delegate
+directly to the service.
+
+#### 3. Contracts
+
+- Preview reads `database.ListFavoriteContents(sourceListID)` so direct rows and
+  live referenced child-list rows are resolved the same way as whole-list copy.
+- Preview never writes favorite rows.
+- Apply always re-runs preview before writing, so stale UI previews cannot be
+  applied blindly.
+- Project lookup prefers cached SQLite/gob platform metadata by
+  `platform/modId`, then `platform/slug`, and only falls back to provider lookup
+  if the cache misses.
+- Version matching uses `providers.ListMatchingProjectVersions` so existing
+  provider cache, sorting, and loader/version filtering rules remain the source
+  of truth.
+- Matched target rows preserve display metadata and replace only target scope
+  fields: `listId`, `minecraftVersion`, `modLoader`, and `versionId`.
+- Apply writes through `AddFavoriteModsToLists`, not direct
+  `database.UpsertFavoriteMod`, so copied IDs/timestamps and aggregate
+  added/updated/skipped accounting stay consistent with other favorite copy
+  workflows.
+
+#### 4. Validation & Error Matrix
+
+- Missing source/target list ID -> preview `Errors`, apply writes nothing.
+- Missing Minecraft version or modloader -> preview `Errors`, apply writes
+  nothing.
+- Project lookup miss -> conflict reason `project not found`.
+- No matching target-scope version -> conflict reason
+  `matching version not found`.
+- Conflicts with `IgnoreConflicts=false` -> apply writes nothing and returns
+  `Applied=false`.
+- Conflicts with `IgnoreConflicts=true` -> apply writes matched rows and reports
+  conflict count as skipped.
+
+#### 5. Good/Base/Bad Cases
+
+- Good: Preview a list with a live child reference; matched/conflict rows include
+  resolved child-list entries without duplicating rows.
+- Good: Apply a partial migration with `IgnoreConflicts=true`; matching mods are
+  upserted into the target list and missing target versions are skipped.
+- Base: Preview an all-conflict migration; no rows are written and the UI can
+  show conflict reasons before asking the user to ignore.
+- Bad: Frontend loops over preview matches and calls `AddFavoriteMod` directly,
+  bypassing conflict handling and bulk result accounting.
+- Bad: Migration code hand-rolls version filtering instead of using provider
+  matching, causing different sort/version semantics from search and install.
+
+#### 6. Tests Required
+
+- Appcore test for all-match preview/apply, asserting preview writes no favorite
+  data and apply writes target-scope rows with matched `versionId`.
+- Appcore test for partial conflict: apply without ignore writes nothing, apply
+  with ignore writes matched rows and skips conflicts.
+- Appcore test for all-conflict migration writing nothing.
+- Appcore test for missing project lookup producing a conflict instead of a
+  panic.
+- Appcore test for source contents from a referenced favorite list.
+
+#### 7. Wrong vs Correct
+
+Wrong:
+
+```go
+preview := s.PreviewFavoriteListMigration(req)
+for _, match := range preview.Matched {
+    database.UpsertFavoriteMod(match.Target) // bypasses ignore-conflict rules and ID reset semantics
+}
+```
+
+Correct:
+
+```go
+preview := s.PreviewFavoriteListMigration(req)
+if len(preview.Conflicts) > 0 && !req.IgnoreConflicts {
+    return FavoriteMigrationApplyResult{Preview: preview}
+}
+return s.ApplyFavoriteListMigration(req) // re-previews and writes through bulk copy semantics
+```
+
 ---
 
 ## Migrations
@@ -410,6 +735,99 @@ SQLite user-data schema is created idempotently by `userdb.go`. Legacy
 `PinnedMods`, `FavoriteLists`, and `FavoriteMods` decoded from gob cache are
 migrated into SQLite on `OpenAt`, then cleared from the active gob state before
 the next cache save.
+
+### Scenario: SQLite User-Data Schema Evolution
+
+#### 1. Scope / Trigger
+
+Use this pattern whenever `user-data.sqlite` needs a new table, index, or column
+for user-owned state. This includes favorite list metadata, groups, references,
+or any future collection data. SQLite schema evolution must preserve existing
+user data; unlike the gob platform cache, user data is not discardable.
+
+#### 2. Signatures
+
+Schema owner:
+
+```go
+func (s *userStore) ensureSchema() error
+func (s *userStore) ensureSchemaV2() error
+func (s *userStore) columnExists(table, column string) (bool, error)
+```
+
+Open path:
+
+```go
+func OpenAt(cachePath string) error // opens cache plus UserDataPathForCachePath(cachePath)
+```
+
+#### 3. Contracts
+
+- Base `CREATE TABLE IF NOT EXISTS` statements may create the current full table
+  shape for fresh databases.
+- Existing databases do not gain new columns from `CREATE TABLE IF NOT EXISTS`;
+  every added column must be applied with an explicit `ALTER TABLE ... ADD COLUMN`
+  guarded by `PRAGMA table_info`.
+- New migrations record an idempotent row in `schema_migrations`.
+- New columns on existing user tables must have `NOT NULL DEFAULT ...` whenever
+  old rows need to remain readable without backfill.
+- New relationship tables must use foreign keys and indexes that match their
+  query path.
+- Public read queries must select the current full column set after migrations
+  have run.
+
+#### 4. Validation & Error Matrix
+
+- Existing SQLite file missing a new column -> add the column before any read
+  query that selects it.
+- Existing SQLite file already containing the column -> skip `ALTER TABLE`.
+- Migration statement fails -> `OpenAt` returns an error; user-data writes must
+  not continue against a partially assumed schema.
+- Legacy gob user data and SQLite schema migration are independent: gob
+  migration inserts rows after SQLite schema creation has completed.
+
+#### 5. Good/Base/Bad Cases
+
+- Good: add `favorite_lists.pinned` through `columnExists("favorite_lists", "pinned")`
+  and `ALTER TABLE favorite_lists ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0`.
+- Base: a fresh install creates `favorite_lists` with all current columns and
+  records schema versions in `schema_migrations`.
+- Bad: add `pinned` to the `CREATE TABLE IF NOT EXISTS favorite_lists` text only;
+  existing databases keep the old table shape and later `SELECT pinned` fails.
+
+#### 6. Tests Required
+
+- Create a v1 SQLite database manually, open it through `OpenAt`, and assert old
+  favorite lists/mods remain readable.
+- Assert `schema_migrations` contains the new version after open.
+- Assert a row from the old schema can write/read the new fields after
+  migration.
+- Keep existing favorite persistence and legacy gob migration tests passing.
+
+#### 7. Wrong vs Correct
+
+Wrong:
+
+```go
+`CREATE TABLE IF NOT EXISTS favorite_lists (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    pinned INTEGER NOT NULL DEFAULT 0
+)`
+// Existing favorite_lists tables still do not have pinned.
+```
+
+Correct:
+
+```go
+if ok, err := s.columnExists("favorite_lists", "pinned"); err != nil {
+    return err
+} else if !ok {
+    if _, err := s.db.Exec(`ALTER TABLE favorite_lists ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0`); err != nil {
+        return err
+    }
+}
+```
 
 ---
 

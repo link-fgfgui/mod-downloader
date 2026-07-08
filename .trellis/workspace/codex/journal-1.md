@@ -345,3 +345,144 @@ Preserved visible text/content snapshots during exit animations for queue FAB, s
 ### Next Steps
 
 - None - task complete
+
+## Session 11: Favorite SQL storage references
+
+**Date**: 2026-07-07
+**Task**: Favorite SQL storage references
+**Package**: app
+**Branch**: `enhance-favorite-page`
+
+### Summary
+
+Implemented SQLite-backed favorite groups, list metadata, live list references, recursive content resolution, tests, and documented user-data schema migrations.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ec2bd67` | (see git log) |
+| `1f4da8b` | (see git log) |
+| `08e228e` | (see git log) |
+| `f232bf3` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+## Session 12: Favorite bulk copy operations
+
+**Date**: 2026-07-08
+**Task**: Favorite bulk copy operations
+**Package**: app
+**Branch**: `enhance-favorite-page`
+
+### Summary
+
+Implemented favorite bulk-add, whole-list copy, live reference service methods, Wails bindings, tests, and backend spec documentation.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9632362` | (see git log) |
+| `35d29bd` | (see git log) |
+| `d4fbf97` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+## Session 13: Favorite version migration
+
+**Date**: 2026-07-08
+**Task**: Favorite version migration
+**Package**: app
+**Branch**: `enhance-favorite-page`
+
+### Summary
+
+Implemented favorite list version/modloader migration preview and apply APIs, exposed Wails bindings, added conflict tests, and documented the migration contract.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `168062f` | (see git log) |
+| `51fba0b` | (see git log) |
+| `21ff45e` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+## Session 14: Favorite advanced UI
+
+**Date**: 2026-07-08
+**Task**: Favorite advanced UI
+**Package**: app
+**Branch**: `enhance-favorite-page`
+
+### Summary
+
+Implemented advanced favorites UI for grouped and pinned lists, icon customization, drag reorder, selected-mod copy, whole-list copy/reference, and migration preview/apply; exposed organization APIs and documented the contract.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8c5d2ac` | (see git log) |
+| `3539cf2` | (see git log) |
+| `5a7a290` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

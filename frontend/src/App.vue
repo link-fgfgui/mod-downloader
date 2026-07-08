@@ -226,10 +226,24 @@ const downloadQueueOpen = ref(false);
 const downloadQueueTab = ref("downloads");
 const visibleQueueSnapshot = ref<DownloadQueueSnapshot | null>(null);
 
-type DownloadQueueSnapshot = Pick<
-    structs.DownloadQueueState,
-    "active" | "pending" | "running" | "messageCount" | "items" | "optionalReminders"
->;
+type OptionalDependencyReminderSnapshot = {
+    id: string;
+    mainProjectKey: string;
+    mainTitle: string;
+    mainVersionId: string;
+    minecraftVersion: string;
+    modLoader: string;
+    dependencies?: structs.OptionalDependencyCandidate[];
+};
+
+type DownloadQueueSnapshot = {
+    active: boolean;
+    pending: number;
+    running: number;
+    messageCount: number;
+    items?: structs.DownloadQueueItem[];
+    optionalReminders?: OptionalDependencyReminderSnapshot[];
+};
 
 const cloneDownloadQueue = (queue: DownloadQueueSnapshot): DownloadQueueSnapshot => ({
     active: Boolean(queue.active),

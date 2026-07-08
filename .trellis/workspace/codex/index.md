@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 10
+- **Total Sessions**: 14
 - **Last Active**: 2026-07-08
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~347 | Active |
+| `journal-1.md` | ~488 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,10 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 11 | 2026-07-07 | Favorite SQL storage references | `ec2bd67`, `1f4da8b`, `08e228e`, `f232bf3` | `enhance-favorite-page` |
+| 12 | 2026-07-08 | Favorite bulk copy operations | `9632362`, `35d29bd`, `d4fbf97` | `enhance-favorite-page` |
+| 13 | 2026-07-08 | Favorite version migration | `168062f`, `51fba0b`, `21ff45e` | `enhance-favorite-page` |
+| 14 | 2026-07-08 | Favorite advanced UI | `8c5d2ac`, `3539cf2`, `5a7a290` | `enhance-favorite-page` |
 | 4 | 2026-07-07 | GUI cache default path | `4823b72` | `true-tmp-path` |
 | 5 | 2026-07-07 | Cancellable dependency analysis | `2af58d9`, `9af0fef` | `cancel-analyse-in-download` |
 | 6 | 2026-07-07 | Optional dependency reminders and incompatible conflicts | `6cc3941`, `e5c2c27`, `6ef5ad5` | `optional-conflict-incompatible-mods` |

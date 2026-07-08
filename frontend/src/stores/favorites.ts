@@ -1,15 +1,28 @@
 import { defineStore } from "pinia";
 import {
+    AddFavoriteListReference,
     AddFavoriteMod,
+    AddFavoriteModsToLists,
+    ApplyFavoriteListMigration,
+    CopyFavoriteListToList,
+    CreateFavoriteGroup,
     CreateFavoriteList,
+    DeleteFavoriteGroup,
     DeleteFavoriteList,
     ExportFavoriteListPackwizZip,
+    ListFavoriteContents,
+    ListFavoriteGroups,
     ListFavoriteLists,
-    ListFavoriteMods,
+    LookupProjectBySlug,
+    PreviewFavoriteListMigration,
     RemoveFavoriteMod,
+    RenameFavoriteGroup,
     RenameFavoriteList,
+    ReorderFavoriteGroups,
+    ReorderFavoriteLists,
+    UpdateFavoriteListMetadata,
 } from "../../wailsjs/go/main/App";
-import type { database, main } from "../../wailsjs/go/models";
+import type { appcore, database, main } from "../../wailsjs/go/models";
 
 export type FavoriteModDraft = {
     platform: string;
@@ -24,17 +37,37 @@ export type FavoriteModDraft = {
     categories?: string[];
 };
 
+export type FavoriteIconMode = "mdi" | "project";
+
+export type FavoriteMigrationTarget = {
+    sourceListId: string;
+    targetListId: string;
+    minecraftVersion: string;
+    modLoader: string;
+    ignoreConflicts?: boolean;
+};
+
+const normalizeKeyPart = (value?: string) => (value || "").trim().toLowerCase();
 const favoriteKey = (mod: Pick<database.FavoriteMod, "platform" | "modId" | "minecraftVersion" | "modLoader">) =>
-    [mod.platform, mod.modId, mod.minecraftVersion || "", mod.modLoader || ""].join("|");
+    [normalizeKeyPart(mod.platform), normalizeKeyPart(mod.modId), mod.minecraftVersion || "", normalizeKeyPart(mod.modLoader)].join("|");
+
+const listOrder = (a: database.FavoriteList, b: database.FavoriteList) =>
+    Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || a.sortOrder - b.sortOrder || a.name.localeCompare(b.name);
+
+const groupOrder = (a: database.FavoriteGroup, b: database.FavoriteGroup) =>
+    a.sortOrder - b.sortOrder || a.name.localeCompare(b.name);
 
 export const useFavoritesStore = defineStore("favorites", {
     state: () => ({
+        groups: [] as database.FavoriteGroup[],
         lists: [] as database.FavoriteList[],
         selectedListId: "",
-        items: [] as database.FavoriteMod[],
+        contents: null as database.FavoriteListContents | null,
+        items: [] as database.FavoriteModEntry[],
         isLoadingLists: false,
         isLoadingItems: false,
         isExportingPackwiz: false,
+        isSaving: false,
         pendingKeys: new Set<string>(),
     }),
     getters: {
@@ -42,12 +75,32 @@ export const useFavoritesStore = defineStore("favorites", {
             return state.lists.find((list) => list.id === state.selectedListId) || state.lists[0] || null;
         },
         itemKey: () => favoriteKey,
+        pinnedLists(state): database.FavoriteList[] {
+            return state.lists.filter((list) => list.pinned).sort(listOrder);
+        },
+        ungroupedLists(state): database.FavoriteList[] {
+            return state.lists.filter((list) => !list.pinned && !list.groupId).sort(listOrder);
+        },
+        groupedLists(state): Record<string, database.FavoriteList[]> {
+            return state.lists.reduce<Record<string, database.FavoriteList[]>>((acc, list) => {
+                if (!list.groupId || list.pinned) return acc;
+                acc[list.groupId] = acc[list.groupId] || [];
+                acc[list.groupId].push(list);
+                acc[list.groupId].sort(listOrder);
+                return acc;
+            }, {});
+        },
+        sortedGroups(state): database.FavoriteGroup[] {
+            return [...state.groups].sort(groupOrder);
+        },
     },
     actions: {
         async loadLists() {
             this.isLoadingLists = true;
             try {
-                this.lists = (await ListFavoriteLists()) || [];
+                const [groups, lists] = await Promise.all([ListFavoriteGroups(), ListFavoriteLists()]);
+                this.groups = (groups || []).sort(groupOrder);
+                this.lists = (lists || []).sort(listOrder);
                 if (!this.selectedListId || !this.lists.some((list) => list.id === this.selectedListId)) {
                     this.selectedListId = this.lists[0]?.id || "";
                 }
@@ -64,11 +117,13 @@ export const useFavoritesStore = defineStore("favorites", {
             const targetListId = listId || this.selectedListId;
             if (!targetListId) {
                 this.items = [];
+                this.contents = null;
                 return;
             }
             this.isLoadingItems = true;
             try {
-                this.items = (await ListFavoriteMods(targetListId)) || [];
+                this.contents = (await ListFavoriteContents(targetListId)) || null;
+                this.items = this.contents?.mods || [];
             } finally {
                 this.isLoadingItems = false;
             }
@@ -80,15 +135,16 @@ export const useFavoritesStore = defineStore("favorites", {
         async createList(name: string) {
             const list = await CreateFavoriteList(name);
             if (!list?.id) return null;
-            this.lists = [...this.lists, list].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+            this.lists = [...this.lists, list].sort(listOrder);
             this.selectedListId = list.id;
+            await this.loadLists();
             this.items = [];
             return list;
         },
         async renameList(listId: string, name: string) {
             const list = await RenameFavoriteList(listId, name);
             if (!list?.id) return null;
-            this.lists = this.lists.map((item) => (item.id === list.id ? list : item));
+            this.lists = this.lists.map((item) => (item.id === list.id ? list : item)).sort(listOrder);
             return list;
         },
         async deleteList(listId: string) {
@@ -100,6 +156,73 @@ export const useFavoritesStore = defineStore("favorites", {
                 await this.loadItems(this.selectedListId);
             }
             return true;
+        },
+        async createGroup(name: string) {
+            const group = await CreateFavoriteGroup(name);
+            if (!group?.id) return null;
+            this.groups = [...this.groups, group].sort(groupOrder);
+            return group;
+        },
+        async renameGroup(groupId: string, name: string) {
+            const group = await RenameFavoriteGroup(groupId, name);
+            if (!group?.id) return null;
+            this.groups = this.groups.map((item) => (item.id === group.id ? group : item)).sort(groupOrder);
+            return group;
+        },
+        async deleteGroup(groupId: string) {
+            const ok = await DeleteFavoriteGroup(groupId);
+            if (!ok) return false;
+            await this.loadLists();
+            return true;
+        },
+        async updateListMetadata(list: database.FavoriteList, patch: Partial<database.FavoriteList>) {
+            const updated = await UpdateFavoriteListMetadata({
+                ...list,
+                ...patch,
+            } as database.FavoriteList);
+            if (!updated?.id) return null;
+            this.lists = this.lists.map((item) => (item.id === updated.id ? updated : item)).sort(listOrder);
+            return updated;
+        },
+        async updateListIcon(list: database.FavoriteList, mode: FavoriteIconMode, value: string, platform = "modrinth") {
+            const iconValue = value.trim();
+            let iconUrl = "";
+            if (mode === "project" && iconValue) {
+                const project = await LookupProjectBySlug(platform, iconValue, "", "");
+                iconUrl = project?.iconUrl || "";
+            }
+            return this.updateListMetadata(list, {
+                iconKind: mode,
+                iconValue,
+                iconUrl,
+            });
+        },
+        async clearListIcon(list: database.FavoriteList) {
+            return this.updateListMetadata(list, {
+                iconKind: "",
+                iconValue: "",
+                iconUrl: "",
+            });
+        },
+        async setListGroup(list: database.FavoriteList, groupId: string) {
+            return this.updateListMetadata(list, { groupId });
+        },
+        async setListPinned(list: database.FavoriteList, pinned: boolean) {
+            return this.updateListMetadata(list, { pinned });
+        },
+        async reorderLists(ids: string[]) {
+            const ok = await ReorderFavoriteLists(ids);
+            if (ok) {
+                await this.loadLists();
+            }
+            return ok;
+        },
+        async reorderGroups(ids: string[]) {
+            const ok = await ReorderFavoriteGroups(ids);
+            if (ok) {
+                await this.loadLists();
+            }
+            return ok;
         },
         async addDrafts(listId: string, drafts: FavoriteModDraft[]) {
             if (!listId || drafts.length === 0) return [];
@@ -166,6 +289,57 @@ export const useFavoritesStore = defineStore("favorites", {
             } finally {
                 this.isExportingPackwiz = false;
             }
+        },
+        async copySelectedMods(targetListIds: string[], mods: database.FavoriteMod[]) {
+            if (!targetListIds.length || !mods.length) return null;
+            const result = await AddFavoriteModsToLists({
+                targetListIds,
+                mods,
+            } as appcore.FavoriteBulkAddRequest);
+            await this.loadLists();
+            if (targetListIds.includes(this.selectedListId)) {
+                await this.loadItems(this.selectedListId);
+            }
+            return result;
+        },
+        async copyList(sourceListId: string, targetListId: string) {
+            const result = await CopyFavoriteListToList({
+                sourceListId,
+                targetListId,
+            } as appcore.FavoriteListCopyRequest);
+            if (targetListId === this.selectedListId) {
+                await this.loadItems(targetListId);
+            }
+            return result;
+        },
+        async addListReference(parentListId: string, childListId: string) {
+            const ref = await AddFavoriteListReference(parentListId, childListId);
+            if (parentListId === this.selectedListId) {
+                await this.loadItems(parentListId);
+            }
+            return ref;
+        },
+        async previewMigration(target: FavoriteMigrationTarget) {
+            return PreviewFavoriteListMigration({
+                sourceListId: target.sourceListId,
+                targetListId: target.targetListId,
+                minecraftVersion: target.minecraftVersion,
+                modLoader: target.modLoader,
+                ignoreConflicts: Boolean(target.ignoreConflicts),
+            } as appcore.FavoriteMigrationRequest);
+        },
+        async applyMigration(target: FavoriteMigrationTarget) {
+            const result = await ApplyFavoriteListMigration({
+                sourceListId: target.sourceListId,
+                targetListId: target.targetListId,
+                minecraftVersion: target.minecraftVersion,
+                modLoader: target.modLoader,
+                ignoreConflicts: Boolean(target.ignoreConflicts),
+            } as appcore.FavoriteMigrationRequest);
+            if (target.targetListId === this.selectedListId) {
+                await this.loadItems(target.targetListId);
+            }
+            return result;
         },
     },
 });

@@ -1,0 +1,31 @@
+{
+  "id": "favorite-advanced-operations",
+  "name": "favorite-advanced-operations",
+  "title": "Favorite advanced operations",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "app",
+  "priority": "P2",
+  "creator": "codex",
+  "assignee": "codex",
+  "createdAt": "2026-07-07",
+  "completedAt": "2026-07-08",
+  "branch": null,
+  "base_branch": "enhance-favorite-page",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "07-07-favorite-sql-storage-references",
+    "07-07-favorite-version-migration",
+    "07-07-favorite-advanced-ui",
+    "07-07-favorite-bulk-copy-operations"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
