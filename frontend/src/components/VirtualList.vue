@@ -1,12 +1,12 @@
 <template>
-    <div ref="wrapperRef" class="virtual-list-wrapper" @keydown="onKeydown">
-        <v-virtual-scroll ref="scrollRef" :items="virtualItems" class="virtual-list-scroll px-2" :item-height="itemHeight"
+    <div class="virtual-list-wrapper" @keydown="onKeydown">
+        <v-virtual-scroll :items="virtualItems" class="virtual-list-scroll px-2" :item-height="itemHeight"
+            :style="{ '--virtual-list-item-height': `${itemHeight}px` }"
             tabindex="0">
             <template #default="{ item }">
                 <template v-if="item.type === 'item'">
                     <slot name="item" :item="item.raw" :index="item.index" :selected="selectedIndices.has(item.index)"
-                        :on-click="(event) => onItemClick(item.index, event)"
-                        :enter-style="itemEnterStyle(item.index)">
+                        :on-click="(event) => onItemClick(item.index, event)">
                     </slot>
                 </template>
 
@@ -32,12 +32,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from "vue";
-import {
-    animateGsapPageContent,
-    animationModeGsap,
-    useActiveAnimationMode,
-} from "../composables/useAnimationSettings";
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 
 const props = defineProps({
     items: {
@@ -72,34 +67,14 @@ const props = defineProps({
 
 const emit = defineEmits(["load-more", "item-click"]);
 
-const wrapperRef = ref(null);
 const loadMoreTarget = ref(null);
 let observer = null;
 let lastLoadMoreResultCount = 0;
-let hasAnimatedListItems = false;
-
-const scrollRef = ref(null);
-let lastScrollTop = 0;
-let currentDirection = "down";
 
 const selectedIndices = reactive(new Set());
 const actionBarSnapshot = ref(null);
 const latestSelectedItems = ref([]);
 let lastClickedIndex = null;
-const activeAnimationMode = useActiveAnimationMode();
-
-const handleScroll = (e) => {
-    const el = e.currentTarget;
-    const currentScrollTop = el.scrollTop;
-    if (currentScrollTop > lastScrollTop && currentDirection !== "down") {
-        currentDirection = "down";
-        el.style.setProperty("--md-fade-y-offset", "18px");
-    } else if (currentScrollTop < lastScrollTop && currentDirection !== "up") {
-        currentDirection = "up";
-        el.style.setProperty("--md-fade-y-offset", "-18px");
-    }
-    lastScrollTop = currentScrollTop;
-};
 
 const virtualItems = computed(() => {
     const wrapped = props.items.map((raw, index) => ({
@@ -115,10 +90,6 @@ const virtualItems = computed(() => {
         });
     }
     return wrapped;
-});
-
-const itemEnterStyle = (index) => ({
-    animationDelay: `${Math.min(index, 5) * 40}ms`,
 });
 
 const selectedItemsList = computed(() => {
@@ -250,19 +221,9 @@ onMounted(() => {
         observer.observe(loadMoreTarget.value);
     }
 
-    const scrollEl = scrollRef.value?.$el;
-    if (scrollEl) {
-        lastScrollTop = scrollEl.scrollTop;
-        scrollEl.style.setProperty("--md-fade-y-offset", "18px");
-        scrollEl.addEventListener("scroll", handleScroll, { passive: true });
-    }
 });
 
 onUnmounted(() => {
-    const scrollEl = scrollRef.value?.$el;
-    if (scrollEl) {
-        scrollEl.removeEventListener("scroll", handleScroll);
-    }
     observer?.disconnect();
     observer = null;
 });
@@ -275,16 +236,6 @@ watch(() => props.items, (next, previous) => {
     }
     if (next !== previousItemsRef && next.length <= (previous?.length || 0)) {
         clearSelection();
-    }
-    if (activeAnimationMode.value === animationModeGsap && wrapperRef.value) {
-        if (next.length === 0) {
-            hasAnimatedListItems = false;
-        } else if (!hasAnimatedListItems && (previous?.length || 0) === 0) {
-            hasAnimatedListItems = true;
-            void nextTick(() => {
-                animateGsapPageContent(wrapperRef.value, { selector: ".v-list-item" });
-            });
-        }
     }
     previousItemsRef = next;
 });
@@ -302,6 +253,15 @@ watch(() => props.items, (next, previous) => {
 .virtual-list-scroll {
     flex: 1 1 auto;
     min-height: 0;
+    scrollbar-gutter: stable;
+}
+
+.virtual-list-scroll :deep(.v-virtual-scroll__item) {
+    box-sizing: border-box;
+    contain: layout size style;
+    height: var(--virtual-list-item-height);
+    max-height: var(--virtual-list-item-height);
+    min-height: var(--virtual-list-item-height);
 }
 
 .load-more-target {

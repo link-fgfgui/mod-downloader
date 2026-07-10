@@ -3,34 +3,15 @@
         <v-card>
             <v-card-title class="text-h6">{{ $t("favorites.addDialog.title") }}</v-card-title>
             <v-card-text>
-                <v-select
-                    v-model="selectedListId"
-                    :items="favoritesStore.lists"
-                    item-title="name"
-                    item-value="id"
+                <v-combobox
+                    v-model="selectedListName"
+                    :items="favoriteListNames"
                     :label="$t('favorites.addDialog.list')"
                     density="comfortable"
                     variant="outlined"
                     :loading="favoritesStore.isLoadingLists"
                     hide-details
-                ></v-select>
-
-                <div class="add-list-row mt-4">
-                    <v-text-field
-                        v-model="newListName"
-                        :label="$t('favorites.addDialog.newList')"
-                        density="compact"
-                        variant="outlined"
-                        hide-details
-                        @keyup.enter.prevent="createList"
-                    ></v-text-field>
-                    <v-btn
-                        icon="mdi-plus"
-                        variant="tonal"
-                        :disabled="!newListName.trim()"
-                        @click="createList"
-                    ></v-btn>
-                </div>
+                ></v-combobox>
 
                 <div class="text-caption text-medium-emphasis mt-3">
                     {{ $t("favorites.addDialog.count", { n: drafts.length }) }}
@@ -43,7 +24,7 @@
                     color="primary"
                     variant="flat"
                     :loading="isSaving"
-                    :disabled="!selectedListId || drafts.length === 0"
+                    :disabled="!selectedListName.trim() || drafts.length === 0"
                     @click="add"
                 >
                     {{ $t("favorites.actions.add") }}
@@ -54,7 +35,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useFavoritesStore, type FavoriteModDraft } from "../stores/favorites";
 
 const emit = defineEmits(["added"]);
@@ -62,32 +43,32 @@ const emit = defineEmits(["added"]);
 const favoritesStore = useFavoritesStore();
 const isOpen = ref(false);
 const drafts = ref<FavoriteModDraft[]>([]);
-const selectedListId = ref("");
-const newListName = ref("");
+const selectedListName = ref("");
 const isSaving = ref(false);
+const favoriteListNames = computed(() => favoritesStore.lists.map((list) => list.name));
 
 const open = async (items: FavoriteModDraft[]) => {
     drafts.value = items;
     await favoritesStore.loadLists();
-    selectedListId.value = favoritesStore.selectedListId || favoritesStore.lists[0]?.id || "";
+    selectedListName.value = favoritesStore.selectedList?.name || favoritesStore.lists[0]?.name || "";
     isOpen.value = true;
 };
 
-const createList = async () => {
-    const name = newListName.value.trim();
-    if (!name) return;
-    const list = await favoritesStore.createList(name);
-    if (list?.id) {
-        selectedListId.value = list.id;
-        newListName.value = "";
-    }
+const resolveListId = async () => {
+    const value = selectedListName.value.trim();
+    if (!value) return "";
+    const namedList = favoritesStore.lists.find((list) => list.name.trim().toLocaleLowerCase() === value.toLocaleLowerCase());
+    if (namedList) return namedList.id;
+    return (await favoritesStore.createList(value))?.id || "";
 };
 
 const add = async () => {
-    if (!selectedListId.value || drafts.value.length === 0) return;
+    if (!selectedListName.value.trim() || drafts.value.length === 0) return;
     isSaving.value = true;
     try {
-        const saved = await favoritesStore.addDrafts(selectedListId.value, drafts.value);
+        const listId = await resolveListId();
+        if (!listId) return;
+        const saved = await favoritesStore.addDrafts(listId, drafts.value);
         emit("added", saved);
         isOpen.value = false;
     } finally {
@@ -97,12 +78,3 @@ const add = async () => {
 
 defineExpose({ open });
 </script>
-
-<style scoped>
-.add-list-row {
-    align-items: center;
-    display: grid;
-    gap: 8px;
-    grid-template-columns: minmax(0, 1fr) 40px;
-}
-</style>

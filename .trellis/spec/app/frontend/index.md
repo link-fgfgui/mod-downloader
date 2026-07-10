@@ -9,6 +9,8 @@ app adapter or `core/` specs.
 ## Required References
 
 - [UI State Lifecycle](./ui-state-lifecycle.md)
+- [Local Mod Version Selection](./local-mod-version-selection.md)
+- [Download Completion Sound](./download-completion-sound.md)
 - [Shared Thinking Guides](../../guides/index.md)
 
 ## Pre-Development Checklist
@@ -19,6 +21,11 @@ app adapter or `core/` specs.
   backend contracts for visual-only behavior.
 - Before adding a shared composable, search `frontend/src/composables/` and
   existing components for an equivalent pattern.
+- Reuse `ModVersionList` for provider version choices and keep local parsed
+  versions separate from online metadata; see
+  [Local Mod Version Selection](./local-mod-version-selection.md).
+- Preserve the success-event plus queue-drain plus unfocused gate for audible
+  download notifications; see [Download Completion Sound](./download-completion-sound.md).
 
 ## Quality Check
 

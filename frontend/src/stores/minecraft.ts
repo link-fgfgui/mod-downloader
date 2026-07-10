@@ -69,7 +69,15 @@ export const useMinecraftStore = defineStore("minecraft", {
             }
         },
         async refreshSelectedMods() {
-            this.applySelectedVersion(await RefreshSelectedVersionMods());
+            if (this.isRefreshing) return this.selectedVersion;
+            this.isRefreshing = true;
+            try {
+                const version = await RefreshSelectedVersionMods();
+                this.applySelectedVersion(version);
+                return version;
+            } finally {
+                this.isRefreshing = false;
+            }
         },
         async selectVersion(version: string) {
             this.isLoading = true;

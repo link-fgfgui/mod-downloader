@@ -9,10 +9,10 @@ import (
 
 	"github.com/link-fgfgui/mod-downloader-core/appcore"
 	"github.com/link-fgfgui/mod-downloader-core/configs"
-	"github.com/link-fgfgui/mod-downloader-core/database"
 	"github.com/link-fgfgui/mod-downloader-core/httpserver"
 	"github.com/link-fgfgui/mod-downloader-core/logging"
 	"github.com/link-fgfgui/mod-downloader-core/models"
+	"github.com/link-fgfgui/mod-downloader-core/storage"
 	appstructs "github.com/link-fgfgui/mod-downloader-core/structs"
 	structs "github.com/link-fgfgui/mod-downloader-core/structs/minecraft"
 
@@ -25,6 +25,7 @@ const searchModsUpdatedEvent = "search-mods-updated"
 const downloadStatesUpdatedEvent = "download-states-updated"
 const downloadQueueUpdatedEvent = "download-queue-updated"
 const downloadFailedEvent = "download-failed"
+const downloadCompletedEvent = "download-completed"
 
 // App struct
 type App struct {
@@ -46,11 +47,16 @@ func NewApp() *App {
 	return &App{}
 }
 
+func (a *App) GetAppVersion() string {
+	return currentAppVersion()
+}
+
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.core = appcore.New(appcore.Options{
 		Config:                a.config,
 		Runtime:               appRuntimeOptions(),
+		Version:               currentAppVersion(),
 		LoadMinecraftReleases: true,
 		OnEvent:               a.emitCoreEvent,
 	})
@@ -71,6 +77,7 @@ func (a *App) service() *appcore.Service {
 		a.core = appcore.New(appcore.Options{
 			Config:  a.config,
 			Runtime: appRuntimeOptions(),
+			Version: currentAppVersion(),
 			OnEvent: a.emitCoreEvent,
 		})
 	}
@@ -101,6 +108,8 @@ func (a *App) emitCoreEvent(event appcore.Event) {
 		eventName = downloadQueueUpdatedEvent
 	case appcore.EventDownloadFailed:
 		eventName = downloadFailedEvent
+	case appcore.EventDownloadCompleted:
+		eventName = downloadCompletedEvent
 	case appcore.EventMinecraftDirChanged:
 		eventName = minecraftDirChangedEvent
 	case appcore.EventSelectedVersionChanged:
@@ -142,15 +151,15 @@ func (a *App) LookupProjectBySlug(platform, slug, mcVersion, modLoader string) m
 	return project
 }
 
-func (a *App) GetPinnedModVersion(platform string, modID string, minecraftVersion string, modLoader string) database.PinnedMod {
+func (a *App) GetPinnedModVersion(platform string, modID string, minecraftVersion string, modLoader string) storage.PinnedMod {
 	return a.service().GetPinnedModVersion(platform, modID, minecraftVersion, modLoader)
 }
 
-func (a *App) PinModVersion(req appstructs.ModVersionPinRequest) database.PinnedMod {
+func (a *App) PinModVersion(req appstructs.ModVersionPinRequest) storage.PinnedMod {
 	return a.service().PinModVersion(req)
 }
 
-func (a *App) ListPinnedMods() []database.PinnedMod {
+func (a *App) ListPinnedMods() []storage.PinnedMod {
 	return a.service().ListPinnedMods()
 }
 
@@ -158,15 +167,15 @@ func (a *App) UnpinMod(platform, modID, mcVersion, modLoader string) bool {
 	return a.service().UnpinMod(platform, modID, mcVersion, modLoader)
 }
 
-func (a *App) ListFavoriteLists() []database.FavoriteList {
+func (a *App) ListFavoriteLists() []storage.FavoriteList {
 	return a.service().ListFavoriteLists()
 }
 
-func (a *App) CreateFavoriteList(name string) database.FavoriteList {
+func (a *App) CreateFavoriteList(name string) storage.FavoriteList {
 	return a.service().CreateFavoriteList(name)
 }
 
-func (a *App) RenameFavoriteList(id, name string) database.FavoriteList {
+func (a *App) RenameFavoriteList(id, name string) storage.FavoriteList {
 	return a.service().RenameFavoriteList(id, name)
 }
 
@@ -174,7 +183,7 @@ func (a *App) DeleteFavoriteList(id string) bool {
 	return a.service().DeleteFavoriteList(id)
 }
 
-func (a *App) UpdateFavoriteListMetadata(list database.FavoriteList) database.FavoriteList {
+func (a *App) UpdateFavoriteListMetadata(list storage.FavoriteList) storage.FavoriteList {
 	return a.service().UpdateFavoriteListMetadata(list)
 }
 
@@ -182,15 +191,15 @@ func (a *App) ReorderFavoriteLists(ids []string) bool {
 	return a.service().ReorderFavoriteLists(ids)
 }
 
-func (a *App) ListFavoriteGroups() []database.FavoriteGroup {
+func (a *App) ListFavoriteGroups() []storage.FavoriteGroup {
 	return a.service().ListFavoriteGroups()
 }
 
-func (a *App) CreateFavoriteGroup(name string) database.FavoriteGroup {
+func (a *App) CreateFavoriteGroup(name string) storage.FavoriteGroup {
 	return a.service().CreateFavoriteGroup(name)
 }
 
-func (a *App) RenameFavoriteGroup(id, name string) database.FavoriteGroup {
+func (a *App) RenameFavoriteGroup(id, name string) storage.FavoriteGroup {
 	return a.service().RenameFavoriteGroup(id, name)
 }
 
@@ -202,15 +211,15 @@ func (a *App) ReorderFavoriteGroups(ids []string) bool {
 	return a.service().ReorderFavoriteGroups(ids)
 }
 
-func (a *App) ListFavoriteMods(listID string) []database.FavoriteMod {
+func (a *App) ListFavoriteMods(listID string) []storage.FavoriteMod {
 	return a.service().ListFavoriteMods(listID)
 }
 
-func (a *App) ListFavoriteContents(listID string) database.FavoriteListContents {
+func (a *App) ListFavoriteContents(listID string) storage.FavoriteListContents {
 	return a.service().ListFavoriteContents(listID)
 }
 
-func (a *App) AddFavoriteMod(mod database.FavoriteMod) database.FavoriteMod {
+func (a *App) AddFavoriteMod(mod storage.FavoriteMod) storage.FavoriteMod {
 	return a.service().AddFavoriteMod(mod)
 }
 
@@ -230,7 +239,7 @@ func (a *App) ApplyFavoriteListMigration(req appcore.FavoriteMigrationRequest) a
 	return a.service().ApplyFavoriteListMigration(req)
 }
 
-func (a *App) AddFavoriteListReference(parentListID, childListID string) database.FavoriteListRef {
+func (a *App) AddFavoriteListReference(parentListID, childListID string) storage.FavoriteListRef {
 	return a.service().AddFavoriteListReference(parentListID, childListID)
 }
 
@@ -238,7 +247,7 @@ func (a *App) RemoveFavoriteListReference(parentListID, childListID string) bool
 	return a.service().RemoveFavoriteListReference(parentListID, childListID)
 }
 
-func (a *App) ListFavoriteListRefs(parentListID string) []database.FavoriteListRef {
+func (a *App) ListFavoriteListRefs(parentListID string) []storage.FavoriteListRef {
 	return a.service().ListFavoriteListRefs(parentListID)
 }
 
@@ -296,6 +305,7 @@ type SettingsView struct {
 	AnimationEnabled            bool    `json:"animationEnabled"`
 	AnimationDurationMultiplier float64 `json:"animationDurationMultiplier"`
 	AutoScanUnusedDependencies  bool    `json:"autoScanUnusedDependencies"`
+	MCIMEnabled                 bool    `json:"mcimEnabled"`
 	MinecraftDir                string  `json:"minecraftDir"` // simplified path (with env vars)
 	CacheDir                    string  `json:"cacheDir"`
 	CachePath                   string  `json:"cachePath"`
@@ -324,6 +334,10 @@ type ExportFavoritePackwizResult struct {
 
 type SaveUnusedDependencyCleanupSettingsRequest struct {
 	AutoScanUnusedDependencies bool `json:"autoScanUnusedDependencies"`
+}
+
+type SaveMCIMSettingsRequest struct {
+	MCIMEnabled bool `json:"mcimEnabled"`
 }
 
 // Convention: a field value of "<keep>" means do not modify the original value (since the frontend cannot access plaintext).
@@ -366,6 +380,12 @@ func (a *App) SaveUnusedDependencyCleanupSettings(req SaveUnusedDependencyCleanu
 	return settingsViewFromCore(next)
 }
 
+func (a *App) SaveMCIMSettings(req SaveMCIMSettingsRequest) SettingsView {
+	next := a.service().SaveMCIMSettings(appcore.SaveMCIMSettingsRequest{MCIMEnabled: req.MCIMEnabled})
+	a.config = a.core.Config()
+	return settingsViewFromCore(next)
+}
+
 func (a *App) SaveCacheDirPreference(dir string) SettingsView {
 	next := a.service().SaveCacheDirPreference(dir)
 	a.config = a.core.Config()
@@ -389,6 +409,10 @@ func (a *App) QueueModDownload(req appstructs.ModDownloadRequest) appstructs.Mod
 
 func (a *App) GetDownloadQueueState() appstructs.DownloadQueueState {
 	return a.service().GetDownloadQueueState()
+}
+
+func (a *App) GetUsageStats() storage.UsageStats {
+	return a.service().GetUsageStats()
 }
 
 func (a *App) CancelDownload(id string) bool {
@@ -515,6 +539,7 @@ func settingsViewFromCore(sv appcore.SettingsView) SettingsView {
 		AnimationEnabled:            sv.AnimationEnabled,
 		AnimationDurationMultiplier: sv.AnimationDurationMultiplier,
 		AutoScanUnusedDependencies:  sv.AutoScanUnusedDependencies,
+		MCIMEnabled:                 sv.MCIMEnabled,
 		MinecraftDir:                sv.MinecraftDir,
 		CacheDir:                    sv.CacheDir,
 		CachePath:                   sv.CachePath,

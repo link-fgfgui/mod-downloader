@@ -334,17 +334,24 @@
   animation: md-fade-in-up var(--md-transition-slow) var(--md-ease-out) both;
 }
 
-/* User-configured CSS/Vuetify animation suppression. Keep animations effectively
- * instant instead of removing them so "both"/forwards keyframe final states still apply. */
+/* User-configured animation suppression. Utility classes are restored to their
+ * final visible state so their first keyframe cannot flash for one frame. */
 :root[data-md-animations="off"] *,
 :root[data-md-animations="off"] *::before,
 :root[data-md-animations="off"] *::after {
   animation-delay: 0ms !important;
-  animation-duration: 0.01ms !important;
-  animation-iteration-count: 1 !important;
+  animation-duration: 0s !important;
   scroll-behavior: auto !important;
   transition-delay: 0ms !important;
-  transition-duration: 0.01ms !important;
+  transition-duration: 0s !important;
+}
+
+:root[data-md-animations="off"] [class*="md-animate-"],
+:root[data-md-animations="off"] .md-page,
+:root[data-md-animations="off"] .md-stagger > * {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
 }
 
 /* GSAP mode: CSS and Vuetify transitions are suppressed so GSAP owns motion. */
@@ -352,11 +359,16 @@
 :root[data-md-animations="gsap"] *::before,
 :root[data-md-animations="gsap"] *::after {
   animation-delay: 0ms !important;
-  animation-duration: 0.01ms !important;
-  animation-iteration-count: 1 !important;
+  animation-duration: 0s !important;
   scroll-behavior: auto !important;
   transition-delay: 0ms !important;
-  transition-duration: 0.01ms !important;
+  transition-duration: 0s !important;
+}
+
+:root[data-md-animations="gsap"] [class*="md-animate-"],
+:root[data-md-animations="gsap"] .md-page,
+:root[data-md-animations="gsap"] .md-stagger > * {
+  animation: none !important;
 }
 
 /* Reduced motion respect */

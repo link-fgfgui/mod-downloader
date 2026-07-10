@@ -41,6 +41,14 @@ modrinth_api_key = ""
 [preferences]
 theme = "dark"
 minecraft_dir = "/path/to/.minecraft"
+mcim_enabled = false
+
+[downloads]
+file_concurrency = 4
+concurrent_downloads = 1
+
+[api]
+requests_per_second = 0
 ```
 
 Environment variables:
@@ -49,10 +57,20 @@ Environment variables:
 - `KEYS_MODRINTH_API_KEY`
 - `PREFERS_MINECRAFT_DIR`
 - `PREFERS_THEME`
+- `PREFERS_MCIM_ENABLED`
+- `DOWNLOADS_FILE_CONCURRENCY`
+- `DOWNLOADS_CONCURRENT_DOWNLOADS`
+- `API_REQUESTS_PER_SECOND`
+- `HTTP_PROXY` / `HTTPS_PROXY`
+- `NO_PROXY`
 
 `theme` supports `dark`, `light`, or `system`. The Modrinth key field is currently reserved for future use; Modrinth requests are made with the app user agent, while CurseForge requires `curseforge_api_key` or `KEYS_CF_API_KEY` to enable that source.
 
-The app also lets you choose the `.minecraft` directory from the UI.
+`file_concurrency` controls the number of ranged chunks used for one file, and `concurrent_downloads` controls how many files may download at once. `requests_per_second` limits the combined CurseForge and Modrinth API request rate; `0` disables rate limiting.
+
+All outbound API, metadata, and file requests automatically use the process system proxy environment. `NO_PROXY` exclusions are honored; lowercase proxy variable names are also supported by Go.
+
+The app also lets you choose the `.minecraft` directory and switch the Modrinth/CurseForge API and file sources to MCIM from the UI.
 
 ## Development
 
@@ -78,6 +96,13 @@ Build a production binary:
 
 ```bash
 wails build
+```
+
+Inject a version into the production binary:
+
+```bash
+export APP_VERSION=v1.2.3
+wails build -ldflags "-X main.appVersion=${APP_VERSION}"
 ```
 
 Build the CLI binary:
@@ -109,8 +134,24 @@ npm run build --prefix frontend
 The app stores configuration and local runtime data separately:
 
 - `mod-downloader.toml` in the working directory for configuration
-- `mods.gob.zst` in the configured cache directory for rebuildable mod platform metadata cache
-- `user-data.sqlite` in the configured cache directory for user-owned data such as pinned mod versions and favorite lists
+- `mod-metadata.tmp` in the configured cache directory for rebuildable mod platform metadata cache
+- `mod-favs.sqlite` in the configured cache directory for user-owned data such as pinned mod versions and favorite lists
+- `mod-downloader.log` in the working directory when stderr is unavailable or file logging is forced
+
+Logging defaults to stderr. Configure automatic output behavior in
+`mod-downloader.toml`:
+
+```toml
+[logging]
+disabled = false
+force_file = false
+```
+
+`disabled = true` suppresses all application logs and takes precedence over
+`force_file`. `force_file = true` appends logs to `mod-downloader.log` while
+continuing to use stderr when it is available. Without either option, the app
+falls back to the log file only when stderr cannot be used. Environment
+equivalents are `LOGGING_DISABLED` and `LOGGING_FORCE_FILE`.
 
 ## CLI
 

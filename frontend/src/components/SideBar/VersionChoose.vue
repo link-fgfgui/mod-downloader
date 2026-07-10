@@ -23,25 +23,14 @@
                         @click="refreshSelectedMods"
                     ></v-btn>
                 </div>
-                <v-combobox
-                    v-model="selectedMinecraftVersion"
-                    :items="releaseVersionList"
-                    label="Minecraft Version"
-                    density="compact"
-                    hide-details
-                    variant="outlined"
+                <MinecraftTargetFields
+                    v-model:minecraft-version="selectedMinecraftVersion"
+                    v-model:mod-loader="selectedModLoader"
+                    :versions="releaseVersionList"
+                    :mod-loaders="modLoaderList"
                     class="mt-2"
-                    clearable
-                ></v-combobox>
-                <v-select
-                    v-model="selectedModLoader"
-                    :items="modLoaderList"
-                    label="Mod Loader"
-                    density="compact"
-                    hide-details
-                    variant="outlined"
-                    class="mt-2"
-                ></v-select>
+                    stacked
+                ></MinecraftTargetFields>
                 <v-text-field
                     v-model="downloadFolder"
                     label=".minecraft folder"
@@ -79,6 +68,7 @@ import { computed } from "vue";
 import { storeToRefs } from "pinia";
 
 import { useMinecraftStore } from "../../stores/minecraft";
+import MinecraftTargetFields from "../MinecraftTargetFields.vue";
 
 const props = defineProps({
     isExpanded: {

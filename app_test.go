@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/link-fgfgui/mod-downloader-core/configs"
-	"github.com/link-fgfgui/mod-downloader-core/database"
 	"github.com/link-fgfgui/mod-downloader-core/global"
+	"github.com/link-fgfgui/mod-downloader-core/storage"
 	structs "github.com/link-fgfgui/mod-downloader-core/structs/minecraft"
 )
 
@@ -305,7 +305,7 @@ func TestAppServiceDefaultsCachePathToCurrentWorkingDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		database.Close()
+		storage.Close()
 		if err := os.Chdir(oldwd); err != nil {
 			t.Fatal(err)
 		}
@@ -313,7 +313,7 @@ func TestAppServiceDefaultsCachePathToCurrentWorkingDirectory(t *testing.T) {
 
 	app := &App{config: &configs.Config{}}
 	settings := app.GetSettings()
-	want := filepath.Join(tmp, database.CacheFileName)
+	want := filepath.Join(tmp, storage.CacheFileName)
 	if got := settings.CachePath; got != want {
 		t.Fatalf("CachePath = %q, want %q", got, want)
 	}
@@ -329,7 +329,7 @@ func TestAppServiceConfiguredCacheDirOverridesGUIDefault(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		database.Close()
+		storage.Close()
 		if err := os.Chdir(oldwd); err != nil {
 			t.Fatal(err)
 		}
@@ -340,7 +340,7 @@ func TestAppServiceConfiguredCacheDirOverridesGUIDefault(t *testing.T) {
 		Runtime: configs.RuntimeConfig{CacheDir: cacheDir},
 	}}
 	settings := app.GetSettings()
-	want := filepath.Join(cacheDir, database.CacheFileName)
+	want := filepath.Join(cacheDir, storage.CacheFileName)
 	if got := settings.CachePath; got != want {
 		t.Fatalf("CachePath = %q, want %q", got, want)
 	}
@@ -539,23 +539,23 @@ func TestUnpinMod(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		database.Close()
+		storage.Close()
 		if err := os.Chdir(oldwd); err != nil {
 			t.Fatal(err)
 		}
 	})
-	if err := database.Open(); err != nil {
+	if err := storage.Open(); err != nil {
 		t.Fatal(err)
 	}
 
-	pin := database.PinnedMod{
+	pin := storage.PinnedMod{
 		Platform:         "modrinth",
 		ModID:            "sodium",
 		VersionID:        "v1",
 		MinecraftVersion: "1.21.1",
 		ModLoader:        "fabric",
 	}
-	if err := database.UpsertPinnedMod(pin); err != nil {
+	if err := storage.UpsertPinnedMod(pin); err != nil {
 		t.Fatal(err)
 	}
 
@@ -563,7 +563,7 @@ func TestUnpinMod(t *testing.T) {
 	if !app.UnpinMod("Modrinth", "Sodium", "1.21.1", "Fabric") {
 		t.Fatal("UnpinMod returned false for existing pin")
 	}
-	if _, ok := database.GetPinnedMod("modrinth", "sodium", "1.21.1", "fabric"); ok {
+	if _, ok := storage.GetPinnedMod("modrinth", "sodium", "1.21.1", "fabric"); ok {
 		t.Fatal("pin still exists after unpin")
 	}
 	if app.UnpinMod("modrinth", "sodium", "1.21.1", "fabric") {

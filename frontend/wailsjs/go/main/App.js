@@ -70,6 +70,10 @@ export function ExportFavoriteListPackwizZip(arg1, arg2, arg3) {
   return window['go']['main']['App']['ExportFavoriteListPackwizZip'](arg1, arg2, arg3);
 }
 
+export function GetAppVersion() {
+  return window['go']['main']['App']['GetAppVersion']();
+}
+
 export function GetDownloadQueueState() {
   return window['go']['main']['App']['GetDownloadQueueState']();
 }
@@ -100,6 +104,10 @@ export function GetSelectedVersion() {
 
 export function GetSettings() {
   return window['go']['main']['App']['GetSettings']();
+}
+
+export function GetUsageStats() {
+  return window['go']['main']['App']['GetUsageStats']();
 }
 
 export function GetVersions() {
@@ -200,6 +208,10 @@ export function SaveApiKeys(arg1) {
 
 export function SaveCacheDirPreference(arg1) {
   return window['go']['main']['App']['SaveCacheDirPreference'](arg1);
+}
+
+export function SaveMCIMSettings(arg1) {
+  return window['go']['main']['App']['SaveMCIMSettings'](arg1);
 }
 
 export function SaveTheme(arg1) {

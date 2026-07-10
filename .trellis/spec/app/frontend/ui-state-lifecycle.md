@@ -98,3 +98,48 @@ function clearQueueSnapshot() {
 Avoid hard-coded timeout delays. Prefer Vue/Vuetify transition lifecycle hooks
 such as `@after-leave`, or the existing GSAP `done`/`onAfterLeave` transition
 path when GSAP owns the motion.
+
+## Virtual Lists and Route Animation
+
+Virtualized rows are recycled while scrolling. Their wrapper height is part of
+the scrollbar calculation and must remain equal to the `item-height` passed to
+`v-virtual-scroll`, including the row's bottom spacing. Apply fixed
+`height`/`min-height`/`max-height`, `contain: layout size style`, and a stable
+scrollbar gutter to the virtual wrapper items.
+
+Do not attach CSS or GSAP entrance animations to virtualized rows. Recycling an
+animated row during a scrollbar drag causes flashes, unnecessary main-thread
+work, and a changing scroll range. Hover and direct-interaction transitions are
+allowed because they do not run as rows enter the viewport.
+
+Route-level GSAP animation must obey these contracts:
+
+- Exclude `.v-list-item` from global page-content targets.
+- Animate the route root with opacity only. Never translate or scale a root
+  containing scrollable content, because that also moves or scales scrollbars.
+- Select visible content targets before both hiding and animating them. Do not
+  hide inactive dialogs or other zero-size targets that the matching enter
+  animation will not restore.
+- Animation-off mode must not apply Vue route transition classes. CSS animation
+  utilities must use their final visible state instead of a `0.01ms` first
+  keyframe.
+
+Correct:
+
+```ts
+const targets = getVisiblePageContentTargets(routeRoot);
+gsap.set(routeRoot, { opacity: 0 });
+gsap.set(targets, { opacity: 0, y: 24 });
+```
+
+Wrong:
+
+```ts
+const targets = routeRoot.querySelectorAll(".v-list-item, .v-card");
+gsap.set(routeRoot, { opacity: 0, y: 20, scale: 0.985 });
+gsap.set(targets, { opacity: 0 }); // Also hides inactive dialog content.
+```
+
+Verification must cover animation modes `off`, `vuetify`, and `gsap`; rapid
+scrollbar dragging; route leave/re-entry; and opening content that was hidden
+during the initial route enter. Always run frontend lint and production build.

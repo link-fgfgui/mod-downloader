@@ -116,47 +116,14 @@
 
                 <v-divider></v-divider>
 
-                <div v-if="isLoadingVersions" class="pa-8 text-center">
-                    <v-progress-circular
-                        color="primary"
-                        indeterminate
-                    ></v-progress-circular>
-                </div>
-                <v-list
-                    v-else-if="matchingVersions.length"
-                    class="version-list py-0"
-                    density="comfortable"
-                    lines="one"
-                >
-                    <v-list-item
-                        v-for="version in matchingVersions"
-                        :key="version.id"
-                        :title="versionFileName(version)"
-                    >
-                        <template #append>
-                            <v-btn
-                                :color="
-                                    isPinnedVersion(version)
-                                        ? 'primary'
-                                        : 'surface-variant'
-                                "
-                                :icon="
-                                    isPinnedVersion(version)
-                                        ? 'mdi-pin'
-                                        : 'mdi-pin-outline'
-                                "
-                                variant="tonal"
-                                size="small"
-                                :loading="pinningVersionID === version.id"
-                                :disabled="isPinningAnotherVersion(version)"
-                                @click="pinVersion(version)"
-                            ></v-btn>
-                        </template>
-                    </v-list-item>
-                </v-list>
-                <div v-else class="pa-8 text-center text-medium-emphasis">
-                    {{ $t("download.noMatchingVersions") }}
-                </div>
+                <ModVersionList
+                    :versions="matchingVersions"
+                    :loading="isLoadingVersions"
+                    action="pin"
+                    :pinned-version-id="downloadStore.pinnedVersion?.versionId || ''"
+                    :busy-version-id="pinningVersionID"
+                    @select="pinVersion"
+                ></ModVersionList>
             </v-card>
         </v-overlay>
 
@@ -254,6 +221,7 @@ import { storeToRefs } from "pinia";
 
 import SearchResultList from "../components/SearchResultList.vue";
 import AddToFavoriteDialog from "../components/AddToFavoriteDialog.vue";
+import ModVersionList from "../components/ModVersionList.vue";
 import { ValidateMinecraftDir } from "../../wailsjs/go/main/App";
 import { useDownloadSearchStore } from "../stores/downloadSearch";
 import { useMinecraftStore } from "../stores/minecraft";
@@ -305,12 +273,6 @@ const openVersionsOverlay = (result: models.ModProject) =>
     downloadStore.openVersionsOverlay(result);
 const pinVersion = (version: models.ModVersion) =>
     downloadStore.pinVersion(version);
-const isPinnedVersion = (version: models.ModVersion) =>
-    downloadStore.isPinnedVersion(version);
-const isPinningAnotherVersion = (version: models.ModVersion) =>
-    downloadStore.isPinningAnotherVersion(version);
-const versionFileName = (version: models.ModVersion) =>
-    downloadStore.versionFileName(version);
 
 const batchDownload = (results: models.ModProject[]) => {
     void downloadStore.batchInstall(results);
@@ -448,11 +410,6 @@ watch(
 
 .version-overlay {
     overflow: hidden;
-}
-
-.version-list {
-    max-height: calc(100vh - 128px);
-    overflow-y: auto;
 }
 
 .batch-conflict-list {

@@ -1,4 +1,4 @@
-# Database Guidelines
+# Storage Guidelines
 
 > Database patterns and conventions for this project.
 
@@ -8,8 +8,8 @@
 
 This project uses two local storage files with different lifecycles:
 
-- `mods.gob.zst` — gob/zstd serialized platform metadata cache.
-- `user-data.sqlite` — SQLite user-owned data store.
+- `mod-metadata.tmp` — gob/zstd serialized platform metadata cache.
+- `mod-favs.sqlite` — SQLite user-owned data store.
 
 **Key principles**:
 - Persistent cache is for **expensive-to-fetch, low-churn data** (platform API responses)
@@ -29,16 +29,15 @@ This project uses two local storage files with different lifecycles:
 
 **Implementation**:
 ```go
-// database/database.go
-const cacheVersion = 3 // Bump on breaking changes
+// storage/storage.go
+const cacheVersion = 5 // Bump on breaking changes
 
 type cacheState struct {
     Version int // Must match cacheVersion
 
     // Platform metadata (persisted)
-    ModProjects      map[string]models.ModProject
-    ModVersions      map[string]models.ModVersion
-    PinnedMods       map[string]PinnedMod
+    ModProjects map[string]models.ModProject
+    ModVersions map[string]models.ModVersion
     
     // Local JAR metadata removed in v3 (moved to global.jarCache)
     // JarMetadata map[string][]structs.ModInfo  // ❌ Removed
@@ -71,8 +70,8 @@ func (db *Database) Load() error {
 
 | Data Type | Cache Location | Rebuild Cost | Churn Rate | Example |
 |-----------|---------------|--------------|------------|---------|
-| **Platform metadata** | Persistent gob cache (`mods.gob.zst`) | High (API rate limits, 200ms+) | Low (immutable per SHA1) | `ModProject`, `ModVersion` |
-| **User-owned mod state** | SQLite (`user-data.sqlite`) | User data, not rebuildable | User-driven | `PinnedMod`, `FavoriteList`, `FavoriteMod` |
+| **Platform metadata** | Persistent gob cache (`mod-metadata.tmp`) | High (API rate limits, 200ms+) | Low (immutable per SHA1) | `ModProject`, `ModVersion` |
+| **User-owned mod state** | SQLite (`mod-favs.sqlite`) | User data, not rebuildable | User-driven | `PinnedMod`, `FavoriteList`, `FavoriteMod` |
 | **Local JAR metadata** | Memory (`global.jarCache`) | Low (~5ms parse per JAR) | High (user adds/removes mods) | Parsed `ModInfo` from JARs |
 
 **Example - Wrong (before refactor)**:
@@ -90,7 +89,7 @@ type cacheState struct {
 **Example - Correct (after refactor)**:
 ```go
 // ✅ Platform data persisted
-// database/database.go
+// storage/storage.go
 type cacheState struct {
     ModProjects map[string]models.ModProject // API data, expensive
     ModVersions map[string]models.ModVersion  // API data, expensive
@@ -147,14 +146,14 @@ project, ok := db.cacheState.ModProjects[key]
 Use this pattern when adding user-owned mod state that must survive cache
 rebuilds, such as pinned mod versions, favorite lists, favorite memberships, or
 future user collections. This data is not platform metadata and must not be
-stored in `mods.gob.zst` or `mod-downloader.toml`.
+stored in `mod-metadata.tmp` or `mod-downloader.toml`.
 
 #### 2. Signatures
 
 ```go
 const (
-    CacheFileName    = "mods.gob.zst"
-    UserDataFileName = "user-data.sqlite"
+    CacheFileName    = "mod-metadata.tmp"
+    UserDataFileName = "mod-favs.sqlite"
 )
 
 func OpenAt(cachePath string) error
@@ -181,26 +180,28 @@ func DeleteFavoriteMod(listID, platform, modID, mcVersion, modLoader string) (bo
 func ListFavoriteMods(listID string) []FavoriteMod
 ```
 
-SQLite schema owner: `core/database/userdb.go`.
+SQLite schema owner: `core/storage/userdb.go`.
 
 #### 3. Contracts
 
-- `OpenAt(cachePath)` opens `mods.gob.zst` at `cachePath` and SQLite at
+- `OpenAt(cachePath)` opens `mod-metadata.tmp` at `cachePath` and SQLite at
   `UserDataPathForCachePath(cachePath)`.
 - `Runtime.CachePath` is a precise cache-file override. `Runtime.CacheDir` and
   TOML `runtime.cache_dir` resolve to `filepath.Join(cacheDir, CacheFileName)`.
 - `Runtime.DefaultCacheDir` is an adapter-provided fallback only. It must be
   lower priority than explicit runtime cache settings and TOML/env
-  `runtime.cache_dir`, and higher priority than `database.DefaultCachePath()`.
+  `runtime.cache_dir`, and higher priority than `storage.DefaultCachePath()`.
 - The Wails GUI sets `Runtime.DefaultCacheDir` to the process working
   directory so GUI defaults colocate with `pwd/mod-downloader.toml`; CLI callers
   leave it empty so core falls back to the OS temp directory.
 - `mod-downloader.toml` stores configuration only. Pins, favorites, and other
   user collections must not be serialized into TOML.
-- Legacy gob fields for `PinnedMods`, `FavoriteLists`, and `FavoriteMods`
-  remain only to decode and migrate old cache files.
+- `cacheState` contains platform cache data only. Do not retain user-data fields
+  solely to decode an older gob layout.
 - Platform cache data remains gob-backed and rebuildable. Do not move platform
   metadata to SQLite unless a task explicitly owns that migration.
+- `OpenAt` opens only the current cache and user-data filenames. It does not
+  discover, rename, import, or delete files from older layouts.
 - SQLite stores normalized key fields: lower-case `platform`, `mod_id`, and
   `mod_loader`; trimmed `minecraft_version`; empty strings instead of NULL for
   favorite scope fields so unique constraints behave like the old composite
@@ -212,13 +213,11 @@ SQLite schema owner: `core/database/userdb.go`.
 
 - Empty cache path -> `OpenAt` returns an error.
 - Empty `Runtime.DefaultCacheDir` -> ignore it and continue to
-  `database.DefaultCachePath()`.
+  `storage.DefaultCachePath()`.
 - Missing gob cache -> start with an empty platform cache.
 - Missing SQLite file -> create parent directory, create schema, then continue.
 - SQLite open/schema failure -> `OpenAt` returns an error; callers must not
   silently continue with user-data writes disabled.
-- Legacy favorite item without an existing list -> skip that orphan during
-  migration instead of failing startup.
 - Empty pin key fields -> no row written.
 - Favorite mod for a missing list -> no row written.
 - Duplicate favorite mod key -> update existing row while preserving ID and
@@ -227,19 +226,17 @@ SQLite schema owner: `core/database/userdb.go`.
 #### 5. Good/Base/Bad Cases
 
 - Good: pin Sodium for `modrinth/sodium/1.21.1/fabric`; it persists in
-  `user-data.sqlite` and `ResolveVersions` continues to read through
-  `database.GetPinnedMod`.
+  `mod-favs.sqlite` and `ResolveVersions` continues to read through
+  `storage.GetPinnedMod`.
 - Good: change `runtime.cache_dir`; service saves TOML config and reopens
-  storage at `<cache_dir>/mods.gob.zst` plus `<cache_dir>/user-data.sqlite`.
+  storage at `<cache_dir>/mod-metadata.tmp` plus `<cache_dir>/mod-favs.sqlite`.
 - Good: Wails startup sets `Runtime.DefaultCacheDir` to `os.Getwd()` so an
-  unset GUI cache preference resolves to `<pwd>/mods.gob.zst`.
-- Base: an existing gob cache containing legacy pins/favorites migrates once,
-  then the next gob save clears those legacy maps.
+  unset GUI cache preference resolves to `<pwd>/mod-metadata.tmp`.
 - Base: CLI/appcore callers with no cache override and no default cache dir use
-  `<os.TempDir()>/mod-downloader/mods.gob.zst`.
+  `<os.TempDir()>/mod-downloader/mod-metadata.tmp`.
 - Bad: passing the GUI working directory as `Runtime.CacheDir`; that overrides a
   saved `runtime.cache_dir` and ignores the user's explicit preference.
-- Bad: writing favorite lists to `mods.gob.zst`, because cache version bumps or
+- Bad: writing favorite lists to `mod-metadata.tmp`, because cache version bumps or
   cache deletion would destroy user data.
 - Bad: adding pin/favorite fields to `mod-downloader.toml`; TOML is config, not
   collection storage.
@@ -247,13 +244,11 @@ SQLite schema owner: `core/database/userdb.go`.
 #### 6. Tests Required
 
 - SQLite persistence tests for pins and favorite lists/mods across close/reopen.
-- Legacy gob migration test that asserts migrated rows are readable from SQLite
-  and legacy gob user maps are cleared after close.
 - Favorite tests for create, rename, delete cascade, duplicate upsert, sort
   order, missing list, and returned-copy behavior.
 - Appcore settings test for `runtime.cache_dir` save plus storage reopen.
 - Wails adapter test that unset GUI cache preference resolves to
-  `<pwd>/mods.gob.zst`.
+  `<pwd>/mod-metadata.tmp`.
 - Wails adapter test that configured `runtime.cache_dir` overrides the GUI
   working-directory default.
 - Wails binding regeneration and frontend build after settings API fields or
@@ -317,8 +312,8 @@ appcore.New(appcore.Options{Runtime: appcore.RuntimeOptions{DefaultCacheDir: wd}
 
 Use this pattern for user-owned collections of platform mods, such as named
 favorite lists. These records are persistent user data, not local JAR scan
-cache or platform metadata cache, so they belong in SQLite (`user-data.sqlite`).
-Schema changes belong in `core/database/userdb.go`.
+cache or platform metadata cache, so they belong in SQLite (`mod-favs.sqlite`).
+Schema changes belong in `core/storage/userdb.go`.
 
 #### 2. Signatures
 
@@ -386,13 +381,13 @@ Wrong:
 
 ```go
 // Favorites accidentally modify download pin behavior.
-database.UpsertPinnedMod(database.PinnedMod{Platform: platform, ModID: modID})
+storage.UpsertPinnedMod(storage.PinnedMod{Platform: platform, ModID: modID})
 ```
 
 Correct:
 
 ```go
-database.UpsertFavoriteMod(database.FavoriteMod{
+storage.UpsertFavoriteMod(storage.FavoriteMod{
     ListID: listID,
     Platform: platform,
     ModID: modID,
@@ -415,7 +410,7 @@ Core service request/response types:
 ```go
 type FavoriteBulkAddRequest struct {
     TargetListIDs []string               `json:"targetListIds"`
-    Mods          []database.FavoriteMod `json:"mods"`
+    Mods          []storage.FavoriteMod `json:"mods"`
 }
 
 type FavoriteListCopyRequest struct {
@@ -436,10 +431,10 @@ Core service methods:
 ```go
 func (s *Service) AddFavoriteModsToLists(req FavoriteBulkAddRequest) FavoriteBulkOperationResult
 func (s *Service) CopyFavoriteListToList(req FavoriteListCopyRequest) FavoriteBulkOperationResult
-func (s *Service) AddFavoriteListReference(parentListID, childListID string) database.FavoriteListRef
+func (s *Service) AddFavoriteListReference(parentListID, childListID string) storage.FavoriteListRef
 func (s *Service) RemoveFavoriteListReference(parentListID, childListID string) bool
-func (s *Service) ListFavoriteListRefs(parentListID string) []database.FavoriteListRef
-func (s *Service) ListFavoriteContents(listID string) database.FavoriteListContents
+func (s *Service) ListFavoriteListRefs(parentListID string) []storage.FavoriteListRef
+func (s *Service) ListFavoriteContents(listID string) storage.FavoriteListContents
 ```
 
 #### 3. Contracts
@@ -449,12 +444,15 @@ func (s *Service) ListFavoriteContents(listID string) database.FavoriteListConte
 - Copied `FavoriteMod` rows must clear `ID`, `CreatedAt`, and `UpdatedAt`
   before upsert so a copied row never reuses the source row's primary key.
 - Duplicate membership in a target list is an update, not a second row.
-- Whole-list copy reads `database.ListFavoriteContents`, so live referenced
+- Whole-list copy reads `storage.ListFavoriteContents`, so live referenced
   child-list mods are copied concretely into the target list.
+- Favorite-list packwiz export also reads `storage.ListFavoriteContents`; the
+  archive includes direct mods plus recursively referenced child-list mods,
+  using the storage layer's cycle protection and duplicate precedence.
 - Whole-list copy from a list to itself is skipped and reported; selected-mod
   bulk add may target the source list because it is idempotent.
 - Reference add/remove delegates cycle prevention and persistence to
-  `database.CreateFavoriteListRef` / `DeleteFavoriteListRef`.
+  `storage.CreateFavoriteListRef` / `DeleteFavoriteListRef`.
 - `app.go` methods are thin Wails-facing delegations only; no persistence or
   copy semantics belong in the adapter.
 
@@ -476,6 +474,8 @@ func (s *Service) ListFavoriteContents(listID string) database.FavoriteListConte
   Lithium is added.
 - Good: Copy a list containing a live child-list reference; the target receives
   concrete rows for both direct and referenced mods.
+- Good: Export a root list referencing a child that references a grandchild;
+  the packwiz archive contains mods from all three lists once.
 - Base: Add a live reference through `AddFavoriteListReference`; no favorite mod
   rows are duplicated.
 - Bad: Frontend loops over selected mods and calls `AddFavoriteMod` one by one,
@@ -498,7 +498,7 @@ Wrong:
 ```go
 for _, mod := range selected {
     mod.ListID = targetListID
-    database.UpsertFavoriteMod(mod) // reuses source ID and hides aggregate failures
+    storage.UpsertFavoriteMod(mod) // reuses source ID and hides aggregate failures
 }
 ```
 
@@ -510,7 +510,7 @@ copied.ID = ""
 copied.ListID = targetListID
 copied.CreatedAt = 0
 copied.UpdatedAt = 0
-database.UpsertFavoriteMod(copied)
+storage.UpsertFavoriteMod(copied)
 ```
 
 ### Scenario: Favorite List Organization APIs
@@ -519,7 +519,7 @@ database.UpsertFavoriteMod(copied)
 
 Use this pattern when the UI needs to organize favorite lists with groups,
 manual ordering, pinning, or custom icons. SQLite owns persistence in
-`core/database`; app-independent orchestration belongs in `core/appcore`; Wails
+`core/storage`; app-independent orchestration belongs in `core/appcore`; Wails
 methods in `app.go` remain thin delegates for generated frontend bindings.
 
 #### 2. Signatures
@@ -527,11 +527,11 @@ methods in `app.go` remain thin delegates for generated frontend bindings.
 Core service methods:
 
 ```go
-func (s *Service) UpdateFavoriteListMetadata(list database.FavoriteList) database.FavoriteList
+func (s *Service) UpdateFavoriteListMetadata(list storage.FavoriteList) storage.FavoriteList
 func (s *Service) ReorderFavoriteLists(ids []string) bool
-func (s *Service) ListFavoriteGroups() []database.FavoriteGroup
-func (s *Service) CreateFavoriteGroup(name string) database.FavoriteGroup
-func (s *Service) RenameFavoriteGroup(id, name string) database.FavoriteGroup
+func (s *Service) ListFavoriteGroups() []storage.FavoriteGroup
+func (s *Service) CreateFavoriteGroup(name string) storage.FavoriteGroup
+func (s *Service) RenameFavoriteGroup(id, name string) storage.FavoriteGroup
 func (s *Service) DeleteFavoriteGroup(id string) bool
 func (s *Service) ReorderFavoriteGroups(ids []string) bool
 ```
@@ -648,7 +648,7 @@ directly to the service.
 
 #### 3. Contracts
 
-- Preview reads `database.ListFavoriteContents(sourceListID)` so direct rows and
+- Preview reads `storage.ListFavoriteContents(sourceListID)` so direct rows and
   live referenced child-list rows are resolved the same way as whole-list copy.
 - Preview never writes favorite rows.
 - Apply always re-runs preview before writing, so stale UI previews cannot be
@@ -662,7 +662,7 @@ directly to the service.
 - Matched target rows preserve display metadata and replace only target scope
   fields: `listId`, `minecraftVersion`, `modLoader`, and `versionId`.
 - Apply writes through `AddFavoriteModsToLists`, not direct
-  `database.UpsertFavoriteMod`, so copied IDs/timestamps and aggregate
+  `storage.UpsertFavoriteMod`, so copied IDs/timestamps and aggregate
   added/updated/skipped accounting stay consistent with other favorite copy
   workflows.
 
@@ -710,7 +710,7 @@ Wrong:
 ```go
 preview := s.PreviewFavoriteListMigration(req)
 for _, match := range preview.Matched {
-    database.UpsertFavoriteMod(match.Target) // bypasses ignore-conflict rules and ID reset semantics
+    storage.UpsertFavoriteMod(match.Target) // bypasses ignore-conflict rules and ID reset semantics
 }
 ```
 
@@ -726,24 +726,476 @@ return s.ApplyFavoriteListMigration(req) // re-previews and writes through bulk 
 
 ---
 
+### Scenario: Historical Usage Counters
+
+#### 1. Scope / Trigger
+
+Use this pattern for the home dashboard's lifetime operation totals. The
+counters are user-owned history and therefore live in SQLite
+(`mod-favs.sqlite`), not in the rebuildable metadata cache, TOML settings, or a
+frontend snapshot. A newly created current-schema database starts every counter
+at zero. This feature does not authorize scanning or backfilling older data.
+
+#### 2. Signatures
+
+SQLite schema owner: `core/storage/userdb.go`.
+
+```sql
+CREATE TABLE IF NOT EXISTS usage_stats (
+    key TEXT PRIMARY KEY,
+    value INTEGER NOT NULL DEFAULT 0 CHECK(value >= 0),
+    updated_at INTEGER NOT NULL
+);
+```
+
+```go
+type UsageStatKey string
+
+const (
+    UsageStatDownloadsCompleted UsageStatKey = "downloads_completed"
+    UsageStatModsEnabled        UsageStatKey = "mods_enabled"
+    UsageStatModsDisabled       UsageStatKey = "mods_disabled"
+    UsageStatModsDeleted        UsageStatKey = "mods_deleted"
+    UsageStatFavoritesAdded     UsageStatKey = "favorites_added"
+    UsageStatPackwizExports     UsageStatKey = "packwiz_exports"
+)
+
+type UsageStats struct {
+    DownloadsCompleted int64 `json:"downloadsCompleted"`
+    ModsEnabled        int64 `json:"modsEnabled"`
+    ModsDisabled       int64 `json:"modsDisabled"`
+    ModsDeleted        int64 `json:"modsDeleted"`
+    FavoritesAdded     int64 `json:"favoritesAdded"`
+    PackwizExports     int64 `json:"packwizExports"`
+}
+
+func IncrementUsageStat(key UsageStatKey, delta int64) error
+func GetUsageStats() UsageStats
+func (s *Service) GetUsageStats() storage.UsageStats
+func (a *App) GetUsageStats() storage.UsageStats
+```
+
+#### 3. Contracts
+
+- Counters are cumulative successful-object counts across application runs,
+  persisted by an atomic SQLite UPSERT (`value = value + delta`).
+- `downloads_completed` increments once only when a new mod file reaches its
+  final installation path. Already-installed versions, existing target files,
+  failures, cancellations, and skipped work do not increment it.
+- `mods_enabled`, `mods_disabled`, and `mods_deleted` increment by the number of
+  local files whose requested filesystem operation succeeded. Batch requests
+  count each successful file, not each button press.
+- `favorites_added` increments only for newly inserted favorite memberships.
+  Updating an existing membership does not increment it; bulk operations use
+  their returned `Added` count.
+- `packwiz_exports` increments once after an export ZIP is written
+  successfully. Preview, validation failure, and write failure do not count.
+- Missing rows read as zero. A fresh database therefore returns a zero-valued
+  `UsageStats` without eagerly inserting six rows.
+- The homepage reads these counters through `App.GetUsageStats`; it must not
+  derive lifetime totals by scanning favorites, local JARs, downloads, logs, or
+  caches.
+- Do not probe old schemas, backfill existing operations, import logs, scan old
+  files, or add compatibility/migration code. Historical counting begins when
+  the current schema and counter hooks are present.
+
+#### 4. Validation & Error Matrix
+
+- Unknown `UsageStatKey` -> ignore it and perform no write.
+- `delta <= 0` -> ignore it and perform no write.
+- SQLite unavailable during a direct increment -> return the storage error.
+- Counter persistence fails after a filesystem operation already succeeded ->
+  log the storage error; do not undo the completed user operation.
+- Counter read fails or storage is not ready -> return zero-valued
+  `UsageStats`; the dashboard remains usable.
+- Counter row contains an unrecognized key -> ignore it when constructing the
+  typed response.
+
+#### 5. Good/Base/Bad Cases
+
+- Good: enabling two disabled JARs and deleting one other JAR adds `2` to
+  `mods_enabled` and `1` to `mods_deleted`, then the values survive close/open.
+- Good: adding one new favorite and updating one existing favorite adds only
+  `1` to `favorites_added`.
+- Base: opening a fresh database returns six zero-valued fields and the home
+  dashboard shows zero cumulative operations.
+- Bad: using the current number of favorite rows as `favorites_added`; deleting
+  a favorite would rewrite history.
+- Bad: scanning an existing database, local mods, cache, or logs to invent
+  totals for installs that predate this feature.
+
+#### 6. Tests Required
+
+- Storage test increments every valid key, closes/reopens SQLite, and asserts
+  exact persisted totals.
+- Storage test asserts unknown keys and non-positive deltas create no rows and
+  change no totals.
+- Downloader test asserts a newly installed file emits one completion event
+  and rerunning against an existing target emits none.
+- Local-mod service test asserts exact successful enable, disable, and delete
+  object counts for batch operations.
+- Favorite service tests assert only new memberships count, including bulk
+  `Added` versus updated rows.
+- Packwiz service test asserts one increment only after a successful export.
+- Regenerate Wails bindings and run the frontend build after changing
+  `UsageStats` fields or `App.GetUsageStats`.
+- Do not add legacy-data migration, backfill, or compatibility tests unless a
+  separate task explicitly requires that behavior.
+
+#### 7. Wrong vs Correct
+
+Wrong:
+
+```go
+// Reconstructs fake history from current state and silently adds migration
+// behavior that was never requested.
+stats.FavoritesAdded = int64(len(storage.ListFavoriteMods(listID)))
+```
+
+Correct:
+
+```go
+_, existed := favoriteModKeySet(storage.ListFavoriteMods(mod.ListID))[favoriteModIdentityKey(mod)]
+_, written, err := storage.UpsertFavoriteMod(mod)
+if err == nil && written && !existed {
+    _ = storage.IncrementUsageStat(storage.UsageStatFavoritesAdded, 1)
+}
+```
+
+---
+
+### Scenario: Minecraft Release Manifest Cache
+
+#### 1. Scope / Trigger
+
+Use this cache for the official Minecraft release ID list loaded during GUI
+startup. The upstream `version_manifest_v2.json` is about 272 KB and changes
+infrequently; fetching it on every process start adds avoidable network traffic
+and makes startup depend on Mojang availability. The parsed release IDs are
+rebuildable metadata and belong in `mod-metadata.tmp`.
+
+#### 2. Signatures
+
+```go
+type cacheState struct {
+    MinecraftReleases   []string
+    MinecraftReleasesAt int64
+}
+
+func GetMinecraftReleaseVersions() ([]string, int64)
+func SetMinecraftReleaseVersions(versions []string, updatedAt int64) error
+```
+
+The appcore startup path owns refresh policy:
+
+```go
+const minecraftReleaseCacheTTL = 24 * time.Hour
+func loadMinecraftReleaseVersions() error
+```
+
+#### 3. Contracts
+
+- A non-empty cache timestamped within 24 hours is copied into `global` and
+  startup performs no manifest request.
+- A missing or expired cache triggers one official manifest request. Successful
+  parsed release IDs update both `global` and the metadata cache.
+- If refresh fails and any stale cache exists, log a warning, use the stale
+  list, and allow startup to continue.
+- If refresh fails and no cache exists, return the error because no release
+  choices are available.
+- Stored values are trimmed, empty values removed, duplicates removed while
+  preserving order, and read methods return copies.
+- This data is not user-owned and must not be placed in SQLite or TOML.
+- The fields are part of the current rebuildable gob schema at
+  `cacheVersion=6`. Old caches are discarded; do not add import, backfill, or
+  compatibility code.
+
+#### 4. Validation & Error Matrix
+
+- Empty versions or `updatedAt <= 0` -> ignore the cache write.
+- Fresh non-empty cache -> zero network calls.
+- Expired cache + successful fetch -> replace the cached list and timestamp.
+- Expired cache + fetch error -> return stale list and no startup error.
+- Empty cache + fetch error -> return the fetch error.
+- Cache write failure after successful fetch -> log warning and keep the
+  in-memory list usable for the current process.
+
+#### 5. Good/Base/Bad Cases
+
+- Good: restart twice within a day; the second startup reads release IDs from
+  `mod-metadata.tmp` and sends no request to Mojang.
+- Good: start offline with yesterday's cache; version selection remains usable.
+- Base: a fresh cache fetches the manifest once, parses release entries, and
+  persists them on cache close.
+- Bad: store only in `global`; every process restart downloads the same 272 KB
+  manifest.
+- Bad: fail the entire app startup when refresh fails despite a valid stale
+  list being available.
+
+#### 6. Tests Required
+
+- Storage test trims/deduplicates values, persists across close/reopen, and
+  verifies returned slices cannot mutate stored state.
+- Appcore test seeds a fresh cache and asserts the fetch function is not called.
+- Appcore test seeds an expired cache, returns a fetch error, and asserts stale
+  fallback plus nil startup error.
+- Appcore test then returns a fresh list and asserts cache contents and timestamp
+  are replaced.
+- Run full core and app test/vet/build checks after changing startup behavior.
+
+#### 7. Wrong vs Correct
+
+Wrong:
+
+```go
+versions, err := minecraft.FetchMinecraftReleaseVersions() // every startup
+if err != nil {
+    return err
+}
+```
+
+Correct:
+
+```go
+cached, updatedAt := storage.GetMinecraftReleaseVersions()
+if len(cached) > 0 && updatedAt >= time.Now().Add(-24*time.Hour).Unix() {
+    global.SetMinecraftReleaseVersions(cached)
+    return nil
+}
+```
+
+---
+
+### Scenario: Local Metadata Negative Cache
+
+#### 1. Scope / Trigger
+
+Use this cache when local JAR SHA1/fingerprint enrichment successfully queries
+a provider but receives no match. Without a negative cache, every Manage-page
+refresh repeats the same bulk requests for unpublished or private mods. This is
+rebuildable provider metadata, so it belongs in `mod-metadata.tmp`, not SQLite.
+
+#### 2. Signatures
+
+```go
+type cacheState struct {
+    LocalMetadataMisses map[localMetadataMissKey]int64
+}
+
+func GetLocalMetadataMissCheckedAt(provider, identity string) (int64, bool)
+func SetLocalMetadataMisses(provider string, identities []string, checkedAt int64) error
+```
+
+Cache key contract:
+
+```text
+modrinth:<lowercase SHA1>
+curseforge:<decimal uint32 fingerprint>
+```
+
+#### 3. Contracts
+
+- A miss is recorded only after that provider request succeeds and omits the
+  queried identity. Provider errors and unavailable clients write nothing.
+- Miss timestamps use Unix seconds and suppress the same provider/identity for
+  24 hours. Expired entries are eligible for a new request.
+- Modrinth and CurseForge misses are independent. A Modrinth miss must not
+  prevent a CurseForge fingerprint lookup, or vice versa.
+- Local metadata resolution is serialized around cache filtering, requests,
+  and writes. A concurrent waiter rechecks the cache after the first request
+  completes instead of issuing the same request concurrently.
+- Successful project/version metadata remains authoritative; a stale negative
+  entry never hides a positive cache hit.
+- `LocalMetadataMisses` is part of the rebuildable gob cache. Adding it bumps
+  `cacheVersion`; old cache data is discarded. Do not write an old-cache
+  decoder, importer, backfill, or compatibility branch.
+
+#### 4. Validation & Error Matrix
+
+- Blank provider or identity -> ignore on write and report no hit on read.
+- `checkedAt <= 0` -> ignore the write.
+- Duplicate/case-varied identities -> normalize and store one entry.
+- Recent miss (`checkedAt >= now - 24h`) -> skip only that provider request.
+- Expired miss -> perform the provider request again.
+- HTTP/decode/provider error -> log the error and leave the identity retryable.
+- Cache unavailable -> resolution may continue remotely; log failed miss
+  persistence and do not treat it as a provider failure.
+
+#### 5. Good/Base/Bad Cases
+
+- Good: an unpublished JAR queried twice during one day produces one Modrinth
+  hash request and one CurseForge fingerprint request total.
+- Good: a transient 503 on the first request is retried on the next refresh.
+- Base: a cached positive project/version enriches the JAR without consulting
+  the negative cache or network.
+- Bad: cache one combined "not found" flag when Modrinth misses, thereby
+  preventing CurseForge from matching the file.
+- Bad: cache errors as misses; a temporary outage would hide metadata for 24
+  hours.
+
+#### 6. Tests Required
+
+- Storage test normalizes provider/identity keys and persists timestamps across
+  close/reopen.
+- Provider test calls an empty successful lookup twice and asserts one HTTP
+  request.
+- Provider test expires the timestamp and asserts the next call retries.
+- Provider test returns a transport error twice and asserts two HTTP requests
+  plus no stored miss.
+- Run provider/storage race tests and the full core test/vet/build gate.
+
+#### 7. Wrong vs Correct
+
+Wrong:
+
+```go
+projects, _ := provider.Resolve(ids)
+cacheMisses(allIDs) // network errors and successful matches are both poisoned
+```
+
+Correct:
+
+```go
+projects, err := provider.Resolve(ids)
+if err == nil {
+    cacheMisses(unresolved(ids, projects))
+}
+```
+
+---
+
+### Scenario: Provider Background Tasks And Storage Shutdown
+
+#### 1. Scope / Trigger
+
+Use this lifecycle whenever a provider launches asynchronous cache refreshes
+that read or write storage. A bare goroutine can outlive a service and race
+`storage.Close`, causing data races and writes against a closing cache.
+
+#### 2. Signatures
+
+```go
+func providers.StartBackgroundTasks()
+func providers.StopBackgroundTasks()
+
+func (s *Service) Startup(ctx context.Context) error
+func (s *Service) Shutdown()
+func (s *Service) Close()
+```
+
+Internal provider work starts only through:
+
+```go
+func startBackgroundTask(task func())
+```
+
+#### 3. Contracts
+
+- Provider background metadata refreshes must use `startBackgroundTask`; do not
+  use a bare `go refresh...` call.
+- The task registry adds to its WaitGroup while holding the same mutex that
+  guards its accepting flag. Stop sets accepting false under that mutex before
+  waiting, so no `Add` can race `Wait`.
+- A separate lifecycle mutex prevents `StartBackgroundTasks` from reopening the
+  gate while `StopBackgroundTasks` is still waiting.
+- `Service.Startup` opens the accepting gate before any provider API can run.
+- `Service.Shutdown` and `Service.Close` stop and drain provider work before
+  calling `storage.Close`.
+- A task submitted after stop is ignored. The next service startup explicitly
+  reopens the gate.
+- Task completion must not require the registry mutex; otherwise stop would
+  deadlock while waiting.
+
+#### 4. Validation & Error Matrix
+
+- Nil task -> ignore.
+- Task registered before stop -> stop waits for completion.
+- Task submitted after stop -> reject without starting a goroutine.
+- Concurrent stop and registration -> either registration wins and is drained,
+  or stop wins and registration is rejected.
+- New startup after a completed stop -> reopen and accept tasks.
+- Background provider/storage error -> task logs through existing provider
+  handling, calls `Done`, and does not block shutdown forever.
+
+#### 5. Good/Base/Bad Cases
+
+- Good: a metadata refresh is reading cache while the window closes; shutdown
+  waits, then saves/closes storage.
+- Good: a late UI request reaches provider after shutdown began; its refresh is
+  not launched.
+- Base: no tasks are running, so stop returns immediately.
+- Bad: call `go refreshProjectMetadataIfStale(...)`; storage can close while the
+  goroutine reads the global cache handle.
+- Bad: call `WaitGroup.Wait` while another goroutine may still call `Add`.
+
+#### 6. Tests Required
+
+- Provider test starts blocked work, asserts stop does not return early, then
+  releases it and asserts stop completes.
+- Provider test submits work after stop and asserts it never runs.
+- Appcore race regression runs the favorite migration path that starts a stale
+  project refresh, then drains background tasks before storage cleanup.
+- Run full providers/appcore race tests plus root/core quality gates.
+
+#### 7. Wrong vs Correct
+
+Wrong:
+
+```go
+go refreshProjectMetadataIfStale(provider, platform, project)
+storage.Close()
+```
+
+Correct:
+
+```go
+startBackgroundTask(func() {
+    refreshProjectMetadataIfStale(provider, platform, project)
+})
+
+providers.StopBackgroundTasks()
+storage.Close()
+```
+
+---
+
 ## Migrations
 
 Platform cache has no incremental migrations. Cache schema changes trigger full
 rebuilds via `cacheVersion` bumps (see [Cache Schema Evolution](#cache-schema-evolution)).
 
-SQLite user-data schema is created idempotently by `userdb.go`. Legacy
-`PinnedMods`, `FavoriteLists`, and `FavoriteMods` decoded from gob cache are
-migrated into SQLite on `OpenAt`, then cleared from the active gob state before
-the next cache save.
+### Legacy Data Migration Policy
+
+- Do not implement legacy data migration unless the task explicitly requires
+  it in its requirements or acceptance criteria.
+- If legacy migration code is not explicitly required, delete it completely in
+  the same change. Do not retain dormant migration helpers, fallback branches,
+  old-format fields, or migration-only tests for possible future use.
+- A filename rename, storage change, schema change, or format change does not
+  imply backward-compatible migration.
+- Without an explicit migration requirement, current code reads and writes only
+  the current format and paths. Older files remain untouched.
+- Do not add legacy filename probes, automatic renames, sidecar moves, old
+  format importers, decode-only fields, compatibility branches, or migration
+  tests proactively.
+- If migration is explicitly required, document the exact source versions,
+  destination, conflict behavior, failure behavior, cleanup policy, and tests
+  before implementing it.
+
+SQLite user-data schema is created idempotently by `userdb.go`. Schema upgrade
+steps are added only when the owning task explicitly requires existing SQLite
+databases to be upgraded.
 
 ### Scenario: SQLite User-Data Schema Evolution
 
 #### 1. Scope / Trigger
 
-Use this pattern whenever `user-data.sqlite` needs a new table, index, or column
-for user-owned state. This includes favorite list metadata, groups, references,
-or any future collection data. SQLite schema evolution must preserve existing
-user data; unlike the gob platform cache, user data is not discardable.
+Use this pattern only when a task explicitly requires existing
+`mod-favs.sqlite` databases to be upgraded after adding a table, index, or
+column for user-owned state. A schema change by itself does not authorize an
+upgrade path for old databases. Without that explicit requirement, define only
+the current schema for fresh databases and do not add legacy schema probes,
+backfills, migration steps, or migration tests.
 
 #### 2. Signatures
 
@@ -783,8 +1235,6 @@ func OpenAt(cachePath string) error // opens cache plus UserDataPathForCachePath
 - Existing SQLite file already containing the column -> skip `ALTER TABLE`.
 - Migration statement fails -> `OpenAt` returns an error; user-data writes must
   not continue against a partially assumed schema.
-- Legacy gob user data and SQLite schema migration are independent: gob
-  migration inserts rows after SQLite schema creation has completed.
 
 #### 5. Good/Base/Bad Cases
 
@@ -802,7 +1252,7 @@ func OpenAt(cachePath string) error // opens cache plus UserDataPathForCachePath
 - Assert `schema_migrations` contains the new version after open.
 - Assert a row from the old schema can write/read the new fields after
   migration.
-- Keep existing favorite persistence and legacy gob migration tests passing.
+- Keep existing favorite persistence tests passing.
 
 #### 7. Wrong vs Correct
 
@@ -863,7 +1313,7 @@ if ok, err := s.columnExists("favorite_lists", "pinned"); err != nil {
 
 **Cause**: Changed `cacheState` struct without incrementing `cacheVersion`
 
-**Fix**: Bump `cacheVersion` constant in `database/database.go`
+**Fix**: Bump `cacheVersion` constant in `storage/storage.go`
 
 **Prevention**: Add `cacheVersion` bump to PR checklist when touching `cacheState`
 

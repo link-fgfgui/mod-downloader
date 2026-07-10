@@ -4,7 +4,7 @@
             <div class="favorites-rail-header">
                 <h1 class="text-h6 font-weight-medium">{{ $t("favorites.title") }}</h1>
                 <div class="rail-actions">
-                    <v-btn icon="mdi-folder-plus" size="small" variant="text" @click="openGroupEdit()"></v-btn>
+                    <v-btn v-if="favoritesStore.lists.length" icon="mdi-folder-plus" size="small" variant="text" @click="openGroupEdit()"></v-btn>
                     <v-btn icon="mdi-plus" size="small" variant="tonal" @click="openListEdit()"></v-btn>
                 </div>
             </div>
@@ -26,9 +26,9 @@
                             :title="pinnedList.name"
                             draggable="true"
                             @click="favoritesStore.selectList(pinnedList.id)"
-                            @dragstart="onListDragStart(pinnedList.id)"
+                            @dragstart.stop="onListDragStart(pinnedList.id)"
                             @dragover.prevent
-                            @drop="onListDrop(pinnedList.id, favoritesStore.pinnedLists)"
+                            @drop="onListDrop(pinnedList.id, favoritesStore.pinnedLists, null, true)"
                         >
                             <template #prepend>
                                 <v-avatar class="list-avatar" rounded="lg" size="24">
@@ -59,7 +59,7 @@
                     </v-list>
                 </section>
 
-                <section v-if="favoritesStore.ungroupedLists.length" class="rail-section">
+                <section class="rail-section" @dragover.prevent @drop="onListSectionDrop('')">
                     <div class="rail-section-title">
                         <v-icon icon="mdi-playlist-star" size="14"></v-icon>
                         {{ $t("favorites.sections.lists") }}
@@ -73,9 +73,9 @@
                             :title="looseList.name"
                             draggable="true"
                             @click="favoritesStore.selectList(looseList.id)"
-                            @dragstart="onListDragStart(looseList.id)"
+                            @dragstart.stop="onListDragStart(looseList.id)"
                             @dragover.prevent
-                            @drop="onListDrop(looseList.id, favoritesStore.ungroupedLists)"
+                            @drop.stop="onListDrop(looseList.id, favoritesStore.ungroupedLists, '')"
                         >
                             <template #prepend>
                                 <v-avatar class="list-avatar" rounded="lg" size="24">
@@ -109,12 +109,10 @@
                     v-for="group in favoritesStore.sortedGroups"
                     :key="group.id"
                     class="rail-section"
-                    draggable="true"
-                    @dragstart="onGroupDragStart(group.id)"
                     @dragover.prevent
-                    @drop="onGroupDrop(group.id)"
+                    @drop="onSectionDrop(group.id)"
                 >
-                    <div class="rail-section-title group-title">
+                    <div class="rail-section-title group-title" draggable="true" @dragstart="onGroupDragStart(group.id)">
                         <v-icon icon="mdi-drag" size="14"></v-icon>
                         <span>{{ group.name }}</span>
                         <v-menu>
@@ -136,9 +134,9 @@
                             :title="groupedList.name"
                             draggable="true"
                             @click="favoritesStore.selectList(groupedList.id)"
-                            @dragstart="onListDragStart(groupedList.id)"
+                            @dragstart.stop="onListDragStart(groupedList.id)"
                             @dragover.prevent
-                            @drop="onListDrop(groupedList.id, favoritesStore.groupedLists[group.id])"
+                            @drop.stop="onListDrop(groupedList.id, favoritesStore.groupedLists[group.id], group.id)"
                         >
                             <template #prepend>
                                 <v-avatar class="list-avatar" rounded="lg" size="24">
@@ -219,15 +217,14 @@
             </div>
 
             <VirtualList v-else class="favorites-items" :items="favoritesStore.items" :item-height="82" :item-key="itemKey">
-                <template #item="{ item, selected, onClick, enterStyle }">
+                <template #item="{ item, selected, onClick }">
                     <v-list-item
-                        class="favorite-mod-row mb-2 border-b md-animate-fade-y md-hover-lift"
+                        class="favorite-mod-row mb-2 border-b md-hover-lift"
                         :class="{ 'favorite-item-selected': selected, 'favorite-item-referenced': item.referenced }"
                         :bg-color="selected ? undefined : 'surface'"
                         rounded="lg"
                         elevation="1"
                         lines="two"
-                        :style="enterStyle"
                         @click="onClick"
                     >
                         <template #prepend>
@@ -243,8 +240,6 @@
                         </v-list-item-title>
                         <v-list-item-subtitle class="text-caption text-medium-emphasis">
                             {{ item.platform }} / {{ item.modId }}
-                            <span v-if="item.minecraftVersion"> · {{ item.minecraftVersion }}</span>
-                            <span v-if="item.modLoader"> · {{ item.modLoader }}</span>
                         </v-list-item-subtitle>
 
                         <template #append>
@@ -364,9 +359,14 @@
                 <v-card-title>{{ $t("favorites.dialog.migrationTitle") }}</v-card-title>
                 <v-card-text>
                     <div class="migration-grid">
-                        <v-select v-model="migrationDialog.targetListId" :items="targetListOptions" item-title="title" item-value="value" :label="$t('favorites.dialog.targetList')"></v-select>
-                        <v-text-field v-model="migrationDialog.minecraftVersion" :label="$t('favorites.dialog.minecraftVersion')"></v-text-field>
-                        <v-text-field v-model="migrationDialog.modLoader" :label="$t('favorites.dialog.modLoader')"></v-text-field>
+                        <MinecraftTargetFields
+                            v-model:minecraft-version="migrationDialog.minecraftVersion"
+                            v-model:mod-loader="migrationDialog.modLoader"
+                            :versions="minecraftStore.releaseVersions"
+                            :mod-loaders="minecraftStore.modLoaderList"
+                            :minecraft-version-label="$t('favorites.dialog.minecraftVersion')"
+                            :mod-loader-label="$t('favorites.dialog.modLoader')"
+                        ></MinecraftTargetFields>
                     </div>
                     <v-checkbox v-model="migrationDialog.ignoreConflicts" :label="$t('favorites.dialog.ignoreConflicts')"></v-checkbox>
                     <v-btn variant="tonal" prepend-icon="mdi-eye" :disabled="!migrationReady" @click="previewMigration">{{ $t("favorites.actions.preview") }}</v-btn>
@@ -409,6 +409,7 @@
 <script setup>
 import { computed, onActivated, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import MinecraftTargetFields from "../components/MinecraftTargetFields.vue";
 import VirtualList from "../components/VirtualList.vue";
 import { useFavoritesStore } from "../stores/favorites";
 import { useMinecraftStore } from "../stores/minecraft";
@@ -444,7 +445,19 @@ const copyDialogTitle = computed(() => {
     return t("favorites.dialog.copySelectedTitle");
 });
 const copyDialogReady = computed(() => copyDialog.mode === "selected" ? copyDialog.targetListIds.length > 0 : Boolean(copyDialog.targetListId));
-const migrationReady = computed(() => migrationDialog.sourceListId && migrationDialog.targetListId && migrationDialog.minecraftVersion.trim() && migrationDialog.modLoader.trim());
+const migrationReady = computed(() => {
+    const minecraftVersion = migrationDialog.minecraftVersion.trim();
+    const modLoader = migrationDialog.modLoader.trim().toLocaleLowerCase();
+    const currentMinecraftVersion = minecraftStore.selectedMinecraftVersion.trim();
+    const currentModLoader = minecraftStore.selectedModLoader.trim().toLocaleLowerCase();
+    return Boolean(
+        migrationDialog.sourceListId &&
+        migrationDialog.targetListId &&
+        minecraftVersion &&
+        modLoader &&
+        (minecraftVersion !== currentMinecraftVersion || modLoader !== currentModLoader)
+    );
+});
 const migrationApplyReady = computed(() => {
     const preview = migrationDialog.preview;
     if (!migrationReady.value || !preview) return false;
@@ -572,8 +585,8 @@ const openMigration = (list) => {
     migrationDialog.show = true;
     migrationDialog.sourceListId = list.id;
     migrationDialog.targetListId = list.id;
-    migrationDialog.minecraftVersion = "";
-    migrationDialog.modLoader = "";
+    migrationDialog.minecraftVersion = minecraftStore.selectedMinecraftVersion;
+    migrationDialog.modLoader = minecraftStore.selectedModLoader;
     migrationDialog.ignoreConflicts = false;
     migrationDialog.preview = null;
 };
@@ -592,20 +605,37 @@ const removeSelected = async (items, clearSelection) => {
 };
 const onListDragStart = (listId) => {
     draggedListId.value = listId;
+    draggedGroupId.value = "";
 };
-const onListDrop = async (targetListId, sectionLists) => {
+const moveListToSection = async (groupId, pinned = false) => {
     const sourceListId = draggedListId.value;
     draggedListId.value = "";
-    if (!sourceListId || sourceListId === targetListId) return;
-    const ids = sectionLists.map((list) => list.id);
-    const from = ids.indexOf(sourceListId);
-    const to = ids.indexOf(targetListId);
-    if (from < 0 || to < 0) return;
-    ids.splice(to, 0, ids.splice(from, 1)[0]);
+    const sourceList = favoritesStore.lists.find((list) => list.id === sourceListId);
+    if (!sourceList) return null;
+    const targetGroupId = groupId === null ? sourceList.groupId || "" : groupId;
+    if (Boolean(sourceList.pinned) === pinned && (sourceList.groupId || "") === targetGroupId) return sourceList;
+    return favoritesStore.updateListMetadata(sourceList, { groupId: targetGroupId, pinned });
+};
+const onListSectionDrop = async (groupId) => {
+    await moveListToSection(groupId);
+};
+const onListDrop = async (targetListId, sectionLists, groupId, pinned = false) => {
+    const sourceListId = draggedListId.value;
+    if (!sourceListId || sourceListId === targetListId) {
+        draggedListId.value = "";
+        return;
+    }
+    const sourceList = await moveListToSection(groupId, pinned);
+    if (!sourceList) return;
+    const ids = sectionLists.map((list) => list.id).filter((id) => id !== sourceListId);
+    const targetIndex = ids.indexOf(targetListId);
+    if (targetIndex < 0) return;
+    ids.splice(targetIndex, 0, sourceListId);
     await favoritesStore.reorderLists(ids);
 };
 const onGroupDragStart = (groupId) => {
     draggedGroupId.value = groupId;
+    draggedListId.value = "";
 };
 const onGroupDrop = async (targetGroupId) => {
     const sourceGroupId = draggedGroupId.value;
@@ -614,6 +644,13 @@ const onGroupDrop = async (targetGroupId) => {
     const ids = favoritesStore.sortedGroups.map((group) => group.id);
     ids.splice(ids.indexOf(targetGroupId), 0, ids.splice(ids.indexOf(sourceGroupId), 1)[0]);
     await favoritesStore.reorderGroups(ids);
+};
+const onSectionDrop = async (groupId) => {
+    if (draggedListId.value) {
+        await onListSectionDrop(groupId);
+        return;
+    }
+    await onGroupDrop(groupId);
 };
 
 const exportPackwiz = async () => {
@@ -636,6 +673,13 @@ const errorMessage = (error) => {
     if (typeof error === "string") return error;
     return error.message || String(error);
 };
+
+watch(
+    () => [migrationDialog.minecraftVersion, migrationDialog.modLoader],
+    () => {
+        migrationDialog.preview = null;
+    },
+);
 
 watch(
     () => [minecraftStore.selectedMinecraftVersion, minecraftStore.selectedModLoader],
@@ -773,9 +817,7 @@ onActivated(() => {
 }
 
 .migration-grid {
-    display: grid;
-    gap: 12px;
-    grid-template-columns: 1fr 1fr 1fr;
+    min-width: 0;
 }
 
 @media (max-width: 900px) {

@@ -35,7 +35,7 @@
                 class="unpin-table elevation-1" hide-default-footer :items-per-page="-1">
                 <template #[actionsSlotName]="{ item }">
                     <v-btn :loading="pinnedModsStore.pendingUnpinKeys.has(pinnedModsStore.pinKey(item))"
-                        variant="outlined" size="small" prepend-icon="mdi-pin-off" @click="unpin(item as database.PinnedMod)">
+                        variant="outlined" size="small" prepend-icon="mdi-pin-off" @click="unpin(item as storage.PinnedMod)">
                         {{ $t('unpin.unpin') }}
                     </v-btn>
                 </template>
@@ -64,7 +64,7 @@
 import { onActivated, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { usePinnedModsStore } from "../stores/pinnedMods";
-import type { database } from "../../wailsjs/go/models";
+import type { storage } from "../../wailsjs/go/models";
 
 const { t } = useI18n();
 const pinnedModsStore = usePinnedModsStore();
@@ -85,7 +85,7 @@ onActivated(() => {
     void pinnedModsStore.load();
 });
 
-async function unpin(pin: database.PinnedMod) {
+async function unpin(pin: storage.PinnedMod) {
     try {
         const ok = await pinnedModsStore.unpin(pin);
         if (ok) {

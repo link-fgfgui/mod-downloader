@@ -28,7 +28,7 @@ mod-downloader/
 │   ├── models/                  # Canonical data types (single source of truth)
 │   ├── structs/                 # Request/response structs + Minecraft manifest types
 │   ├── providers/               # CurseForge/Modrinth platform abstraction layer
-│   ├── database/                # Platform cache and SQLite user-data storage
+│   ├── storage/                 # Platform cache and SQLite user-data storage
 │   ├── downloader/              # Download queue + state machine
 │   ├── modbridge/               # Cross-domain bridge
 │   ├── global/                  # Global clients and in-memory indexes
@@ -57,7 +57,7 @@ mod-downloader-cli/
 ```
 [CF/MR SDK] → providers (SDK→models converters) → models (canonical types)
                     ↓                                  ↑
-              database (caches models.*)         structs (request/response; consumes models)
+              storage (caches models.*)          structs (request/response; consumes models)
                     ↓                                  ↑
               downloader (consumes models.*)      appcore (UI-independent service)
                     ↓
@@ -68,7 +68,7 @@ mod-downloader-cli/
     JAR mem cache)    parsing)
 ```
 
-**Boundary constraint**: `minecraft` (local analysis) and `providers` (platform analysis) must NOT import each other. Their convergence point is `modbridge`. Dependency direction is unidirectional: `downloader → modbridge → {providers, database, global, minecraft}`.
+**Boundary constraint**: `minecraft` (local analysis) and `providers` (platform analysis) must NOT import each other. Their convergence point is `modbridge`. Dependency direction is unidirectional: `downloader → modbridge → {providers, storage, global, minecraft}`.
 
 ### Scenario: UI-Independent Core Service And CLI Adapters
 
@@ -381,7 +381,7 @@ func (s *Service) GetDownloadQueueState() appstructs.DownloadQueueState
 - Running queue jobs own a child `context.Context` and `context.CancelFunc`.
   `CancelDownload(id)` cancels the active attempt and records the user cancel
   request so the runner can append a retryable `canceled` item.
-- Pre-download helpers must check `ctx.Err()` after every provider/database/JAR
+- Pre-download helpers must check `ctx.Err()` after every provider/storage/JAR
   analysis boundary and before enqueueing dependencies or continuing to file
   download.
 - Required dependencies discovered by an active job must be queued before that
@@ -603,6 +603,8 @@ type ModInfo struct {
     OnlinePlatform  string   `json:"onlinePlatform,omitempty"`
     OnlineProjectID string   `json:"onlineProjectId,omitempty"`
     OnlineSlug      string   `json:"onlineSlug,omitempty"`
+    CfFingerprint   uint32   `json:"cfFingerprint,omitempty"`
+    OnlineMetadataLoading bool `json:"onlineMetadataLoading,omitempty"`
     IconURL         string   `json:"iconUrl,omitempty"`
     Categories      []string `json:"categories,omitempty"`
 }
@@ -869,16 +871,19 @@ bindings are written. Run `npm run build` first, or otherwise ensure
   - Modrinth project: `Project.Categories` plus `Project.AdditionalCategories`
   - CurseForge mod: `Mod.Categories`, preferring `Slug` and falling back to `Name`
 - `models.NormalizeCategories` lowercases, trims, and deduplicates category strings before they cross package boundaries.
-- `modbridge.ApplyProjectMetadataToModInfo` may fill `OnlineName`, `IconURL`, platform/project fields, and `Categories`.
+- `modbridge.ApplyPlatformMetadataToModInfo` may fill `OnlineName`, `IconURL`, platform/project fields, online version fields, and `Categories`.
 - Display enrichment must not overwrite `ModInfo.ID`, `Name`, `Version`, `SHA1`, `Path`, `Enabled`, or `JijMods`.
 - Frontend display should prefer `onlineName || name || id`; technical subtitles may keep JAR-derived IDs/version/file details.
 - Every selected-version local-mod refresh path must use the same enrichment pipeline:
   scan local jars, apply cached platform metadata, asynchronously resolve missed
-  SHA1s, update `global.SetSelectedVersion`, and emit
+  Modrinth SHA1s and CurseForge fingerprints, update `global.SetSelectedVersion`, and emit
   `EventSelectedVersionChanged` after async metadata changes. `SelectVersion`
   and `RefreshSelectedVersionMods` must not diverge.
 - Async metadata writeback must verify the selected instance still matches the
   refreshed instance before mutating global selected-version state.
+- The Manage icon slot renders a fixed-size progress indicator while
+  `OnlineMetadataLoading` is true. Async completion clears the flag and emits
+  even when no provider metadata matched, so unmatched mods never spin forever.
 
 #### 4. Validation & Error Matrix
 
@@ -1098,7 +1103,7 @@ await RetryDownload(item.id);
 These needed to bridge via SHA1 hash matching for features like "show install status for this platform mod" or "find platform metadata for this local JAR."
 
 **Options Considered**:
-1. Let `minecraft` import `providers` and `database` for cross-domain queries
+1. Let `minecraft` import `providers` and `storage` for cross-domain queries
 2. Let `providers` import `minecraft` for local status checks
 3. Create a neutral bridge package that imports both
 
@@ -1116,7 +1121,7 @@ package modbridge
 import (
     "github.com/link-fgfgui/mod-downloader-core/minecraft"  // local JAR parsing
     "github.com/link-fgfgui/mod-downloader-core/providers"  // platform API
-    "github.com/link-fgfgui/mod-downloader-core/database"   // persistence
+    "github.com/link-fgfgui/mod-downloader-core/storage"   // persistence
     "github.com/link-fgfgui/mod-downloader-core/global"     // local mod index
 )
 
@@ -1131,7 +1136,7 @@ func InstallStatus(version models.ModVersion, instanceID string) string {
 }
 ```
 
-**Dependency direction**: `downloader → modbridge → {providers, database, global, minecraft}` (unidirectional, no cycles).
+**Dependency direction**: `downloader → modbridge → {providers, storage, global, minecraft}` (unidirectional, no cycles).
 
 **Extensibility**: Future cross-domain features (e.g., "find all platform mods for this local JAR", "suggest updates for local mods") go in `modbridge`.
 
@@ -1195,7 +1200,7 @@ func VersionDirPath(root string, version structs.VersionInfo) string
 1. **Local JAR metadata**: Changes frequently (user adds/removes mods), sourced from disk
 2. **Platform mod metadata**: Changes rarely (remote files are immutable per SHA1), sourced from APIs
 
-Both were stored in the same persistent cache (`mods.gob.zst`), causing:
+Both were stored in the same persistent cache (`mod-metadata.tmp`), causing:
 - Serialize/deserialize overhead on every Manage page load
 - Cache invalidation complexity (when to rebuild local vs platform data)
 - Slow startup when scanning 100+ local JARs
@@ -1235,7 +1240,7 @@ func SetJarMetadata(sha1 string, mods []structs.ModInfo) {
 ```
 
 ```go
-// database/mods.go - persistent cache (platform data only)
+// storage/mods.go - persistent cache (platform data only)
 func (db *Database) SetVersionModIDs(platformVersionID string, modIDs []string) error {
     // Persist remote JAR modIDs alongside platform ModVersion
     // (remote files are immutable, cache is long-lived)
@@ -1250,7 +1255,7 @@ func (db *Database) SetVersionModIDs(platformVersionID string, modIDs []string) 
 
 ### Decision: Upward Signaling via Callback (Layer Constraint Workaround)
 
-**Context**: `modbridge` sits below the Wails adapter in the dependency graph (`app.go → appcore → downloader → modbridge → {providers, database, global, minecraft}`). `modbridge` must NOT import `wails/runtime` (it would invert the dependency direction and couple a pure-logic package to the Wails runtime). But `modbridge.DownloadStates` sometimes needs to trigger a frontend refresh after an async backfill completes — and only `app.go` can emit Wails events because only it owns `a.ctx`.
+**Context**: `modbridge` sits below the Wails adapter in the dependency graph (`app.go → appcore → downloader → modbridge → {providers, storage, global, minecraft}`). `modbridge` must NOT import `wails/runtime` (it would invert the dependency direction and couple a pure-logic package to the Wails runtime). But `modbridge.DownloadStates` sometimes needs to trigger a frontend refresh after an async backfill completes — and only `app.go` can emit Wails events because only it owns `a.ctx`.
 
 **Options Considered**:
 1. Let `modbridge` import `wails/runtime` and emit directly (breaks layering, couples logic to runtime)
@@ -1298,7 +1303,7 @@ func DownloadStates(req appstructs.DownloadStatesRequest, onBackfillComplete fun
 }
 ```
 
-**When to apply**: Any time a lower-layer package (`modbridge`, `providers`, `database`, `httpserver`) needs to signal an adapter after async work, but cannot import `wails/runtime` due to layering. Pass a `func()` callback or `OnEvent` hook from the adapter-neutral service boundary, then let `app.go` perform Wails-specific event emission. The callback must be invoked exactly once after all async work completes; nil-check before invoking.
+**When to apply**: Any time a lower-layer package (`modbridge`, `providers`, `storage`, `httpserver`) needs to signal an adapter after async work, but cannot import `wails/runtime` due to layering. Pass a `func()` callback or `OnEvent` hook from the adapter-neutral service boundary, then let `app.go` perform Wails-specific event emission. The callback must be invoked exactly once after all async work completes; nil-check before invoking.
 
 ---
 

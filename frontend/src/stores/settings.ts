@@ -5,6 +5,7 @@ import {
     SaveAnimationSettings,
     SaveApiKeys,
     SaveUnusedDependencyCleanupSettings,
+    SaveMCIMSettings,
     SaveCacheDirPreference,
     ChooseCacheDir,
     ChooseMinecraftDir,
@@ -31,6 +32,7 @@ export const useSettingsStore = defineStore("settings", {
         isSavingTheme: false,
         isSavingAnimations: false,
         isSavingUnusedDependencyCleanup: false,
+        isSavingMCIM: false,
         isSavingKeys: false,
         isSavingCacheDir: false,
         isChoosingDir: false,
@@ -41,6 +43,7 @@ export const useSettingsStore = defineStore("settings", {
         draftAnimationMode: defaultAnimationMode,
         draftAnimationDurationMultiplier: defaultAnimationDurationMultiplier,
         draftAutoScanUnusedDependencies: true,
+        draftMCIMEnabled: false,
         draftCurseforgeKey: "",
         draftModrinthKey: "",
         clearCurseforgeKey: false,
@@ -64,6 +67,7 @@ export const useSettingsStore = defineStore("settings", {
                     this.view?.animationDurationMultiplier ?? defaultAnimationDurationMultiplier
                 );
                 this.draftAutoScanUnusedDependencies = this.view?.autoScanUnusedDependencies ?? true;
+                this.draftMCIMEnabled = this.view?.mcimEnabled ?? false;
                 this.draftCurseforgeKey = "";
                 this.draftModrinthKey = "";
                 this.clearCurseforgeKey = false;
@@ -119,6 +123,16 @@ export const useSettingsStore = defineStore("settings", {
                 return this.view;
             } finally {
                 this.isSavingUnusedDependencyCleanup = false;
+            }
+        },
+        async saveMCIMSettings() {
+            this.isSavingMCIM = true;
+            try {
+                this.view = await SaveMCIMSettings({ mcimEnabled: this.draftMCIMEnabled });
+                this.draftMCIMEnabled = this.view.mcimEnabled;
+                return this.view;
+            } finally {
+                this.isSavingMCIM = false;
             }
         },
         async saveApiKeys() {

@@ -118,6 +118,19 @@
 
             <v-col cols="12" md="6">
                 <v-card class="mb-4">
+                    <v-card-title>{{ $t('settings.mcim.label') }}</v-card-title>
+                    <v-card-subtitle>{{ $t('settings.mcim.hint') }}</v-card-subtitle>
+                    <v-card-text>
+                        <v-switch v-model="settingsStore.draftMCIMEnabled" color="primary" density="comfortable"
+                            hide-details :label="$t('settings.mcim.useMirror')" />
+                        <v-btn :loading="settingsStore.isSavingMCIM" variant="outlined"
+                            prepend-icon="mdi-content-save" class="mt-3" @click="saveMCIM">
+                            {{ $t('settings.mcim.save') }}
+                        </v-btn>
+                    </v-card-text>
+                </v-card>
+
+                <v-card class="mb-4">
                     <v-card-title>{{ $t('settings.apiKeys.curseforge.label') }}</v-card-title>
                     <v-card-subtitle>{{ $t('settings.apiKeys.curseforge.hint') }}</v-card-subtitle>
                     <v-card-text>
@@ -219,6 +232,11 @@ async function saveAnimations() {
 async function saveCleanup() {
     await settingsStore.saveUnusedDependencyCleanupSettings();
     snackbar.value = { show: true, message: t('settings.cleanup.saved'), color: "success" };
+}
+
+async function saveMCIM() {
+    await settingsStore.saveMCIMSettings();
+    snackbar.value = { show: true, message: t('settings.mcim.saved'), color: "success" };
 }
 
 async function chooseDir() {

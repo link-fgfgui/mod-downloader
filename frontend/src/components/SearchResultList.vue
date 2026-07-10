@@ -8,14 +8,13 @@
         :no-more-text="$t('search.noMoreResults')"
         @load-more="emit('load-more')"
     >
-        <template #item="{ item, index, selected, onClick, enterStyle }">
+        <template #item="{ item, index, selected, onClick }">
             <v-list-item :key="itemKey(item, index)" :title="item.title"
                 :subtitle="item.description"
-                :class="['mb-2 border-b md-animate-fade-y md-hover-lift', { 'search-result-selected': selected }]"
+                :class="['mb-2 border-b md-hover-lift', { 'search-result-selected': selected }]"
                 :bg-color="selected ? undefined : 'surface'"
                 rounded="xl" elevation="1"
                 lines="two"
-                :style="enterStyle"
                 @click="onClick">
                 <template #prepend>
                     <div class="align-self-start pt-1 me-3">
@@ -130,15 +129,18 @@ const onInstall = (index, allowConfirm) => {
 
 const iconFor = (index) => stateFor(index)?.icon || "mdi-download";
 
-const colorFor = (index) => stateFor(index)?.color || "primary";
+const colorFor = (index) => stateFor(index)?.color || "surface-variant";
 
 const loadingFor = (index) => {
     const state = stateFor(index);
-    if (!state) return true;
+    if (!state) return false;
     return Boolean(state.loading || props.downloadingKeys[state.key]);
 };
 
-const disabledFor = (index) => Boolean(stateFor(index)?.disabled);
+const disabledFor = (index) => {
+    const state = stateFor(index);
+    return !state || Boolean(state.disabled);
+};
 
 const onCopyNames = async (selectedItems) => {
     const names = selectedItems.map((r) => r.title).join("\n");

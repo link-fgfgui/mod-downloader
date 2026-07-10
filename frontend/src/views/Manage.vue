@@ -23,28 +23,40 @@
             </v-btn>
         </div>
 
+        <v-text-field v-if="hasSelectedInstance" v-model="searchInput" class="manage-search"
+            prepend-inner-icon="mdi-magnify" :label="$t('manage.search.label')" clearable
+            density="comfortable" hide-details />
+
         <v-alert v-if="!hasSelectedInstance" type="info" variant="tonal">
             {{ $t("manage.noInstance") }}
         </v-alert>
 
         <div v-else-if="groupedMods.length === 0" class="empty-state md-animate-fade-up">
             <v-icon class="md-animate-float" icon="mdi-package-variant" size="48"></v-icon>
-            <div class="text-body-1 mt-3">{{ $t("manage.noMods") }}</div>
+            <div class="text-body-1 mt-3">
+                {{ appliedSearch ? $t("manage.search.empty") : $t("manage.noMods") }}
+            </div>
         </div>
 
         <VirtualList v-else :items="groupedMods" :item-height="72" :item-key="modRowKey"
             class="manage-list">
-            <template #item="{ item: group, selected, onClick, enterStyle }">
-                <v-list-item class="mb-2 border-b md-animate-fade-y md-hover-lift"
+            <template #item="{ item: group, selected, onClick }">
+                <v-list-item class="mb-2 border-b md-hover-lift"
                     :class="{ 'manage-item-selected': selected }"
                     :bg-color="selected ? undefined : 'surface'"
                     rounded="xl" elevation="1" lines="two"
-                    :style="enterStyle"
                     @click="onClick">
                     <template #prepend>
                         <div class="align-self-start pt-1 me-3">
                             <v-avatar color="surface-container-high" rounded="lg" size="48">
-                                <v-img v-if="group.primary.iconUrl" :src="group.primary.iconUrl" :alt="displayModName(group)"></v-img>
+                                <v-progress-circular
+                                    v-if="group.primary.onlineMetadataLoading"
+                                    color="primary"
+                                    indeterminate
+                                    size="24"
+                                    width="2"
+                                ></v-progress-circular>
+                                <v-img v-else-if="group.primary.iconUrl" :src="group.primary.iconUrl" :alt="displayModName(group)"></v-img>
                                 <v-icon v-else icon="mdi-package-variant" color="on-surface-variant"></v-icon>
                             </v-avatar>
                         </div>
@@ -64,20 +76,26 @@
                         <span class="manage-subtitle-scroll">
                             <span class="manage-subtitle-details">
                                 {{ strongModIds(group).join(", ") }}
-                                <span v-if="group.primary.version"> · {{ group.primary.version }}</span>
+                                <v-tooltip v-if="group.primary.version" :text="versionTooltip(group)" location="top">
+                                    <template #activator="{ props: versionTip }">
+                                        <button
+                                            v-bind="versionTip"
+                                            class="manage-version-button"
+                                            type="button"
+                                            :disabled="!canReplaceVersion(group)"
+                                            @click.stop="openVersionDialog(group)"
+                                        >
+                                            · {{ group.primary.version }}
+                                        </button>
+                                    </template>
+                                </v-tooltip>
                                 <span v-if="group.primary.fileName || group.primary.path"> · {{ group.primary.fileName || group.primary.path }}</span>
                             </span>
                             <v-tooltip v-if="modCategories(group).length" :text="categoryTooltip(group)" location="top">
                                 <template #activator="{ props: tagTip }">
                                     <span v-bind="tagTip" class="manage-category-strip">
-                                        <v-chip
-                                            v-for="category in modCategories(group)"
-                                            :key="category"
-                                            class="manage-category-chip"
-                                            size="x-small"
-                                            variant="tonal"
-                                        >
-                                            {{ category }}
+                                        <v-chip class="manage-category-chip" size="x-small" variant="tonal">
+                                            {{ modCategories(group)[0] }}
                                         </v-chip>
                                     </span>
                                 </template>
@@ -95,9 +113,20 @@
                                 :disabled="!canFavoriteGroup(group)"
                                 @click.stop="openAddFavorites([group])"
                             ></v-btn>
-                            <v-chip :color="group.primary.enabled ? 'success' : 'warning'" size="small" variant="tonal">
+                            <v-btn
+                                class="manage-status-toggle"
+                                :color="group.primary.enabled ? 'success' : 'warning'"
+                                :prepend-icon="group.primary.enabled ? 'mdi-toggle-switch' : 'mdi-toggle-switch-off-outline'"
+                                size="small"
+                                variant="tonal"
+                                :loading="pendingTogglePath === group.primary.path"
+                                :disabled="isBatchBusy"
+                                :aria-label="group.primary.enabled ? $t('manage.disableSelected') : $t('manage.enableSelected')"
+                                :title="group.primary.enabled ? $t('manage.disableSelected') : $t('manage.enableSelected')"
+                                @click.stop="toggleGroup(group)"
+                            >
                                 {{ group.primary.enabled ? $t("manage.enabled") : $t("manage.disabled") }}
-                            </v-chip>
+                            </v-btn>
                         </div>
                     </template>
                 </v-list-item>
@@ -211,6 +240,26 @@
             </v-card>
         </v-dialog>
 
+        <v-dialog v-model="versionDialog" max-width="680" @after-leave="clearClosedVersionDialog">
+            <v-card class="version-dialog">
+                <v-toolbar density="compact" color="surface">
+                    <v-toolbar-title>{{ versionDialogTitle }}</v-toolbar-title>
+                    <v-btn icon="mdi-close" variant="text" @click="versionDialog = false"></v-btn>
+                </v-toolbar>
+                <v-divider></v-divider>
+                <ModVersionList
+                    :versions="matchingVersions"
+                    :loading="isLoadingVersions"
+                    action="replace"
+                    :installed-version-id="selectedVersionGroup?.primary?.onlineVersionId || ''"
+                    :installed-sha1="selectedVersionGroup?.primary?.sha1 || ''"
+                    :busy-version-id="replacingVersionId"
+                    disable-installed-action
+                    @select="replaceWithVersion"
+                ></ModVersionList>
+            </v-card>
+        </v-dialog>
+
         <AddToFavoriteDialog ref="addFavoriteDialog" @added="onFavoritesAdded"></AddToFavoriteDialog>
 
         <v-snackbar v-model="showOperationError" color="error" timeout="5000">
@@ -224,21 +273,24 @@
 </template>
 
 <script setup>
-import { computed, onActivated, ref } from "vue";
+import { computed, onActivated, onDeactivated, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 import { useI18n } from "vue-i18n";
 
 import VirtualList from "../components/VirtualList.vue";
 import AddToFavoriteDialog from "../components/AddToFavoriteDialog.vue";
+import ModVersionList from "../components/ModVersionList.vue";
 import { useMinecraftStore } from "../stores/minecraft";
 import { useSettingsStore } from "../stores/settings";
-import { ApplyLocalModBatchOperation, ScanUnusedDependencies } from "../../wailsjs/go/main/App";
+import { ApplyLocalModBatchOperation, ListMatchingProjectVersions, QueueModDownload, ScanUnusedDependencies } from "../../wailsjs/go/main/App";
+import { EventsOn } from "../../wailsjs/runtime/runtime";
 
 const minecraftStore = useMinecraftStore();
 const settingsStore = useSettingsStore();
 const { t } = useI18n();
 const { isRefreshing } = storeToRefs(minecraftStore);
 const batchOperation = ref("");
+const pendingTogglePath = ref("");
 const isScanningUnusedDependencies = ref(false);
 const isPreparingDelete = ref(false);
 const cleanupOperation = ref(false);
@@ -251,11 +303,20 @@ const operationError = ref("");
 const showOperationError = ref(false);
 const addFavoriteDialog = ref(null);
 const snackbar = ref({ show: false, key: "", color: "success", params: {} });
+const searchInput = ref("");
+const appliedSearch = ref("");
+const versionDialog = ref(false);
+const selectedVersionGroup = ref(null);
+const matchingVersions = ref([]);
+const isLoadingVersions = ref(false);
+const replacingVersionId = ref("");
+let replacementQueued = false;
+let stopListeningDownloadQueue = null;
 let pendingDeleteClearSelection = null;
 
 const isBatchBusy = computed(() => batchOperation.value !== "");
 
-const groupedMods = computed(() => {
+const allGroupedMods = computed(() => {
     const raw = minecraftStore.mods;
     const groups = new Map();
     for (const mod of raw) {
@@ -271,6 +332,41 @@ const groupedMods = computed(() => {
         }
     }
     return [...groups.values()].filter((group) => group.primary);
+});
+
+const groupedMods = computed(() => {
+    if (!appliedSearch.value) {
+        return allGroupedMods.value;
+    }
+    return allGroupedMods.value.filter((group) => searchableGroupText(group).includes(appliedSearch.value));
+});
+
+const searchableGroupText = (group) => {
+    const values = [];
+    const seen = new Set();
+    const collect = (value) => {
+        if (value === null || value === undefined || typeof value === "boolean") return;
+        if (typeof value === "string" || typeof value === "number") {
+            values.push(String(value));
+            return;
+        }
+        if (typeof value !== "object" || seen.has(value)) return;
+        seen.add(value);
+        if (Array.isArray(value)) {
+            value.forEach(collect);
+            return;
+        }
+        Object.values(value).forEach(collect);
+    };
+    collect(group);
+    return values.join("\n").toLocaleLowerCase();
+};
+
+watch(searchInput, (value, _previous, onCleanup) => {
+    const timer = window.setTimeout(() => {
+        appliedSearch.value = (value || "").trim().toLocaleLowerCase();
+    }, 1000);
+    onCleanup(() => window.clearTimeout(timer));
 });
 
 const hasSelectedInstance = computed(() => {
@@ -307,6 +403,97 @@ const modCategories = (group) => {
 };
 
 const categoryTooltip = (group) => modCategories(group).join(", ");
+
+const canReplaceVersion = (group) => Boolean(
+    group?.primary?.onlinePlatform && group?.primary?.onlineProjectId && hasSelectedInstance.value,
+);
+
+const versionTooltip = (group) => {
+    const mod = group.primary || {};
+    const onlineVersion = mod.onlineVersion || t("manage.version.onlineUnknown");
+    const details = [t("manage.version.online", { version: onlineVersion }), mod.onlineFileName].filter(Boolean);
+    if (canReplaceVersion(group)) details.push(t("manage.version.choose"));
+    return details.join("\n");
+};
+
+const onlineProjectFromGroup = (group) => {
+    const mod = group.primary;
+    const platform = mod.onlinePlatform || "";
+    const projectId = mod.onlineProjectId || "";
+    return {
+        id: `${platform.toLowerCase()}:${projectId}`,
+        platform,
+        projectId,
+        slug: mod.onlineSlug || "",
+        title: displayModName(group),
+        icon: "mdi-package-variant",
+        iconUrl: mod.iconUrl || "",
+        description: mod.description || "",
+        downloads: 0,
+        categories: modCategories(group),
+        updatedAt: 0,
+        cachedAt: 0,
+    };
+};
+
+const versionDialogTitle = computed(() =>
+    selectedVersionGroup.value ? t("manage.version.title", { name: displayModName(selectedVersionGroup.value) }) : "",
+);
+
+const openVersionDialog = async (group) => {
+    if (!canReplaceVersion(group)) return;
+    selectedVersionGroup.value = group;
+    matchingVersions.value = [];
+    replacingVersionId.value = "";
+    versionDialog.value = true;
+    isLoadingVersions.value = true;
+    try {
+        matchingVersions.value = await ListMatchingProjectVersions(
+            onlineProjectFromGroup(group),
+            minecraftStore.selectedMinecraftVersion,
+            minecraftStore.selectedModLoader,
+        ) || [];
+    } catch (error) {
+        operationError.value = errorMessage(error);
+        showOperationError.value = true;
+    } finally {
+        isLoadingVersions.value = false;
+    }
+};
+
+const replaceWithVersion = async (version) => {
+    const group = selectedVersionGroup.value;
+    if (!group || replacingVersionId.value) return;
+    replacingVersionId.value = version.id;
+    try {
+        const project = onlineProjectFromGroup(group);
+        const result = await QueueModDownload({
+            projectId: group.primary.onlineProjectId,
+            result: project,
+            minecraftVersion: minecraftStore.selectedMinecraftVersion,
+            modLoader: minecraftStore.selectedModLoader,
+            versionId: version.id,
+        });
+        if (result?.skipped) {
+            showSnackbar("download.errors.generic", "error");
+            return;
+        }
+        replacementQueued = true;
+        versionDialog.value = false;
+        showSnackbar("manage.version.queued", "success");
+    } catch (error) {
+        operationError.value = errorMessage(error);
+        showOperationError.value = true;
+    } finally {
+        replacingVersionId.value = "";
+    }
+};
+
+const clearClosedVersionDialog = () => {
+    if (versionDialog.value) return;
+    selectedVersionGroup.value = null;
+    matchingVersions.value = [];
+};
 
 const canFavoriteGroup = (group) => {
     return Boolean(group?.primary?.onlinePlatform && group?.primary?.onlineProjectId);
@@ -365,7 +552,7 @@ const groupTooltip = (group) => {
         parts.push(`Declared mods: ${strongModNames(group).join(", ")}`);
     }
     if (group.jij.length) {
-        parts.push(`Bundled JiJ: ${group.jij.map((m) => m.name || m.id).filter(Boolean).join(", ")}`);
+        parts.push(group.jij.map((m) => m.name || m.id).filter(Boolean).join(", "));
     }
     return parts.join("\n");
 };
@@ -426,6 +613,17 @@ const applyBatchOperation = async (groups, action, clearSelection) => {
         return false;
     } finally {
         batchOperation.value = "";
+    }
+};
+
+const toggleGroup = async (group) => {
+    const path = (group.primary?.path || "").trim();
+    if (!path || isBatchBusy.value) return;
+    pendingTogglePath.value = path;
+    try {
+        await applyBatchOperation([group], group.primary.enabled ? "disable" : "enable");
+    } finally {
+        pendingTogglePath.value = "";
     }
 };
 
@@ -563,9 +761,21 @@ const errorMessage = (error) => {
 };
 
 onActivated(async () => {
+    if (!stopListeningDownloadQueue) {
+        stopListeningDownloadQueue = EventsOn("download-queue-updated", (state) => {
+            if (!replacementQueued || state?.active || state?.Active) return;
+            replacementQueued = false;
+            void minecraftStore.refreshSelectedMods();
+        });
+    }
     await minecraftStore.start();
     await settingsStore.load();
     await minecraftStore.refreshSelectedMods();
+});
+
+onDeactivated(() => {
+    stopListeningDownloadQueue?.();
+    stopListeningDownloadQueue = null;
 });
 </script>
 
@@ -590,6 +800,12 @@ onActivated(async () => {
 .manage-header-copy {
     flex: 1 1 220px;
     min-width: 0;
+}
+
+.manage-search {
+    flex: 0 0 auto;
+    margin-bottom: 16px;
+    max-width: 520px;
 }
 
 .empty-state {
@@ -625,22 +841,38 @@ onActivated(async () => {
     display: flex;
     gap: 6px;
     min-width: 0;
-    overflow-x: auto;
+    overflow-x: hidden;
     overflow-y: hidden;
-    scrollbar-width: thin;
     white-space: nowrap;
 }
 
 .manage-subtitle-details {
-    flex: 0 0 auto;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.manage-version-button {
+    background: transparent;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    letter-spacing: 0;
+    padding: 0;
+}
+
+.manage-version-button:disabled {
+    cursor: default;
 }
 
 .manage-category-strip {
     display: inline-flex;
-    flex: 1 1 auto;
+    flex: 0 0 auto;
     flex-wrap: nowrap;
     gap: 4px;
-    min-width: min(72px, 100%);
+    min-width: 0;
     overflow: hidden;
 }
 
@@ -660,6 +892,10 @@ onActivated(async () => {
     align-items: center;
     display: flex;
     gap: 8px;
+}
+
+.manage-status-toggle {
+    min-width: 96px;
 }
 
 @media (max-width: 599.98px) {
@@ -684,7 +920,12 @@ onActivated(async () => {
         gap: 4px;
     }
 
-    .manage-actions :deep(.v-chip) {
+    .manage-status-toggle {
+        min-width: 36px;
+        width: 36px;
+    }
+
+    .manage-status-toggle :deep(.v-btn__content) {
         display: none;
     }
 

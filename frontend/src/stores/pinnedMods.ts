@@ -1,10 +1,10 @@
 import { defineStore } from "pinia";
 import { ListPinnedMods, UnpinMod } from "../../wailsjs/go/main/App";
-import type { database } from "../../wailsjs/go/models";
+import type { storage } from "../../wailsjs/go/models";
 
 export const usePinnedModsStore = defineStore("pinnedMods", {
     state: () => ({
-        pins: [] as database.PinnedMod[],
+        pins: [] as storage.PinnedMod[],
         isLoading: false,
         filterPlatform: "",
         filterMinecraftVersion: "",
@@ -12,7 +12,7 @@ export const usePinnedModsStore = defineStore("pinnedMods", {
         pendingUnpinKeys: new Set<string>(),
     }),
     getters: {
-        filteredPins(state): database.PinnedMod[] {
+        filteredPins(state): storage.PinnedMod[] {
             const platform = state.filterPlatform.toLowerCase();
             const mc = state.filterMinecraftVersion.toLowerCase();
             const loader = state.filterModLoader.toLowerCase();
@@ -29,7 +29,7 @@ export const usePinnedModsStore = defineStore("pinnedMods", {
                 return true;
             });
         },
-        pinKey(): (pin: database.PinnedMod) => string {
+        pinKey(): (pin: storage.PinnedMod) => string {
             return (pin) => [pin.platform, pin.modId, pin.minecraftVersion, pin.modLoader].join("|");
         },
         hasPins(state): boolean {
@@ -45,7 +45,7 @@ export const usePinnedModsStore = defineStore("pinnedMods", {
                 this.isLoading = false;
             }
         },
-        async unpin(pin: database.PinnedMod) {
+        async unpin(pin: storage.PinnedMod) {
             const key = this.pinKey(pin);
             if (this.pendingUnpinKeys.has(key)) return;
             this.pendingUnpinKeys.add(key);

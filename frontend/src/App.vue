@@ -203,6 +203,7 @@ import { initTheme, applyVuetifyTheme, stopThemeListener } from "./composables/u
 import {
     afterGsapRouteLeave,
     animationModeGsap,
+    animationModeOff,
     applyAnimationSettings,
     beforeGsapFabEnter,
     beforeGsapRouteEnter,
@@ -271,6 +272,7 @@ const downloadQueueItems = computed(() => visibleDownloadQueue.value.items || []
 const downloadQueueReminders = computed(() => visibleDownloadQueue.value.optionalReminders || []);
 
 const gsapAnimationsActive = computed(() => activeAnimationMode.value === animationModeGsap);
+const animationsOff = computed(() => activeAnimationMode.value === animationModeOff);
 
 const routeTransitionProps = computed(() => (
     gsapAnimationsActive.value
@@ -282,7 +284,9 @@ const routeTransitionProps = computed(() => (
             onLeave: leaveGsapRoute,
             onAfterLeave: afterGsapRouteLeave,
         }
-        : { name: "slide-fade", mode: "out-in" as const }
+        : animationsOff.value
+            ? { css: false, mode: "out-in" as const }
+            : { name: "slide-fade", mode: "out-in" as const }
 ));
 const fabTransitionProps = computed(() => (
     gsapAnimationsActive.value
@@ -293,7 +297,9 @@ const fabTransitionProps = computed(() => (
             onLeave: leaveGsapFab,
             onAfterLeave: clearDownloadQueueSnapshot,
         }
-        : { name: "md-fab", onAfterLeave: clearDownloadQueueSnapshot }
+        : animationsOff.value
+            ? { css: false, onAfterLeave: clearDownloadQueueSnapshot }
+            : { name: "md-fab", onAfterLeave: clearDownloadQueueSnapshot }
 ));
 
 const queueStatusIcon = (status: string) => {

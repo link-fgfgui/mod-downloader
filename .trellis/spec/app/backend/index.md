@@ -10,6 +10,7 @@ code in `app.go`. Reusable domain logic belongs in the `core/` submodule.
 - [Shared Backend Guidelines](../../backend/index.md)
 - [Directory Structure](../../backend/directory-structure.md)
 - [Quality Guidelines](../../backend/quality-guidelines.md)
+- [Build Version](./build-version.md)
 
 ## Pre-Development Checklist
 
@@ -17,6 +18,8 @@ code in `app.go`. Reusable domain logic belongs in the `core/` submodule.
   `core/` submodule.
 - Keep Wails runtime imports in the app adapter layer only.
 - Preserve `replace github.com/link-fgfgui/mod-downloader-core => ./core`.
+- Inject release identity through `APP_VERSION` and Go `-X`; see
+  [Build Version](./build-version.md).
 
 ## Quality Check
 

@@ -10,8 +10,14 @@ import {
 } from "../../wailsjs/go/main/App";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
 import type { structs } from "../../wailsjs/go/models";
+import {
+    appIsUnfocused,
+    playDownloadCompletionSound,
+    prepareDownloadCompletionSound,
+} from "../composables/useDownloadCompletionSound";
 
 const downloadQueueUpdatedEvent = "download-queue-updated";
+const downloadCompletedEvent = "download-completed";
 
 type DownloadQueueSnapshot = Pick<structs.DownloadQueueState, "active" | "pending" | "running" | "messageCount" | "items" | "optionalReminders">;
 
@@ -26,6 +32,9 @@ export const useDownloadQueueStore = defineStore("downloadQueue", {
     state: () => ({
         queue: emptyQueue(),
         stopListening: null as (() => void) | null,
+        stopListeningCompleted: null as (() => void) | null,
+        stopPreparingSound: null as (() => void) | null,
+        completedInActiveCycle: false,
     }),
     getters: {
         activeCount: (state) => (state.queue.pending || 0) + (state.queue.running || 0),
@@ -90,17 +99,43 @@ export const useDownloadQueueStore = defineStore("downloadQueue", {
             return results || [];
         },
         async start() {
-            if (this.stopListening) {
+            if (this.stopListening || this.stopListeningCompleted) {
                 return;
             }
             await this.refresh();
             this.stopListening = EventsOn(downloadQueueUpdatedEvent, (state: DownloadQueueSnapshot) => {
-                this.queue = state || emptyQueue();
+                const previousActive = Boolean(this.queue.active);
+                const nextQueue = state || emptyQueue();
+                this.queue = nextQueue;
+                if (previousActive && !nextQueue.active) {
+                    const shouldPlay = this.completedInActiveCycle && appIsUnfocused();
+                    this.completedInActiveCycle = false;
+                    if (shouldPlay) void playDownloadCompletionSound();
+                }
             });
+            this.stopListeningCompleted = EventsOn(downloadCompletedEvent, () => {
+                this.completedInActiveCycle = true;
+            });
+            const prepareSound = () => {
+                void prepareDownloadCompletionSound();
+                this.stopPreparingSound?.();
+                this.stopPreparingSound = null;
+            };
+            document.addEventListener("pointerdown", prepareSound, { once: true });
+            document.addEventListener("keydown", prepareSound, { once: true });
+            this.stopPreparingSound = () => {
+                document.removeEventListener("pointerdown", prepareSound);
+                document.removeEventListener("keydown", prepareSound);
+            };
         },
         stop() {
             this.stopListening?.();
+            this.stopListeningCompleted?.();
+            this.stopPreparingSound?.();
             this.stopListening = null;
+            this.stopListeningCompleted = null;
+            this.stopPreparingSound = null;
+            this.completedInActiveCycle = false;
         },
     },
 });

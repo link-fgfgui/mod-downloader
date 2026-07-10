@@ -18,7 +18,6 @@ const baseDurations = {
 
 const pageContentSelector = [
     ".v-card",
-    ".v-list-item",
     ".v-data-table",
     ".v-data-table__tr",
     ".v-alert",
@@ -117,9 +116,9 @@ function routeAnimationTargets(el: Element): Element[] {
 }
 
 export function beforeGsapRouteEnter(el: Element) {
-    const targets = getPageContentTargets(el);
+    const targets = getVisiblePageContentTargets(el);
     gsap.killTweensOf([el, ...targets]);
-    gsap.set(el, { opacity: 0, y: 20, scale: 0.985 });
+    gsap.set(el, { opacity: 0 });
     if (targets.length > 0) {
         gsap.set(targets, { opacity: 0, y: 24, scale: 0.985 });
     }
@@ -136,8 +135,6 @@ export function enterGsapRoute(el: Element, done: () => void) {
 
     timeline.to(el, {
         opacity: 1,
-        y: 0,
-        scale: 1,
         duration: gsapDuration(0.32),
         ease: "expo.out",
     }, 0);
@@ -162,8 +159,6 @@ export function leaveGsapRoute(el: Element, done: () => void) {
     gsap.killTweensOf(targets);
     gsap.to(el, {
         opacity: 0,
-        y: -14,
-        scale: 0.985,
         duration: gsapDuration(0.26),
         ease: "power2.in",
         onComplete: done,

@@ -336,15 +336,6 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
             const stateKey = index >= 0 ? this.downloadStates[index]?.key : "";
             return stateKey || result?.id || "";
         },
-        isPinnedVersion(version: ProjectVersionSnapshot) {
-            return this.pinnedVersion?.versionId === version.id;
-        },
-        isPinningAnotherVersion(version: ProjectVersionSnapshot) {
-            return Boolean(this.pinningVersionID && this.pinningVersionID !== version.id);
-        },
-        versionFileName(version: ProjectVersionSnapshot) {
-            return version.fileName || version.name || version.version || version.id;
-        },
         async start() {
             if (this.stopListeningSearchModsUpdated || this.stopListeningDownloadQueueUpdated || this.stopListeningDownloadFailed || this.stopListeningExtensionModsAccepted || this.stopListeningDownloadStatesUpdated) {
                 return;

@@ -65,7 +65,14 @@ jobs:
       - name: Build Wails App
         shell: bash
         run: |
-          wails build -clean ${{ matrix.build_flags }}
+          if [[ -z "${APP_VERSION:-}" ]]; then
+            if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+              APP_VERSION="${GITHUB_REF_NAME}"
+            else
+              APP_VERSION="${GITHUB_SHA::12}"
+            fi
+          fi
+          wails build -clean ${{ matrix.build_flags }} -ldflags "-X main.appVersion=${APP_VERSION}"
 
       - name: Package macOS App
         if: matrix.platform == 'darwin'
