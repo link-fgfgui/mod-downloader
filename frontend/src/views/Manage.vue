@@ -39,7 +39,7 @@
         </div>
 
         <VirtualList v-else :items="groupedMods" :item-height="72" :item-key="modRowKey"
-            class="manage-list">
+            class="manage-list" @scroll="onListScroll" @pointer-move="restoreListTooltips">
             <template #item="{ item: group, selected, onClick }">
                 <v-list-item class="mb-2 border-b md-hover-lift"
                     :class="{ 'manage-item-selected': selected }"
@@ -63,7 +63,7 @@
                     </template>
 
                     <v-list-item-title class="font-weight-medium">
-                            <v-tooltip v-if="hasGroupedDetails(group)" :text="groupTooltip(group)" location="top">
+                            <v-tooltip v-if="hasGroupedDetails(group)" :disabled="listTooltipsPaused" :text="groupTooltip(group)" location="top">
                                 <template #activator="{ props: tip }">
                                     <span v-bind="tip">{{ displayModName(group) }}
                                         <v-icon icon="mdi-package-variant-closed-plus" size="14" class="ms-1 text-medium-emphasis"></v-icon>
@@ -76,7 +76,7 @@
                         <span class="manage-subtitle-scroll">
                             <span class="manage-subtitle-details">
                                 {{ strongModIds(group).join(", ") }}
-                                <v-tooltip v-if="group.primary.version" :text="versionTooltip(group)" location="top">
+                                <v-tooltip v-if="group.primary.version" :disabled="listTooltipsPaused" :text="versionTooltip(group)" location="top">
                                     <template #activator="{ props: versionTip }">
                                         <button
                                             v-bind="versionTip"
@@ -91,7 +91,7 @@
                                 </v-tooltip>
                                 <span v-if="group.primary.fileName || group.primary.path"> · {{ group.primary.fileName || group.primary.path }}</span>
                             </span>
-                            <v-tooltip v-if="modCategories(group).length" :text="categoryTooltip(group)" location="top">
+                            <v-tooltip v-if="modCategories(group).length" :disabled="listTooltipsPaused" :text="categoryTooltip(group)" location="top">
                                 <template #activator="{ props: tagTip }">
                                     <span v-bind="tagTip" class="manage-category-strip">
                                         <v-chip class="manage-category-chip" size="x-small" variant="tonal">
@@ -133,63 +133,26 @@
             </template>
 
             <template #actions="{ selectedItems, clearSelection }">
-                <v-tooltip :disabled="canFavoriteSelection(selectedItems)" :text="$t('favorites.invalidSelection')" location="top">
+                <v-tooltip :text="canFavoriteSelection(selectedItems) ? $t('favorites.addToFavorites') : $t('favorites.invalidSelection')" location="top">
                     <template #activator="{ props: tip }">
-                        <span v-bind="tip" class="d-inline-flex me-1">
-                            <v-btn size="small" variant="tonal" color="secondary"
-                                prepend-icon="mdi-playlist-plus"
+                        <span v-bind="tip" class="d-inline-flex">
+                            <v-btn :aria-label="$t('favorites.addToFavorites')" icon="mdi-playlist-plus" size="small" variant="tonal" color="secondary"
                                 :disabled="!canFavoriteSelection(selectedItems)"
-                                @click="openAddFavorites(selectedItems)">
-                                {{ $t('favorites.addToFavorites') }}
-                            </v-btn>
+                                @click="openAddFavorites(selectedItems)"></v-btn>
                         </span>
                     </template>
                 </v-tooltip>
 
-                <v-btn size="small" variant="tonal" class="me-1"
-                    prepend-icon="mdi-content-copy"
-                    :disabled="isBatchBusy"
-                    @click="copyModNames(selectedItems)">
-                    {{ $t('manage.copyNames') }}
-                </v-btn>
-
-                <v-btn size="small" variant="tonal" class="me-1"
-                    prepend-icon="mdi-identifier"
-                    :disabled="isBatchBusy"
-                    @click="copyModIds(selectedItems)">
-                    {{ $t('manage.copyIds') }}
-                </v-btn>
-
-                <v-btn size="small" variant="tonal" color="primary" class="me-1"
-                    :prepend-icon="primaryBatchAction(selectedItems) === 'disable' ? 'mdi-toggle-switch-off-outline' : 'mdi-toggle-switch-outline'"
-                    :loading="batchOperation === primaryBatchAction(selectedItems)"
-                    :disabled="isBatchBusy"
-                    @click="applyBatchOperation(selectedItems, primaryBatchAction(selectedItems), clearSelection)"
-                    @contextmenu.prevent="applyBatchOperation(selectedItems, 'invert', clearSelection)">
-                    {{ primaryBatchAction(selectedItems) === 'disable' ? $t('manage.disableSelected') : $t('manage.enableSelected') }}
-                </v-btn>
-
-                <v-btn size="small" variant="tonal" color="warning" class="me-1"
-                    prepend-icon="mdi-swap-horizontal"
-                    :loading="batchOperation === 'invert'"
-                    :disabled="isBatchBusy"
-                    @click="applyBatchOperation(selectedItems, 'invert', clearSelection)">
-                    {{ $t('manage.invertSelected') }}
-                </v-btn>
-
-                <v-btn size="small" variant="tonal" color="error" class="me-1"
-                    prepend-icon="mdi-delete"
-                    :disabled="isBatchBusy"
-                    @click="openDeleteDialog(selectedItems, clearSelection)">
-                    {{ $t('manage.deleteSelected') }}
-                </v-btn>
-
-                <v-btn size="small" variant="tonal" color="error"
-                    prepend-icon="mdi-selection-off"
-                    :disabled="isBatchBusy"
-                    @click="clearSelection()">
-                    {{ $t('download.selection.deselectAll') }}
-                </v-btn>
+                <v-tooltip v-for="action in manageSelectionActions(selectedItems, clearSelection)" :key="action.label"
+                    :text="action.label" location="top">
+                    <template #activator="{ props: tip }">
+                        <span v-bind="tip" class="d-inline-flex">
+                            <v-btn :aria-label="action.label" :icon="action.icon" size="small" variant="tonal"
+                                :color="action.color" :loading="action.loading" :disabled="isBatchBusy"
+                                @click="action.run"></v-btn>
+                        </span>
+                    </template>
+                </v-tooltip>
             </template>
         </VirtualList>
 
@@ -254,8 +217,12 @@
                     :installed-version-id="selectedVersionGroup?.primary?.onlineVersionId || ''"
                     :installed-sha1="selectedVersionGroup?.primary?.sha1 || ''"
                     :busy-version-id="replacingVersionId"
+                    :pinned-version-id="pinnedVersionId"
+                    :pin-busy-version-id="pinningVersionId"
+                    show-pin-action
                     disable-installed-action
                     @select="replaceWithVersion"
+                    @pin="pinManageVersion"
                 ></ModVersionList>
             </v-card>
         </v-dialog>
@@ -282,7 +249,7 @@ import AddToFavoriteDialog from "../components/AddToFavoriteDialog.vue";
 import ModVersionList from "../components/ModVersionList.vue";
 import { useMinecraftStore } from "../stores/minecraft";
 import { useSettingsStore } from "../stores/settings";
-import { ApplyLocalModBatchOperation, ListMatchingProjectVersions, QueueModDownload, ScanUnusedDependencies } from "../../wailsjs/go/main/App";
+import { ApplyLocalModBatchOperation, GetPinnedModVersion, ListMatchingProjectVersions, PinModVersion, QueueModDownload, ScanUnusedDependencies } from "../../wailsjs/go/main/App";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
 
 const minecraftStore = useMinecraftStore();
@@ -303,6 +270,7 @@ const operationError = ref("");
 const showOperationError = ref(false);
 const addFavoriteDialog = ref(null);
 const snackbar = ref({ show: false, key: "", color: "success", params: {} });
+const listTooltipsPaused = ref(false);
 const searchInput = ref("");
 const appliedSearch = ref("");
 const versionDialog = ref(false);
@@ -310,9 +278,25 @@ const selectedVersionGroup = ref(null);
 const matchingVersions = ref([]);
 const isLoadingVersions = ref(false);
 const replacingVersionId = ref("");
+const pinnedVersionId = ref("");
+const pinningVersionId = ref("");
 let replacementQueued = false;
 let stopListeningDownloadQueue = null;
 let pendingDeleteClearSelection = null;
+let listScrollTimer = 0;
+
+const restoreListTooltips = () => {
+    window.clearTimeout(listScrollTimer);
+    listTooltipsPaused.value = false;
+};
+
+const onListScroll = () => {
+    listTooltipsPaused.value = true;
+    window.clearTimeout(listScrollTimer);
+    listScrollTimer = window.setTimeout(() => {
+        listTooltipsPaused.value = false;
+    }, 1000);
+};
 
 const isBatchBusy = computed(() => batchOperation.value !== "");
 
@@ -445,19 +429,42 @@ const openVersionDialog = async (group) => {
     selectedVersionGroup.value = group;
     matchingVersions.value = [];
     replacingVersionId.value = "";
+    pinnedVersionId.value = "";
+    pinningVersionId.value = "";
     versionDialog.value = true;
     isLoadingVersions.value = true;
     try {
-        matchingVersions.value = await ListMatchingProjectVersions(
-            onlineProjectFromGroup(group),
-            minecraftStore.selectedMinecraftVersion,
-            minecraftStore.selectedModLoader,
-        ) || [];
+        const project = onlineProjectFromGroup(group);
+        const [versions, pin] = await Promise.all([
+            ListMatchingProjectVersions(project, minecraftStore.selectedMinecraftVersion, minecraftStore.selectedModLoader),
+            GetPinnedModVersion(project.platform, project.projectId, minecraftStore.selectedMinecraftVersion, minecraftStore.selectedModLoader),
+        ]);
+        matchingVersions.value = versions || [];
+        pinnedVersionId.value = pin?.versionId || "";
     } catch (error) {
         operationError.value = errorMessage(error);
         showOperationError.value = true;
     } finally {
         isLoadingVersions.value = false;
+    }
+};
+
+const pinManageVersion = async (version) => {
+    const group = selectedVersionGroup.value;
+    if (!group || pinningVersionId.value) return;
+    const project = onlineProjectFromGroup(group);
+    pinningVersionId.value = version.id;
+    try {
+        const pin = await PinModVersion({
+            platform: project.platform,
+            modId: project.projectId,
+            versionId: version.id,
+            minecraftVersion: minecraftStore.selectedMinecraftVersion,
+            modLoader: minecraftStore.selectedModLoader,
+        });
+        pinnedVersionId.value = pin?.versionId || "";
+    } finally {
+        pinningVersionId.value = "";
     }
 };
 
@@ -493,6 +500,7 @@ const clearClosedVersionDialog = () => {
     if (versionDialog.value) return;
     selectedVersionGroup.value = null;
     matchingVersions.value = [];
+    pinnedVersionId.value = "";
 };
 
 const canFavoriteGroup = (group) => {
@@ -591,6 +599,24 @@ const selectedGroupPaths = (groups) => {
 
 const primaryBatchAction = (groups) => {
     return groups.some((group) => group.primary?.enabled) ? "disable" : "enable";
+};
+
+const manageSelectionActions = (groups, clearSelection) => {
+    const primaryAction = primaryBatchAction(groups);
+    return [
+        { label: t("manage.copyNames"), icon: "mdi-content-copy", run: () => copyModNames(groups) },
+        { label: t("manage.copyIds"), icon: "mdi-identifier", run: () => copyModIds(groups) },
+        {
+            label: t(primaryAction === "disable" ? "manage.disableSelected" : "manage.enableSelected"),
+            icon: primaryAction === "disable" ? "mdi-toggle-switch-off-outline" : "mdi-toggle-switch-outline",
+            color: "primary",
+            loading: batchOperation.value === primaryAction,
+            run: () => applyBatchOperation(groups, primaryAction, clearSelection),
+        },
+        { label: t("manage.invertSelected"), icon: "mdi-swap-horizontal", color: "warning", loading: batchOperation.value === "invert", run: () => applyBatchOperation(groups, "invert", clearSelection) },
+        { label: t("manage.deleteSelected"), icon: "mdi-delete", color: "error", run: () => openDeleteDialog(groups, clearSelection) },
+        { label: t("download.selection.deselectAll"), icon: "mdi-selection-off", color: "error", run: clearSelection },
+    ];
 };
 
 const applyBatchOperation = async (groups, action, clearSelection) => {
@@ -774,6 +800,8 @@ onActivated(async () => {
 });
 
 onDeactivated(() => {
+    window.clearTimeout(listScrollTimer);
+    listTooltipsPaused.value = false;
     stopListeningDownloadQueue?.();
     stopListeningDownloadQueue = null;
 });
@@ -781,10 +809,12 @@ onDeactivated(() => {
 
 <style scoped>
 .manage-page {
+    height: calc(100vh - 32px);
     max-width: 1080px;
-    min-height: calc(100vh - 32px);
+    min-height: 0;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 
 .manage-header {
@@ -819,7 +849,7 @@ onDeactivated(() => {
 
 .manage-list {
     flex: 1 1 auto;
-    max-height: calc(100vh - 176px);
+    min-height: 0;
 }
 
 .cleanup-candidate-list {

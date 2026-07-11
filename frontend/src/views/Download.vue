@@ -147,7 +147,13 @@
                     {{ $t(confirmDialogTitleKey) }}
                 </v-card-title>
                 <v-card-text>
-                    {{ $t(confirmDialogBodyKey) }}
+                    <div v-if="confirmDialog.status === 'conflict' && confirmDialog.conflictFileName" class="font-weight-medium mb-2">
+                        {{ $t("download.confirmReplace.conflictFile", { file: confirmDialog.conflictFileName }) }}
+                    </div>
+                    <div>{{ $t(confirmDialogBodyKey) }}</div>
+                    <div v-if="confirmDialog.status === 'conflict'" class="text-caption text-medium-emphasis mt-3">
+                        {{ $t("download.confirmReplace.conflictHint") }}
+                    </div>
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer></v-spacer>
@@ -261,6 +267,7 @@ const installMod = (payload: {
     result?: models.ModProject;
     key?: string;
     status?: string;
+    conflictFileName?: string;
     confirm?: boolean;
 }) => downloadStore.installMod(payload);
 const confirmInstall = () => downloadStore.confirmInstall();
@@ -378,8 +385,10 @@ watch(
 .download-page {
     display: flex;
     flex-direction: column;
+    height: calc(100vh - 32px);
     max-width: 960px;
-    min-height: calc(100vh - 32px);
+    min-height: 0;
+    overflow: hidden;
 }
 
 .search-spacer {
@@ -396,16 +405,17 @@ watch(
 }
 
 .search-result-list {
-    flex: 0 0 auto;
-    max-height: calc(100vh - 170px);
+    flex: 1 1 auto;
+    min-height: 0;
     transition:
         flex 0.4s var(--md-ease-out),
-        max-height 0.4s var(--md-ease-out);
+        opacity 0.4s var(--md-ease-out);
 }
 
 .search-result-list--empty {
     flex: 0 0 0 !important;
-    max-height: 0 !important;
+    min-height: 0 !important;
+    opacity: 0;
 }
 
 .version-overlay {

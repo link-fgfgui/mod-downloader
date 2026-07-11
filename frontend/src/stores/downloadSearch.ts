@@ -56,7 +56,7 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
         activeDownloadStateRequestID: "",
         downloadingKeys: {} as Record<string, boolean>,
         snackbar: { show: false, key: "", params: {} as Record<string, string>, color: "success" },
-        confirmDialog: { show: false, status: "", result: null as SearchModSnapshot | null, key: "" },
+        confirmDialog: { show: false, status: "", result: null as SearchModSnapshot | null, key: "", conflictFileName: "" },
         batchConfirmDialog: {
             show: false,
             conflicts: [] as structs.BatchIncompatibleConflict[],
@@ -182,13 +182,13 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
         async loadMoreSearchResults() {
             await this.runSearch({ append: true });
         },
-        async installMod(payload: { result?: SearchModSnapshot; key?: string; status?: string; confirm?: boolean }) {
-            const { result, key, status, confirm } = payload || {};
+        async installMod(payload: { result?: SearchModSnapshot; key?: string; status?: string; conflictFileName?: string; confirm?: boolean }) {
+            const { result, key, status, conflictFileName, confirm } = payload || {};
             if (!key || this.downloadingKeys[key] || !this.hasSelectedInstance || !this.selectedVersion || !this.selectedModLoader) {
                 return;
             }
             if (confirm && this.confirmStatuses.has(status || "")) {
-                this.confirmDialog = { show: true, status: status || "", result: result || null, key };
+                this.confirmDialog = { show: true, status: status || "", result: result || null, key, conflictFileName: conflictFileName || "" };
                 return;
             }
             await this.doInstall({ result, key });
@@ -244,7 +244,7 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
         },
         clearClosedConfirmDialog() {
             if (!this.confirmDialog.show) {
-                this.confirmDialog = { show: false, status: "", result: null, key: "" };
+                this.confirmDialog = { show: false, status: "", result: null, key: "", conflictFileName: "" };
             }
         },
         async doInstall(payload: { result?: SearchModSnapshot; key?: string }) {

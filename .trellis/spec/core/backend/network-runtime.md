@@ -41,7 +41,13 @@ Environment equivalents are `DOWNLOADS_FILE_CONCURRENCY`,
 - Non-positive download values normalize to 4 range chunks per file and 1
   simultaneous file.
 - A negative API rate normalizes to 0; 0 means unlimited.
+- File concurrency is constrained to 1-32, concurrent downloads to 1-16, and
+  provider requests per second to 0-100. Values above a maximum clamp to it;
+  download values below the minimum use their compatibility defaults.
 - `Service.Startup` applies download settings before accepting queue work.
+- `Service.SaveNetworkSettings` persists normalized values and immediately
+  reconfigures new downloader jobs and the shared provider limiter. Existing
+  in-flight downloads are not canceled or resized.
 - Every `filetransfer.Request` receives the configured file concurrency.
 - The queue exposes every active job in `DownloadQueueState.Items`, and
   `Running` equals the active job count.
@@ -57,7 +63,8 @@ Environment equivalents are `DOWNLOADS_FILE_CONCURRENCY`,
 
 - Missing config sections -> defaults (4, 1, unlimited API).
 - Download value <= 0 -> its default; do not create a zero-worker queue.
-- API value <= 0 -> no wait.
+- Download value above its maximum -> clamp to 32 or 16 respectively.
+- API value below 0 -> 0/no wait; above 100 -> clamp to 100.
 - Request context canceled while rate-limited -> return `ctx.Err()` without
   invoking the base transport.
 - Cancel one running download -> cancel only that job and keep other workers
@@ -78,6 +85,8 @@ Environment equivalents are `DOWNLOADS_FILE_CONCURRENCY`,
 ### 6. Tests Required
 
 - Decode TOML and prefixed environment variables; assert default normalization.
+- Save below/above-range settings through appcore; assert the returned view and
+  reloaded TOML contain normalized values.
 - Configure two concurrent downloads with a blocking backend; assert both are
   running and each request carries the configured file concurrency.
 - Assert a rate-limited request canceled during its wait never reaches the base

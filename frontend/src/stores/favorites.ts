@@ -5,20 +5,15 @@ import {
     AddFavoriteModsToLists,
     ApplyFavoriteListMigration,
     CopyFavoriteListToList,
-    CreateFavoriteGroup,
     CreateFavoriteList,
-    DeleteFavoriteGroup,
     DeleteFavoriteList,
     ExportFavoriteListPackwizZip,
     ListFavoriteContents,
-    ListFavoriteGroups,
     ListFavoriteLists,
     LookupProjectBySlug,
     PreviewFavoriteListMigration,
     RemoveFavoriteMod,
-    RenameFavoriteGroup,
     RenameFavoriteList,
-    ReorderFavoriteGroups,
     ReorderFavoriteLists,
     UpdateFavoriteListMetadata,
 } from "../../wailsjs/go/main/App";
@@ -78,12 +73,15 @@ const favoriteContentsForScope = (
 const listOrder = (a: storage.FavoriteList, b: storage.FavoriteList) =>
     Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || a.sortOrder - b.sortOrder || a.name.localeCompare(b.name);
 
-const groupOrder = (a: storage.FavoriteGroup, b: storage.FavoriteGroup) =>
-    a.sortOrder - b.sortOrder || a.name.localeCompare(b.name);
+const listMatchesScope = (list: storage.FavoriteList, minecraftVersion: string, modLoader: string) => {
+    const listVersion = normalizeMinecraftVersion(list.minecraftVersion);
+    const listLoader = normalizeKeyPart(list.modLoader);
+    if (!listVersion && !listLoader) return true;
+    return hasFavoriteScope(minecraftVersion, modLoader) && listVersion === minecraftVersion && listLoader === modLoader;
+};
 
 export const useFavoritesStore = defineStore("favorites", {
     state: () => ({
-        groups: [] as storage.FavoriteGroup[],
         lists: [] as storage.FavoriteList[],
         selectedListId: "",
         displayMinecraftVersion: "",
@@ -98,26 +96,14 @@ export const useFavoritesStore = defineStore("favorites", {
     }),
     getters: {
         selectedList(state): storage.FavoriteList | null {
-            return state.lists.find((list) => list.id === state.selectedListId) || null;
+            return state.lists.find((list) => list.id === state.selectedListId && listMatchesScope(list, state.displayMinecraftVersion, state.displayModLoader)) || null;
         },
         itemKey: () => favoriteKey,
         pinnedLists(state): storage.FavoriteList[] {
-            return state.lists.filter((list) => list.pinned).sort(listOrder);
+            return state.lists.filter((list) => list.pinned && listMatchesScope(list, state.displayMinecraftVersion, state.displayModLoader)).sort(listOrder);
         },
         ungroupedLists(state): storage.FavoriteList[] {
-            return state.lists.filter((list) => !list.pinned && !list.groupId).sort(listOrder);
-        },
-        groupedLists(state): Record<string, storage.FavoriteList[]> {
-            return state.lists.reduce<Record<string, storage.FavoriteList[]>>((acc, list) => {
-                if (!list.groupId || list.pinned) return acc;
-                acc[list.groupId] = acc[list.groupId] || [];
-                acc[list.groupId].push(list);
-                acc[list.groupId].sort(listOrder);
-                return acc;
-            }, {});
-        },
-        sortedGroups(state): storage.FavoriteGroup[] {
-            return [...state.groups].sort(groupOrder);
+            return state.lists.filter((list) => !list.pinned && listMatchesScope(list, state.displayMinecraftVersion, state.displayModLoader)).sort(listOrder);
         },
     },
     actions: {
@@ -129,7 +115,7 @@ export const useFavoritesStore = defineStore("favorites", {
             }
             this.displayMinecraftVersion = nextMinecraftVersion;
             this.displayModLoader = nextModLoader;
-            this.closeSelectedList();
+            if (!this.selectedList) this.closeSelectedList();
             return true;
         },
         closeSelectedList() {
@@ -140,10 +126,8 @@ export const useFavoritesStore = defineStore("favorites", {
         async loadLists() {
             this.isLoadingLists = true;
             try {
-                const [groups, lists] = await Promise.all([ListFavoriteGroups(), ListFavoriteLists()]);
-                this.groups = (groups || []).sort(groupOrder);
-                this.lists = (lists || []).sort(listOrder);
-                if (this.selectedListId && !this.lists.some((list) => list.id === this.selectedListId)) {
+                this.lists = (await ListFavoriteLists() || []).sort(listOrder);
+                if (this.selectedListId && !this.selectedList) {
                     this.closeSelectedList();
                 }
                 if (this.selectedListId) {
@@ -180,11 +164,11 @@ export const useFavoritesStore = defineStore("favorites", {
             await this.loadItems(listId);
         },
         async createList(name: string) {
-            const list = await CreateFavoriteList(name);
+            const list = await CreateFavoriteList(name, this.displayMinecraftVersion, this.displayModLoader);
             if (!list?.id) return null;
             this.lists = [...this.lists, list].sort(listOrder);
             this.selectedListId = list.id;
-            await this.loadLists();
+            this.contents = null;
             this.items = [];
             return list;
         },
@@ -201,24 +185,6 @@ export const useFavoritesStore = defineStore("favorites", {
             if (this.selectedListId === listId) {
                 this.closeSelectedList();
             }
-            return true;
-        },
-        async createGroup(name: string) {
-            const group = await CreateFavoriteGroup(name);
-            if (!group?.id) return null;
-            this.groups = [...this.groups, group].sort(groupOrder);
-            return group;
-        },
-        async renameGroup(groupId: string, name: string) {
-            const group = await RenameFavoriteGroup(groupId, name);
-            if (!group?.id) return null;
-            this.groups = this.groups.map((item) => (item.id === group.id ? group : item)).sort(groupOrder);
-            return group;
-        },
-        async deleteGroup(groupId: string) {
-            const ok = await DeleteFavoriteGroup(groupId);
-            if (!ok) return false;
-            await this.loadLists();
             return true;
         },
         async updateListMetadata(list: storage.FavoriteList, patch: Partial<storage.FavoriteList>) {
@@ -250,21 +216,11 @@ export const useFavoritesStore = defineStore("favorites", {
                 iconUrl: "",
             });
         },
-        async setListGroup(list: storage.FavoriteList, groupId: string) {
-            return this.updateListMetadata(list, { groupId });
-        },
         async setListPinned(list: storage.FavoriteList, pinned: boolean) {
             return this.updateListMetadata(list, { pinned });
         },
         async reorderLists(ids: string[]) {
             const ok = await ReorderFavoriteLists(ids);
-            if (ok) {
-                await this.loadLists();
-            }
-            return ok;
-        },
-        async reorderGroups(ids: string[]) {
-            const ok = await ReorderFavoriteGroups(ids);
             if (ok) {
                 await this.loadLists();
             }

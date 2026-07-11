@@ -1,0 +1,31 @@
+{
+  "id": "complete-mod-downloader-issues",
+  "name": "complete-mod-downloader-issues",
+  "title": "Complete mod-downloader issues",
+  "description": "Complete all 29 prioritized issues mirrored from the exact mod-downloader Microsoft To Do list",
+  "status": "in_progress",
+  "dev_type": "fullstack",
+  "scope": "app and core",
+  "package": "app",
+  "priority": "P2",
+  "creator": "link-fgfgui",
+  "assignee": "link-fgfgui",
+  "createdAt": "2026-07-11",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "master",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "issues.md",
+    "frontend/src/",
+    "app.go",
+    "core/"
+  ],
+  "notes": "Single Trellis task by explicit user request; do not split into child tasks.",
+  "meta": {}
+}

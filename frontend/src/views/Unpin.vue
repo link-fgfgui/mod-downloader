@@ -4,20 +4,12 @@
             <v-col cols="12" md="auto">
                 <h1 class="text-h5">{{ $t('unpin.title') }}</h1>
             </v-col>
-            <v-col cols="12" md="auto" class="unpin-filter-row">
-                <v-text-field v-model="pinnedModsStore.filterPlatform" :label="$t('unpin.columns.platform')"
-                    class="unpin-filter-field" density="compact" hide-details clearable />
-                <v-text-field v-model="pinnedModsStore.filterMinecraftVersion" :label="$t('unpin.columns.minecraftVersion')"
-                    class="unpin-filter-field unpin-filter-field-wide" density="compact" hide-details clearable />
-                <v-text-field v-model="pinnedModsStore.filterModLoader" :label="$t('unpin.columns.modLoader')"
-                    class="unpin-filter-field" density="compact" hide-details clearable />
-            </v-col>
             <v-col cols="12" md="auto" class="unpin-action-row ml-auto">
                 <v-btn :loading="pinnedModsStore.isLoading" variant="outlined" prepend-icon="mdi-refresh"
                     @click="pinnedModsStore.load()">
                     {{ $t('unpin.refresh') }}
                 </v-btn>
-                <v-btn :disabled="!pinnedModsStore.filteredPins.length" color="error" prepend-icon="mdi-pin-off"
+                <v-btn :disabled="!pinnedModsStore.pins.length" color="error" prepend-icon="mdi-pin-off"
                     @click="confirmAll = true">
                     {{ $t('unpin.unpinAll') }}
                 </v-btn>
@@ -31,7 +23,7 @@
         </v-alert>
 
         <div v-else class="unpin-table-wrap">
-            <v-data-table :items="pinnedModsStore.filteredPins" :headers="headers" density="compact"
+            <v-data-table :items="pinnedModsStore.pins" :headers="headers" density="compact"
                 class="unpin-table elevation-1" hide-default-footer :items-per-page="-1">
                 <template #[actionsSlotName]="{ item }">
                     <v-btn :loading="pinnedModsStore.pendingUnpinKeys.has(pinnedModsStore.pinKey(item))"
@@ -101,26 +93,16 @@ async function unpin(pin: storage.PinnedMod) {
 
 async function unpinAll() {
     confirmAll.value = false;
-    await pinnedModsStore.unpinAllFiltered();
+    await pinnedModsStore.unpinAll();
     await pinnedModsStore.load();
 }
 </script>
 
 <style scoped>
-.unpin-filter-row,
 .unpin-action-row {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-}
-
-.unpin-filter-field {
-    flex: 1 1 140px;
-    min-width: 0;
-}
-
-.unpin-filter-field-wide {
-    flex-basis: 160px;
 }
 
 .unpin-action-row {

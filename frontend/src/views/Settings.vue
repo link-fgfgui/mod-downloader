@@ -24,7 +24,8 @@
                             {{ $t('settings.animations.mode') }}
                         </div>
                         <v-btn-toggle v-model="settingsStore.draftAnimationMode" color="primary" density="comfortable"
-                            divided mandatory variant="outlined" class="animation-mode-toggle mb-3">
+                            divided mandatory variant="outlined" class="animation-mode-toggle mb-3"
+                            @update:model-value="settingsStore.scheduleAutoSave('animations')">
                             <v-btn :value="animationModeOff" size="small">
                                 {{ $t('settings.animations.modes.off') }}
                             </v-btn>
@@ -38,16 +39,14 @@
                         <div class="d-flex align-center gap-2 mb-3">
                             <v-slider v-model="settingsStore.draftAnimationDurationMultiplier"
                                 :disabled="animationsDisabled" :min="minAnimationDurationMultiplier"
-                                :max="maxAnimationDurationMultiplier" :step="0.25" density="compact" hide-details />
+                                :max="maxAnimationDurationMultiplier" :step="0.25" density="compact" hide-details
+                                @update:model-value="settingsStore.scheduleAutoSave('animations')" />
                             <v-text-field v-model.number="settingsStore.draftAnimationDurationMultiplier"
                                 :disabled="animationsDisabled" type="number"
                                 :min="minAnimationDurationMultiplier" :max="maxAnimationDurationMultiplier"
-                                step="0.25" suffix="x" density="compact" hide-details class="multiplier-input" />
+                                step="0.25" suffix="x" density="compact" hide-details class="multiplier-input"
+                                @update:model-value="settingsStore.scheduleAutoSave('animations')" />
                         </div>
-                        <v-btn :loading="settingsStore.isSavingAnimations" variant="outlined"
-                            prepend-icon="mdi-content-save" @click="saveAnimations">
-                            {{ $t('settings.animations.save') }}
-                        </v-btn>
                     </v-card-text>
                 </v-card>
 
@@ -60,44 +59,14 @@
                             density="comfortable"
                             hide-details
                             :label="$t('settings.cleanup.autoScan')"
+                            @update:model-value="settingsStore.scheduleAutoSave('cleanup')"
                         />
-                        <v-btn
-                            :loading="settingsStore.isSavingUnusedDependencyCleanup"
-                            variant="outlined"
-                            prepend-icon="mdi-content-save"
-                            class="mt-3"
-                            @click="saveCleanup"
-                        >
-                            {{ $t('settings.cleanup.save') }}
-                        </v-btn>
-                    </v-card-text>
-                </v-card>
-
-                <v-card class="mb-4">
-                    <v-card-title>{{ $t('settings.minecraftDir.label') }}</v-card-title>
-                    <v-card-text>
-                        <v-text-field :model-value="settingsStore.view?.minecraftDir" readonly density="compact"
-                            hide-details class="mb-2" />
-                        <div class="settings-action-row settings-action-row--center">
-                            <v-btn :loading="settingsStore.isChoosingDir" variant="outlined"
-                                prepend-icon="mdi-folder-open" @click="chooseDir">
-                                {{ $t('settings.minecraftDir.choose') }}
-                            </v-btn>
-                            <v-btn :loading="settingsStore.isValidatingDir" variant="text" prepend-icon="mdi-check-circle"
-                                @click="settingsStore.validateDir()">
-                                {{ $t('settings.minecraftDir.valid') }}
-                            </v-btn>
-                            <v-icon v-if="settingsStore.dirValid === true" color="success">mdi-check</v-icon>
-                            <v-icon v-else-if="settingsStore.dirValid === false" color="error">mdi-close</v-icon>
-                        </div>
                     </v-card-text>
                 </v-card>
 
                 <v-card class="mb-4">
                     <v-card-title>{{ $t('settings.cacheDir.label') }}</v-card-title>
                     <v-card-text>
-                        <v-text-field :model-value="settingsStore.view?.cacheDir || $t('settings.cacheDir.default')"
-                            readonly density="compact" hide-details class="mb-2" />
                         <v-text-field :model-value="settingsStore.view?.cachePath"
                             :label="$t('settings.cacheDir.path')" readonly density="compact" hide-details
                             class="mb-2" />
@@ -122,11 +91,23 @@
                     <v-card-subtitle>{{ $t('settings.mcim.hint') }}</v-card-subtitle>
                     <v-card-text>
                         <v-switch v-model="settingsStore.draftMCIMEnabled" color="primary" density="comfortable"
-                            hide-details :label="$t('settings.mcim.useMirror')" />
-                        <v-btn :loading="settingsStore.isSavingMCIM" variant="outlined"
-                            prepend-icon="mdi-content-save" class="mt-3" @click="saveMCIM">
-                            {{ $t('settings.mcim.save') }}
-                        </v-btn>
+                            hide-details :label="$t('settings.mcim.useMirror')"
+                            @update:model-value="settingsStore.scheduleAutoSave('mcim')" />
+                    </v-card-text>
+                </v-card>
+
+                <v-card class="mb-4">
+                    <v-card-title>{{ $t('settings.network.label') }}</v-card-title>
+                    <v-card-text class="network-settings-grid">
+                        <v-number-input v-model="settingsStore.draftFileConcurrency" :min="1" :max="32"
+                            :label="$t('settings.network.fileConcurrency')" control-variant="stacked" hide-details
+                            @update:model-value="settingsStore.scheduleAutoSave('network')"></v-number-input>
+                        <v-number-input v-model="settingsStore.draftConcurrentDownloads" :min="1" :max="16"
+                            :label="$t('settings.network.concurrentDownloads')" control-variant="stacked" hide-details
+                            @update:model-value="settingsStore.scheduleAutoSave('network')"></v-number-input>
+                        <v-number-input v-model="settingsStore.draftRequestsPerSecond" :min="0" :max="100"
+                            :label="$t('settings.network.requestsPerSecond')" control-variant="stacked" hide-details
+                            @update:model-value="settingsStore.scheduleAutoSave('network')"></v-number-input>
                     </v-card-text>
                 </v-card>
 
@@ -144,12 +125,8 @@
                         </div>
                         <v-text-field v-model="settingsStore.draftCurseforgeKey"
                             :label="$t('settings.apiKeys.curseforge.placeholder')" type="password" density="compact"
-                            hide-details class="mb-2" />
+                            hide-details class="mb-2" @update:model-value="settingsStore.scheduleAutoSave('keys', 900)" />
                         <div class="settings-action-row">
-                            <v-btn :loading="settingsStore.isSavingKeys" variant="outlined"
-                                prepend-icon="mdi-content-save" @click="saveKeys">
-                                {{ $t('settings.apiKeys.curseforge.save') }}
-                            </v-btn>
                             <v-btn :disabled="!settingsStore.hasCurseforgeKey" :loading="settingsStore.isSavingKeys"
                                 variant="text" color="error" prepend-icon="mdi-delete" @click="clearCurseforge">
                                 {{ $t('settings.apiKeys.curseforge.clear') }}
@@ -172,12 +149,8 @@
                         </div>
                         <v-text-field v-model="settingsStore.draftModrinthKey"
                             :label="$t('settings.apiKeys.modrinth.placeholder')" type="password" density="compact"
-                            hide-details class="mb-2" />
+                            hide-details class="mb-2" @update:model-value="settingsStore.scheduleAutoSave('keys', 900)" />
                         <div class="settings-action-row">
-                            <v-btn :loading="settingsStore.isSavingKeys" variant="outlined"
-                                prepend-icon="mdi-content-save" @click="saveKeys">
-                                {{ $t('settings.apiKeys.modrinth.save') }}
-                            </v-btn>
                             <v-btn :disabled="!settingsStore.hasModrinthKey" :loading="settingsStore.isSavingKeys"
                                 variant="text" color="error" prepend-icon="mdi-delete" @click="clearModrinth">
                                 {{ $t('settings.apiKeys.modrinth.clear') }}
@@ -191,11 +164,14 @@
         <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="2000">
             {{ snackbar.message }}
         </v-snackbar>
+        <v-snackbar :model-value="Boolean(settingsStore.autoSaveError)" color="error" timeout="4000">
+            {{ settingsStore.autoSaveError }}
+        </v-snackbar>
     </v-container>
 </template>
 
 <script setup lang="ts">
-import { computed, onActivated, ref } from "vue";
+import { computed, onActivated, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useSettingsStore } from "../stores/settings";
 import { applyVuetifyTheme } from "../composables/useTheme";
@@ -217,30 +193,14 @@ onActivated(() => {
     void settingsStore.load();
 });
 
+watch(() => settingsStore.view?.animationMode, () => {
+    if (settingsStore.view) applyAnimationSettings(settingsStore.view);
+});
+
 async function onThemeChange() {
     const next = await settingsStore.saveTheme();
     applyVuetifyTheme(next);
     snackbar.value = { show: true, message: t('settings.theme.saved'), color: "success" };
-}
-
-async function saveAnimations() {
-    const next = await settingsStore.saveAnimationSettings();
-    applyAnimationSettings(next);
-    snackbar.value = { show: true, message: t('settings.animations.saved'), color: "success" };
-}
-
-async function saveCleanup() {
-    await settingsStore.saveUnusedDependencyCleanupSettings();
-    snackbar.value = { show: true, message: t('settings.cleanup.saved'), color: "success" };
-}
-
-async function saveMCIM() {
-    await settingsStore.saveMCIMSettings();
-    snackbar.value = { show: true, message: t('settings.mcim.saved'), color: "success" };
-}
-
-async function chooseDir() {
-    await settingsStore.chooseMinecraftDir();
 }
 
 async function chooseCacheDir() {
@@ -317,5 +277,10 @@ function clearModrinth() {
 .animation-mode-toggle :deep(.v-btn) {
     flex: 1 1 0;
     min-width: 0;
+}
+
+.network-settings-grid {
+    display: grid;
+    gap: 12px;
 }
 </style>

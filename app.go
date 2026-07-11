@@ -26,6 +26,7 @@ const downloadStatesUpdatedEvent = "download-states-updated"
 const downloadQueueUpdatedEvent = "download-queue-updated"
 const downloadFailedEvent = "download-failed"
 const downloadCompletedEvent = "download-completed"
+const usageStatsUpdatedEvent = "usage-stats-updated"
 
 // App struct
 type App struct {
@@ -114,6 +115,8 @@ func (a *App) emitCoreEvent(event appcore.Event) {
 		eventName = minecraftDirChangedEvent
 	case appcore.EventSelectedVersionChanged:
 		eventName = selectedVersionChangedEvent
+	case appcore.EventUsageStatsUpdated:
+		eventName = usageStatsUpdatedEvent
 	default:
 		return
 	}
@@ -171,8 +174,8 @@ func (a *App) ListFavoriteLists() []storage.FavoriteList {
 	return a.service().ListFavoriteLists()
 }
 
-func (a *App) CreateFavoriteList(name string) storage.FavoriteList {
-	return a.service().CreateFavoriteList(name)
+func (a *App) CreateFavoriteList(name, minecraftVersion, modLoader string) storage.FavoriteList {
+	return a.service().CreateFavoriteListForScope(name, minecraftVersion, modLoader)
 }
 
 func (a *App) RenameFavoriteList(id, name string) storage.FavoriteList {
@@ -189,26 +192,6 @@ func (a *App) UpdateFavoriteListMetadata(list storage.FavoriteList) storage.Favo
 
 func (a *App) ReorderFavoriteLists(ids []string) bool {
 	return a.service().ReorderFavoriteLists(ids)
-}
-
-func (a *App) ListFavoriteGroups() []storage.FavoriteGroup {
-	return a.service().ListFavoriteGroups()
-}
-
-func (a *App) CreateFavoriteGroup(name string) storage.FavoriteGroup {
-	return a.service().CreateFavoriteGroup(name)
-}
-
-func (a *App) RenameFavoriteGroup(id, name string) storage.FavoriteGroup {
-	return a.service().RenameFavoriteGroup(id, name)
-}
-
-func (a *App) DeleteFavoriteGroup(id string) bool {
-	return a.service().DeleteFavoriteGroup(id)
-}
-
-func (a *App) ReorderFavoriteGroups(ids []string) bool {
-	return a.service().ReorderFavoriteGroups(ids)
 }
 
 func (a *App) ListFavoriteMods(listID string) []storage.FavoriteMod {
@@ -313,6 +296,9 @@ type SettingsView struct {
 	CurseforgeKeyMask           string  `json:"curseforgeKeyMask"` // e.g. "abcd****wxyz" or ""
 	HasModrinthKey              bool    `json:"hasModrinthKey"`
 	ModrinthKeyMask             string  `json:"modrinthKeyMask"`
+	FileConcurrency             int     `json:"fileConcurrency"`
+	ConcurrentDownloads         int     `json:"concurrentDownloads"`
+	RequestsPerSecond           int     `json:"requestsPerSecond"`
 }
 
 // SaveApiKeysRequest is the request structure for the frontend to save API keys.
@@ -338,6 +324,12 @@ type SaveUnusedDependencyCleanupSettingsRequest struct {
 
 type SaveMCIMSettingsRequest struct {
 	MCIMEnabled bool `json:"mcimEnabled"`
+}
+
+type SaveNetworkSettingsRequest struct {
+	FileConcurrency     int `json:"fileConcurrency"`
+	ConcurrentDownloads int `json:"concurrentDownloads"`
+	RequestsPerSecond   int `json:"requestsPerSecond"`
 }
 
 // Convention: a field value of "<keep>" means do not modify the original value (since the frontend cannot access plaintext).
@@ -382,6 +374,16 @@ func (a *App) SaveUnusedDependencyCleanupSettings(req SaveUnusedDependencyCleanu
 
 func (a *App) SaveMCIMSettings(req SaveMCIMSettingsRequest) SettingsView {
 	next := a.service().SaveMCIMSettings(appcore.SaveMCIMSettingsRequest{MCIMEnabled: req.MCIMEnabled})
+	a.config = a.core.Config()
+	return settingsViewFromCore(next)
+}
+
+func (a *App) SaveNetworkSettings(req SaveNetworkSettingsRequest) SettingsView {
+	next := a.service().SaveNetworkSettings(appcore.SaveNetworkSettingsRequest{
+		FileConcurrency:     req.FileConcurrency,
+		ConcurrentDownloads: req.ConcurrentDownloads,
+		RequestsPerSecond:   req.RequestsPerSecond,
+	})
 	a.config = a.core.Config()
 	return settingsViewFromCore(next)
 }
@@ -547,6 +549,9 @@ func settingsViewFromCore(sv appcore.SettingsView) SettingsView {
 		CurseforgeKeyMask:           sv.CurseforgeKeyMask,
 		HasModrinthKey:              sv.HasModrinthKey,
 		ModrinthKeyMask:             sv.ModrinthKeyMask,
+		FileConcurrency:             sv.FileConcurrency,
+		ConcurrentDownloads:         sv.ConcurrentDownloads,
+		RequestsPerSecond:           sv.RequestsPerSecond,
 	}
 }
 

@@ -31,6 +31,8 @@ type AnimationMode = typeof animationModeOff | typeof animationModeVuetify | typ
 type AnimationDirection = "up" | "down";
 
 const activeAnimationMode = ref<AnimationMode>(defaultAnimationMode);
+const activeGsapElements = new Set<Element>();
+const pendingGsapDone = new Map<Element, () => void>();
 
 export type AnimationSettings = {
     animationMode?: string;
@@ -74,6 +76,7 @@ export function applyAnimationSettings(settings?: AnimationSettings | null) {
     const mode = normalizeAnimationMode(settings?.animationMode, settings?.animationEnabled);
     const multiplier = normalizeAnimationDurationMultiplier(settings?.animationDurationMultiplier);
 
+    if (activeAnimationMode.value !== mode) cleanupActiveGsapAnimations();
     activeAnimationMode.value = mode;
     root.dataset.mdAnimations = mode;
     root.dataset.mdAnimationMode = mode;
@@ -100,6 +103,29 @@ function clearGsapProps(el: Element | Element[]) {
     gsap.set(el, { clearProps: "opacity,transform,scale,rotation" });
 }
 
+function trackGsapElements(elements: Element[]) {
+    elements.forEach((element) => activeGsapElements.add(element));
+}
+
+function finishGsapAnimation(root: Element, elements: Element[], done?: () => void) {
+    clearGsapProps(elements);
+    elements.forEach((element) => activeGsapElements.delete(element));
+    pendingGsapDone.delete(root);
+    done?.();
+}
+
+export function cleanupActiveGsapAnimations() {
+    const elements = [...activeGsapElements];
+    if (elements.length > 0) {
+        gsap.killTweensOf(elements);
+        clearGsapProps(elements);
+    }
+    activeGsapElements.clear();
+    const callbacks = [...new Set(pendingGsapDone.values())];
+    pendingGsapDone.clear();
+    callbacks.forEach((done) => done());
+}
+
 function getPageContentTargets(root: Element, selector = pageContentSelector): Element[] {
     return Array.from(root.querySelectorAll(selector));
 }
@@ -116,21 +142,22 @@ function routeAnimationTargets(el: Element): Element[] {
 }
 
 export function beforeGsapRouteEnter(el: Element) {
-    const targets = getVisiblePageContentTargets(el);
-    gsap.killTweensOf([el, ...targets]);
+    const targets = [el, ...getVisiblePageContentTargets(el)];
+    gsap.killTweensOf(targets);
+    trackGsapElements(targets);
     gsap.set(el, { opacity: 0 });
-    if (targets.length > 0) {
-        gsap.set(targets, { opacity: 0, y: 24, scale: 0.985 });
+    if (targets.length > 1) {
+        gsap.set(targets.slice(1), { opacity: 0, y: 24, scale: 0.985 });
     }
 }
 
 export function enterGsapRoute(el: Element, done: () => void) {
     const targets = getVisiblePageContentTargets(el);
+    const allTargets = [el, ...targets];
+    trackGsapElements(allTargets);
+    pendingGsapDone.set(el, done);
     const timeline = gsap.timeline({
-        onComplete: () => {
-            clearGsapProps([el, ...targets]);
-            done();
-        },
+        onComplete: () => finishGsapAnimation(el, allTargets, done),
     });
 
     timeline.to(el, {
@@ -157,45 +184,49 @@ export function enterGsapRoute(el: Element, done: () => void) {
 export function leaveGsapRoute(el: Element, done: () => void) {
     const targets = routeAnimationTargets(el);
     gsap.killTweensOf(targets);
+    trackGsapElements(targets);
+    pendingGsapDone.set(el, done);
     gsap.to(el, {
         opacity: 0,
         duration: gsapDuration(0.26),
         ease: "power2.in",
-        onComplete: done,
+        onComplete: () => finishGsapAnimation(el, targets, done),
     });
 }
 
 export function afterGsapRouteLeave(el: Element) {
-    clearGsapProps(routeAnimationTargets(el));
+    finishGsapAnimation(el, routeAnimationTargets(el));
 }
 
 export function beforeGsapFabEnter(el: Element) {
     gsap.killTweensOf(el);
+    trackGsapElements([el]);
     gsap.set(el, { opacity: 0, scale: 0, rotation: -90 });
 }
 
 export function enterGsapFab(el: Element, done: () => void) {
+    trackGsapElements([el]);
+    pendingGsapDone.set(el, done);
     gsap.to(el, {
         opacity: 1,
         scale: 1,
         rotation: 0,
         duration: gsapDuration(0.48),
         ease: "back.out(1.8)",
-        onComplete: () => {
-            clearGsapProps(el);
-            done();
-        },
+        onComplete: () => finishGsapAnimation(el, [el], done),
     });
 }
 
 export function leaveGsapFab(el: Element, done: () => void) {
+    trackGsapElements([el]);
+    pendingGsapDone.set(el, done);
     gsap.to(el, {
         opacity: 0,
         scale: 0.5,
         rotation: 45,
         duration: gsapDuration(0.22),
         ease: "power2.in",
-        onComplete: done,
+        onComplete: () => finishGsapAnimation(el, [el], done),
     });
 }
 
@@ -218,6 +249,7 @@ export function animateGsapPageContent(
     if (targets.length === 0) return gsap.timeline();
 
     gsap.killTweensOf(targets);
+    trackGsapElements(targets);
 
     const fromY = options?.from === "down" ? -20 : 24;
     return gsap.fromTo(
@@ -234,6 +266,7 @@ export function animateGsapPageContent(
                 from: "start",
             },
             clearProps: "opacity,transform,scale",
+            onComplete: () => targets.forEach((target) => activeGsapElements.delete(target)),
         },
     );
 }
@@ -256,6 +289,12 @@ export function useGsapPageAnimations(
 
     const cleanup = () => {
         ctx?.revert();
+        if (containerRef.value) {
+            const targets = [containerRef.value, ...getPageContentTargets(containerRef.value, options?.selector ?? pageContentSelector)];
+            gsap.killTweensOf(targets);
+            clearGsapProps(targets);
+            targets.forEach((target) => activeGsapElements.delete(target));
+        }
         ctx = null;
     };
 

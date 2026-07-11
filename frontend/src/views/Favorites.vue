@@ -4,7 +4,6 @@
             <div class="favorites-rail-header">
                 <h1 class="text-h6 font-weight-medium">{{ $t("favorites.title") }}</h1>
                 <div class="rail-actions">
-                    <v-btn v-if="favoritesStore.lists.length" icon="mdi-folder-plus" size="small" variant="text" @click="openGroupEdit()"></v-btn>
                     <v-btn icon="mdi-plus" size="small" variant="tonal" @click="openListEdit()"></v-btn>
                 </div>
             </div>
@@ -21,16 +20,18 @@
                         <v-list-item
                             v-for="pinnedList in favoritesStore.pinnedLists"
                             :key="pinnedList.id"
-                            class="favorite-list-row"
+                            :class="['favorite-list-row', { 'favorite-list-row--drop-before': dropTargetId === pinnedList.id }]"
                             :active="pinnedList.id === favoritesStore.selectedListId"
                             :title="pinnedList.name"
-                            draggable="true"
                             @click="favoritesStore.selectList(pinnedList.id)"
-                            @dragstart.stop="onListDragStart(pinnedList.id)"
-                            @dragover.prevent
-                            @drop="onListDrop(pinnedList.id, favoritesStore.pinnedLists, null, true)"
+                            @contextmenu.prevent.stop="openListMenu(pinnedList, $event)"
+                            @dragover.prevent="onListDragOver(pinnedList.id, $event)"
+                            @dragleave="onListDragLeave(pinnedList.id)"
+                            @drop="onListDrop(pinnedList.id, favoritesStore.pinnedLists, null, true, $event)"
                         >
                             <template #prepend>
+                                <v-icon class="favorite-drag-handle me-2" draggable="true" icon="mdi-drag"
+                                    size="16" @dragstart.stop="onListDragStart(pinnedList, $event)" @dragend="onListDragEnd"></v-icon>
                                 <v-avatar class="list-avatar" rounded="lg" size="24">
                                     <v-img v-if="listIconUrl(pinnedList)" :src="listIconUrl(pinnedList)" :alt="pinnedList.name"></v-img>
                                     <v-icon v-else :icon="listIconName(pinnedList)" size="20"></v-icon>
@@ -39,27 +40,14 @@
                             <template #append>
                                 <div class="row-actions">
                                     <v-icon icon="mdi-pin" size="14"></v-icon>
-                                    <v-menu>
-                                        <template #activator="{ props }">
-                                            <v-btn v-bind="props" icon="mdi-dots-vertical" size="x-small" variant="text" @click.stop></v-btn>
-                                        </template>
-                                        <v-list density="compact">
-                                            <v-list-item prepend-icon="mdi-pencil" :title="$t('favorites.actions.rename')" @click="openListEdit(pinnedList)"></v-list-item>
-                                            <v-list-item prepend-icon="mdi-pin-off" :title="$t('favorites.actions.unpin')" @click="favoritesStore.setListPinned(pinnedList, false)"></v-list-item>
-                                            <v-list-item prepend-icon="mdi-palette" :title="$t('favorites.actions.customize')" @click="openMetadata(pinnedList)"></v-list-item>
-                                            <v-list-item prepend-icon="mdi-content-copy" :title="$t('favorites.actions.copyList')" @click="openListCopy(pinnedList)"></v-list-item>
-                                            <v-list-item prepend-icon="mdi-link-variant" :title="$t('favorites.actions.referenceList')" @click="openReference(pinnedList)"></v-list-item>
-                                            <v-list-item prepend-icon="mdi-swap-horizontal" :title="$t('favorites.actions.migrate')" @click="openMigration(pinnedList)"></v-list-item>
-                                            <v-list-item prepend-icon="mdi-delete" :title="$t('favorites.actions.delete')" @click="openDelete(pinnedList)"></v-list-item>
-                                        </v-list>
-                                    </v-menu>
+                                    <v-btn icon="mdi-dots-vertical" size="x-small" variant="text" @click.stop="openListMenu(pinnedList, $event)"></v-btn>
                                 </div>
                             </template>
                         </v-list-item>
                     </v-list>
                 </section>
 
-                <section class="rail-section" @dragover.prevent @drop="onListSectionDrop('')">
+                <section class="rail-section" @dragover.prevent="setMoveDropEffect" @drop="onListSectionDrop('', $event)">
                     <div class="rail-section-title">
                         <v-icon icon="mdi-playlist-star" size="14"></v-icon>
                         {{ $t("favorites.sections.lists") }}
@@ -68,16 +56,18 @@
                         <v-list-item
                             v-for="looseList in favoritesStore.ungroupedLists"
                             :key="looseList.id"
-                            class="favorite-list-row"
+                            :class="['favorite-list-row', { 'favorite-list-row--drop-before': dropTargetId === looseList.id }]"
                             :active="looseList.id === favoritesStore.selectedListId"
                             :title="looseList.name"
-                            draggable="true"
                             @click="favoritesStore.selectList(looseList.id)"
-                            @dragstart.stop="onListDragStart(looseList.id)"
-                            @dragover.prevent
-                            @drop.stop="onListDrop(looseList.id, favoritesStore.ungroupedLists, '')"
+                            @contextmenu.prevent.stop="openListMenu(looseList, $event)"
+                            @dragover.prevent="onListDragOver(looseList.id, $event)"
+                            @dragleave="onListDragLeave(looseList.id)"
+                            @drop.stop="onListDrop(looseList.id, favoritesStore.ungroupedLists, '', false, $event)"
                         >
                             <template #prepend>
+                                <v-icon class="favorite-drag-handle me-2" draggable="true" icon="mdi-drag"
+                                    size="16" @dragstart.stop="onListDragStart(looseList, $event)" @dragend="onListDragEnd"></v-icon>
                                 <v-avatar class="list-avatar" rounded="lg" size="24">
                                     <v-img v-if="listIconUrl(looseList)" :src="listIconUrl(looseList)" :alt="looseList.name"></v-img>
                                     <v-icon v-else :icon="listIconName(looseList)" size="20"></v-icon>
@@ -85,89 +75,30 @@
                             </template>
                             <template #append>
                                 <div class="row-actions">
-                                    <v-menu>
-                                        <template #activator="{ props }">
-                                            <v-btn v-bind="props" icon="mdi-dots-vertical" size="x-small" variant="text" @click.stop></v-btn>
-                                        </template>
-                                        <v-list density="compact">
-                                            <v-list-item prepend-icon="mdi-pencil" :title="$t('favorites.actions.rename')" @click="openListEdit(looseList)"></v-list-item>
-                                            <v-list-item prepend-icon="mdi-pin" :title="$t('favorites.actions.pin')" @click="favoritesStore.setListPinned(looseList, true)"></v-list-item>
-                                            <v-list-item prepend-icon="mdi-palette" :title="$t('favorites.actions.customize')" @click="openMetadata(looseList)"></v-list-item>
-                                            <v-list-item prepend-icon="mdi-content-copy" :title="$t('favorites.actions.copyList')" @click="openListCopy(looseList)"></v-list-item>
-                                            <v-list-item prepend-icon="mdi-link-variant" :title="$t('favorites.actions.referenceList')" @click="openReference(looseList)"></v-list-item>
-                                            <v-list-item prepend-icon="mdi-swap-horizontal" :title="$t('favorites.actions.migrate')" @click="openMigration(looseList)"></v-list-item>
-                                            <v-list-item prepend-icon="mdi-delete" :title="$t('favorites.actions.delete')" @click="openDelete(looseList)"></v-list-item>
-                                        </v-list>
-                                    </v-menu>
+                                    <v-btn icon="mdi-dots-vertical" size="x-small" variant="text" @click.stop="openListMenu(looseList, $event)"></v-btn>
                                 </div>
                             </template>
                         </v-list-item>
                     </v-list>
                 </section>
 
-                <section
-                    v-for="group in favoritesStore.sortedGroups"
-                    :key="group.id"
-                    class="rail-section"
-                    @dragover.prevent
-                    @drop="onSectionDrop(group.id)"
-                >
-                    <div class="rail-section-title group-title" draggable="true" @dragstart="onGroupDragStart(group.id)">
-                        <v-icon icon="mdi-drag" size="14"></v-icon>
-                        <span>{{ group.name }}</span>
-                        <v-menu>
-                            <template #activator="{ props }">
-                                <v-btn v-bind="props" icon="mdi-dots-horizontal" size="x-small" variant="text"></v-btn>
-                            </template>
-                            <v-list density="compact">
-                                <v-list-item prepend-icon="mdi-pencil" :title="$t('favorites.actions.rename')" @click="openGroupEdit(group)"></v-list-item>
-                                <v-list-item prepend-icon="mdi-delete" :title="$t('favorites.actions.delete')" @click="deleteGroup(group)"></v-list-item>
-                            </v-list>
-                        </v-menu>
-                    </div>
-                    <v-list v-if="favoritesStore.groupedLists[group.id]?.length" density="compact" nav>
-                        <v-list-item
-                            v-for="groupedList in favoritesStore.groupedLists[group.id]"
-                            :key="groupedList.id"
-                            class="favorite-list-row"
-                            :active="groupedList.id === favoritesStore.selectedListId"
-                            :title="groupedList.name"
-                            draggable="true"
-                            @click="favoritesStore.selectList(groupedList.id)"
-                            @dragstart.stop="onListDragStart(groupedList.id)"
-                            @dragover.prevent
-                            @drop.stop="onListDrop(groupedList.id, favoritesStore.groupedLists[group.id], group.id)"
-                        >
-                            <template #prepend>
-                                <v-avatar class="list-avatar" rounded="lg" size="24">
-                                    <v-img v-if="listIconUrl(groupedList)" :src="listIconUrl(groupedList)" :alt="groupedList.name"></v-img>
-                                    <v-icon v-else :icon="listIconName(groupedList)" size="20"></v-icon>
-                                </v-avatar>
-                            </template>
-                            <template #append>
-                                <div class="row-actions">
-                                    <v-menu>
-                                        <template #activator="{ props }">
-                                            <v-btn v-bind="props" icon="mdi-dots-vertical" size="x-small" variant="text" @click.stop></v-btn>
-                                        </template>
-                                        <v-list density="compact">
-                                            <v-list-item prepend-icon="mdi-pencil" :title="$t('favorites.actions.rename')" @click="openListEdit(groupedList)"></v-list-item>
-                                            <v-list-item prepend-icon="mdi-pin" :title="$t('favorites.actions.pin')" @click="favoritesStore.setListPinned(groupedList, true)"></v-list-item>
-                                            <v-list-item prepend-icon="mdi-palette" :title="$t('favorites.actions.customize')" @click="openMetadata(groupedList)"></v-list-item>
-                                            <v-list-item prepend-icon="mdi-content-copy" :title="$t('favorites.actions.copyList')" @click="openListCopy(groupedList)"></v-list-item>
-                                            <v-list-item prepend-icon="mdi-link-variant" :title="$t('favorites.actions.referenceList')" @click="openReference(groupedList)"></v-list-item>
-                                            <v-list-item prepend-icon="mdi-swap-horizontal" :title="$t('favorites.actions.migrate')" @click="openMigration(groupedList)"></v-list-item>
-                                            <v-list-item prepend-icon="mdi-delete" :title="$t('favorites.actions.delete')" @click="openDelete(groupedList)"></v-list-item>
-                                        </v-list>
-                                    </v-menu>
-                                </div>
-                            </template>
-                        </v-list-item>
-                    </v-list>
-                </section>
             </div>
 
-            <div v-else class="empty-rail text-body-2 text-medium-emphasis">
+            <v-menu v-model="listMenu.show" :target="listMenu.target">
+                <v-list v-if="listMenu.list" density="compact">
+                    <v-list-item prepend-icon="mdi-pencil" :title="$t('favorites.actions.rename')" @click="openListEdit(listMenu.list)"></v-list-item>
+                    <v-list-item :prepend-icon="listMenu.list.pinned ? 'mdi-pin-off' : 'mdi-pin'"
+                        :title="$t(listMenu.list.pinned ? 'favorites.actions.unpin' : 'favorites.actions.pin')"
+                        @click="favoritesStore.setListPinned(listMenu.list, !listMenu.list.pinned)"></v-list-item>
+                    <v-list-item prepend-icon="mdi-palette" :title="$t('favorites.actions.customize')" @click="openMetadata(listMenu.list)"></v-list-item>
+                    <v-list-item prepend-icon="mdi-content-copy" :title="$t('favorites.actions.copyList')" @click="openListCopy(listMenu.list)"></v-list-item>
+                    <v-list-item prepend-icon="mdi-link-variant" :title="$t('favorites.actions.referenceList')" @click="openReference(listMenu.list)"></v-list-item>
+                    <v-list-item prepend-icon="mdi-swap-horizontal" :title="$t('favorites.actions.migrate')" @click="openMigration(listMenu.list)"></v-list-item>
+                    <v-list-item prepend-icon="mdi-delete" :title="$t('favorites.actions.delete')" @click="openDelete(listMenu.list)"></v-list-item>
+                </v-list>
+            </v-menu>
+
+            <div v-if="!favoritesStore.lists.length" class="empty-rail text-body-2 text-medium-emphasis">
                 {{ $t("favorites.empty.noLists") }}
             </div>
         </aside>
@@ -228,7 +159,8 @@
                         @click="onClick"
                     >
                         <template #prepend>
-                            <v-avatar color="surface-container-high" rounded="lg" size="48" class="me-3">
+                            <v-avatar :class="['me-3', { 'favorite-mod-icon--actionable': canPinItem(item) }]"
+                                color="surface-container-high" rounded="lg" size="48" @click.stop="openPinDialog(item)">
                                 <v-img v-if="item.iconUrl" :src="item.iconUrl" :alt="displayName(item)"></v-img>
                                 <v-icon v-else icon="mdi-package-variant" color="on-surface-variant"></v-icon>
                             </v-avatar>
@@ -256,22 +188,24 @@
                 </template>
 
                 <template #actions="{ selectedItems, clearSelection }">
-                    <v-btn size="small" variant="tonal" prepend-icon="mdi-content-copy" @click="openSelectedCopy(selectedItems, clearSelection)">
-                        {{ $t("favorites.actions.copySelected") }}
-                    </v-btn>
-                    <v-btn
-                        size="small"
-                        variant="tonal"
-                        color="error"
-                        class="ms-1"
-                        prepend-icon="mdi-playlist-remove"
-                        @click="removeSelected(selectedItems, clearSelection)"
-                    >
-                        {{ $t("favorites.actions.removeSelected") }}
-                    </v-btn>
-                    <v-btn size="small" variant="tonal" class="ms-1" prepend-icon="mdi-selection-off" @click="clearSelection()">
-                        {{ $t("download.selection.deselectAll") }}
-                    </v-btn>
+                    <v-tooltip :text="$t('favorites.actions.copySelected')" location="top">
+                        <template #activator="{ props: tip }">
+                            <v-btn v-bind="tip" :aria-label="$t('favorites.actions.copySelected')" icon="mdi-content-copy"
+                                size="small" variant="tonal" @click="openSelectedCopy(selectedItems, clearSelection)"></v-btn>
+                        </template>
+                    </v-tooltip>
+                    <v-tooltip :text="$t('favorites.actions.removeSelected')" location="top">
+                        <template #activator="{ props: tip }">
+                            <v-btn v-bind="tip" :aria-label="$t('favorites.actions.removeSelected')" icon="mdi-playlist-remove"
+                                size="small" variant="tonal" color="error" @click="removeSelected(selectedItems, clearSelection)"></v-btn>
+                        </template>
+                    </v-tooltip>
+                    <v-tooltip :text="$t('download.selection.deselectAll')" location="top">
+                        <template #activator="{ props: tip }">
+                            <v-btn v-bind="tip" :aria-label="$t('download.selection.deselectAll')" icon="mdi-selection-off"
+                                size="small" variant="tonal" @click="clearSelection()"></v-btn>
+                        </template>
+                    </v-tooltip>
                 </template>
             </VirtualList>
         </main>
@@ -290,26 +224,11 @@
             </v-card>
         </v-dialog>
 
-        <v-dialog v-model="groupEdit.show" max-width="420">
-            <v-card>
-                <v-card-title>{{ groupEdit.id ? $t("favorites.dialog.renameGroupTitle") : $t("favorites.dialog.createGroupTitle") }}</v-card-title>
-                <v-card-text>
-                    <v-text-field v-model="groupEdit.name" :label="$t('favorites.dialog.name')" autofocus @keyup.enter.prevent="saveGroup"></v-text-field>
-                </v-card-text>
-                <v-card-actions>
-                    <v-spacer></v-spacer>
-                    <v-btn variant="text" @click="groupEdit.show = false">{{ $t("favorites.actions.cancel") }}</v-btn>
-                    <v-btn color="primary" variant="flat" :disabled="!groupEdit.name.trim()" @click="saveGroup">{{ $t("favorites.actions.save") }}</v-btn>
-                </v-card-actions>
-            </v-card>
-        </v-dialog>
-
         <v-dialog v-model="metadataDialog.show" max-width="520">
             <v-card>
                 <v-card-title>{{ $t("favorites.dialog.customizeTitle") }}</v-card-title>
                 <v-card-text>
-                    <v-select v-model="metadataDialog.groupId" :items="groupOptions" item-title="title" item-value="value" :label="$t('favorites.dialog.group')"></v-select>
-                    <v-switch v-model="metadataDialog.pinned" color="primary" inset :label="$t('favorites.actions.pin')"></v-switch>
+                    <v-switch v-model="metadataDialog.pinned" color="primary" inset density="comfortable" hide-details :label="$t('favorites.actions.pin')"></v-switch>
                     <v-select v-model="metadataDialog.iconKind" :items="iconModeOptions" item-title="title" item-value="value" :label="$t('favorites.dialog.iconMode')"></v-select>
                     <v-text-field v-model="metadataDialog.iconValue" :label="metadataDialog.iconKind === 'mdi' ? $t('favorites.dialog.mdiIcon') : $t('favorites.dialog.projectSlug')"></v-text-field>
                     <v-select v-if="metadataDialog.iconKind === 'project'" v-model="metadataDialog.iconPlatform" :items="platformOptions" :label="$t('favorites.dialog.platform')"></v-select>
@@ -400,6 +319,19 @@
             </v-card>
         </v-dialog>
 
+        <v-dialog v-model="pinDialog.show" max-width="680" @after-leave="clearClosedPinDialog">
+            <v-card class="version-dialog">
+                <v-toolbar density="compact" color="surface">
+                    <v-toolbar-title>{{ displayName(pinDialog.item || {}) }}</v-toolbar-title>
+                    <v-btn icon="mdi-close" variant="text" @click="pinDialog.show = false"></v-btn>
+                </v-toolbar>
+                <v-divider></v-divider>
+                <ModVersionList :versions="pinDialog.versions" :loading="pinDialog.loading" action="pin"
+                    :pinned-version-id="pinDialog.pinnedVersionId" :busy-version-id="pinDialog.busyVersionId"
+                    @select="pinFavoriteVersion"></ModVersionList>
+            </v-card>
+        </v-dialog>
+
         <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="3500">
             {{ snackbar.message }}
         </v-snackbar>
@@ -410,29 +342,28 @@
 import { computed, onActivated, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import MinecraftTargetFields from "../components/MinecraftTargetFields.vue";
+import ModVersionList from "../components/ModVersionList.vue";
 import VirtualList from "../components/VirtualList.vue";
 import { useFavoritesStore } from "../stores/favorites";
 import { useMinecraftStore } from "../stores/minecraft";
+import { GetPinnedModVersion, ListMatchingProjectVersions, PinModVersion } from "../../wailsjs/go/main/App";
 
 const favoritesStore = useFavoritesStore();
 const minecraftStore = useMinecraftStore();
 const { t } = useI18n();
 const selectedList = computed(() => favoritesStore.selectedList);
 const draggedListId = ref("");
-const draggedGroupId = ref("");
+const dropTargetId = ref("");
 const pendingClearSelection = ref(null);
 
 const listEdit = reactive({ show: false, id: "", name: "" });
-const groupEdit = reactive({ show: false, id: "", name: "" });
+const listMenu = reactive({ show: false, list: null, target: null });
 const deleteDialog = reactive({ show: false, list: null });
-const metadataDialog = reactive({ show: false, list: null, groupId: "", pinned: false, iconKind: "mdi", iconValue: "", iconPlatform: "modrinth" });
+const metadataDialog = reactive({ show: false, list: null, pinned: false, iconKind: "mdi", iconValue: "", iconPlatform: "modrinth" });
 const copyDialog = reactive({ show: false, mode: "selected", sourceListId: "", targetListId: "", targetListIds: [], mods: [] });
 const migrationDialog = reactive({ show: false, sourceListId: "", targetListId: "", minecraftVersion: "", modLoader: "", ignoreConflicts: false, preview: null });
+const pinDialog = reactive({ show: false, item: null, versions: [], loading: false, pinnedVersionId: "", busyVersionId: "" });
 
-const groupOptions = computed(() => [
-    { title: t("favorites.sections.ungrouped"), value: "" },
-    ...favoritesStore.sortedGroups.map((group) => ({ title: group.name, value: group.id })),
-]);
 const targetListOptions = computed(() => favoritesStore.lists.map((list) => ({ title: list.name, value: list.id })));
 const iconModeOptions = computed(() => [
     { title: "MDI", value: "mdi" },
@@ -467,10 +398,31 @@ const snackbar = ref({ show: false, message: "", color: "success" });
 
 const itemKey = (item) => favoritesStore.itemKey(item);
 const displayName = (item) => item.title || item.slug || item.modId;
+const canPinItem = (item) => Boolean(item?.platform && item?.modId);
+const projectFromFavorite = (item) => ({
+    id: `${item.platform}:${item.modId}`,
+    platform: item.platform,
+    projectId: item.modId,
+    slug: item.slug || "",
+    title: displayName(item),
+    icon: "mdi-package-variant",
+    iconUrl: item.iconUrl || "",
+    description: item.description || "",
+    downloads: 0,
+    categories: item.categories || [],
+    updatedAt: 0,
+    cachedAt: 0,
+});
 const listIconUrl = (list) => (list?.iconKind === "project" ? list.iconUrl || "" : "");
 const listIconName = (list) => (list?.iconKind === "mdi" && list.iconValue ? list.iconValue : "mdi-playlist-star");
 const showMessage = (message, color = "success") => {
     snackbar.value = { show: true, message, color };
+};
+const openListMenu = (list, event) => {
+    listMenu.show = false;
+    listMenu.list = list;
+    listMenu.target = event.type === "contextmenu" ? [event.clientX, event.clientY] : event.currentTarget;
+    listMenu.show = true;
 };
 const syncFavoriteDisplayScope = () => {
     favoritesStore.setDisplayScope(
@@ -491,21 +443,6 @@ const saveList = async () => {
     else await favoritesStore.createList(name);
     listEdit.show = false;
 };
-const openGroupEdit = (group = null) => {
-    groupEdit.show = true;
-    groupEdit.id = group?.id || "";
-    groupEdit.name = group?.name || "";
-};
-const saveGroup = async () => {
-    const name = groupEdit.name.trim();
-    if (!name) return;
-    if (groupEdit.id) await favoritesStore.renameGroup(groupEdit.id, name);
-    else await favoritesStore.createGroup(name);
-    groupEdit.show = false;
-};
-const deleteGroup = async (group) => {
-    await favoritesStore.deleteGroup(group.id);
-};
 const openDelete = (list) => {
     deleteDialog.show = true;
     deleteDialog.list = list;
@@ -520,10 +457,50 @@ const clearClosedDeleteDialog = () => {
     if (deleteDialog.show) return;
     deleteDialog.list = null;
 };
+const openPinDialog = async (item) => {
+    if (!canPinItem(item)) return;
+    pinDialog.show = true;
+    pinDialog.item = item;
+    pinDialog.versions = [];
+    pinDialog.pinnedVersionId = "";
+    pinDialog.loading = true;
+    try {
+        const [versions, pin] = await Promise.all([
+            ListMatchingProjectVersions(projectFromFavorite(item), favoritesStore.displayMinecraftVersion, favoritesStore.displayModLoader),
+            GetPinnedModVersion(item.platform, item.modId, favoritesStore.displayMinecraftVersion, favoritesStore.displayModLoader),
+        ]);
+        pinDialog.versions = versions || [];
+        pinDialog.pinnedVersionId = pin?.versionId || "";
+    } finally {
+        pinDialog.loading = false;
+    }
+};
+const pinFavoriteVersion = async (version) => {
+    const item = pinDialog.item;
+    if (!item || pinDialog.busyVersionId) return;
+    pinDialog.busyVersionId = version.id;
+    try {
+        const pin = await PinModVersion({
+            platform: item.platform,
+            modId: item.modId,
+            versionId: version.id,
+            minecraftVersion: favoritesStore.displayMinecraftVersion,
+            modLoader: favoritesStore.displayModLoader,
+        });
+        pinDialog.pinnedVersionId = pin?.versionId || "";
+    } finally {
+        pinDialog.busyVersionId = "";
+    }
+};
+const clearClosedPinDialog = () => {
+    if (pinDialog.show) return;
+    pinDialog.item = null;
+    pinDialog.versions = [];
+    pinDialog.pinnedVersionId = "";
+};
 const openMetadata = (list) => {
     metadataDialog.show = true;
     metadataDialog.list = list;
-    metadataDialog.groupId = list.groupId || "";
     metadataDialog.pinned = Boolean(list.pinned);
     metadataDialog.iconKind = list.iconKind || "mdi";
     metadataDialog.iconValue = list.iconValue || "";
@@ -532,7 +509,6 @@ const openMetadata = (list) => {
 const saveMetadata = async () => {
     if (!metadataDialog.list) return;
     const list = await favoritesStore.updateListMetadata(metadataDialog.list, {
-        groupId: metadataDialog.groupId,
         pinned: metadataDialog.pinned,
     });
     if (list) await favoritesStore.updateListIcon(list, metadataDialog.iconKind, metadataDialog.iconValue, metadataDialog.iconPlatform);
@@ -603,9 +579,30 @@ const removeSelected = async (items, clearSelection) => {
     await favoritesStore.removeMany(items.filter((item) => !item.referenced));
     clearSelection();
 };
-const onListDragStart = (listId) => {
-    draggedListId.value = listId;
-    draggedGroupId.value = "";
+const onListDragStart = (list, event) => {
+    draggedListId.value = list.id;
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", list.id);
+    const preview = document.createElement("div");
+    preview.className = "favorite-drag-preview";
+    preview.textContent = list.name;
+    document.body.appendChild(preview);
+    event.dataTransfer.setDragImage(preview, 16, 16);
+    requestAnimationFrame(() => preview.remove());
+};
+const onListDragEnd = () => {
+    draggedListId.value = "";
+    dropTargetId.value = "";
+};
+const setMoveDropEffect = (event) => {
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+};
+const onListDragOver = (listId, event) => {
+    setMoveDropEffect(event);
+    if (draggedListId.value && draggedListId.value !== listId) dropTargetId.value = listId;
+};
+const onListDragLeave = (listId) => {
+    if (dropTargetId.value === listId) dropTargetId.value = "";
 };
 const moveListToSection = async (groupId, pinned = false) => {
     const sourceListId = draggedListId.value;
@@ -616,10 +613,14 @@ const moveListToSection = async (groupId, pinned = false) => {
     if (Boolean(sourceList.pinned) === pinned && (sourceList.groupId || "") === targetGroupId) return sourceList;
     return favoritesStore.updateListMetadata(sourceList, { groupId: targetGroupId, pinned });
 };
-const onListSectionDrop = async (groupId) => {
+const onListSectionDrop = async (groupId, event) => {
+    setMoveDropEffect(event);
     await moveListToSection(groupId);
+    dropTargetId.value = "";
 };
-const onListDrop = async (targetListId, sectionLists, groupId, pinned = false) => {
+const onListDrop = async (targetListId, sectionLists, groupId, pinned = false, event) => {
+    setMoveDropEffect(event);
+    dropTargetId.value = "";
     const sourceListId = draggedListId.value;
     if (!sourceListId || sourceListId === targetListId) {
         draggedListId.value = "";
@@ -632,25 +633,6 @@ const onListDrop = async (targetListId, sectionLists, groupId, pinned = false) =
     if (targetIndex < 0) return;
     ids.splice(targetIndex, 0, sourceListId);
     await favoritesStore.reorderLists(ids);
-};
-const onGroupDragStart = (groupId) => {
-    draggedGroupId.value = groupId;
-    draggedListId.value = "";
-};
-const onGroupDrop = async (targetGroupId) => {
-    const sourceGroupId = draggedGroupId.value;
-    draggedGroupId.value = "";
-    if (!sourceGroupId || sourceGroupId === targetGroupId) return;
-    const ids = favoritesStore.sortedGroups.map((group) => group.id);
-    ids.splice(ids.indexOf(targetGroupId), 0, ids.splice(ids.indexOf(sourceGroupId), 1)[0]);
-    await favoritesStore.reorderGroups(ids);
-};
-const onSectionDrop = async (groupId) => {
-    if (draggedListId.value) {
-        await onListSectionDrop(groupId);
-        return;
-    }
-    await onGroupDrop(groupId);
 };
 
 const exportPackwiz = async () => {
@@ -699,7 +681,9 @@ onActivated(() => {
     display: grid;
     gap: 20px;
     grid-template-columns: minmax(240px, 310px) minmax(0, 1fr);
-    min-height: calc(100vh - 32px);
+    height: calc(100vh - 32px);
+    min-height: 0;
+    overflow: hidden;
 }
 
 .favorites-rail,
@@ -754,6 +738,7 @@ onActivated(() => {
 }
 
 .favorites-list {
+    flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
 }
@@ -772,12 +757,43 @@ onActivated(() => {
     text-transform: uppercase;
 }
 
-.group-title {
+.favorite-list-row {
+    border-radius: 8px !important;
+    position: relative;
+}
+
+.favorite-list-row--drop-before::before {
+    background: rgb(var(--v-theme-primary));
+    border-radius: 2px;
+    content: "";
+    height: 3px;
+    inset: -2px 8px auto;
+    position: absolute;
+    z-index: 2;
+}
+
+.favorite-drag-handle {
     cursor: grab;
 }
 
-.favorite-list-row {
-    border-radius: 8px !important;
+.favorite-drag-handle:active {
+    cursor: grabbing;
+}
+
+:global(.favorite-drag-preview) {
+    background: rgb(var(--v-theme-surface));
+    border: 1px solid rgb(var(--v-theme-primary));
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.24);
+    color: rgb(var(--v-theme-on-surface));
+    max-width: 240px;
+    overflow: hidden;
+    padding: 8px 12px;
+    pointer-events: none;
+    position: fixed;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    z-index: 9999;
 }
 
 .favorites-main {
@@ -787,7 +803,7 @@ onActivated(() => {
 
 .favorites-items {
     flex: 1 1 auto;
-    max-height: calc(100vh - 176px);
+    min-height: 0;
 }
 
 .empty-state,
@@ -814,6 +830,10 @@ onActivated(() => {
 
 .favorite-item-referenced {
     border-inline-start: 3px solid rgb(var(--v-theme-tertiary));
+}
+
+.favorite-mod-icon--actionable {
+    cursor: pointer;
 }
 
 .migration-grid {

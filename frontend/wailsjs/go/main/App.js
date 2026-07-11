@@ -46,16 +46,8 @@ export function CopyFavoriteListToList(arg1) {
   return window['go']['main']['App']['CopyFavoriteListToList'](arg1);
 }
 
-export function CreateFavoriteGroup(arg1) {
-  return window['go']['main']['App']['CreateFavoriteGroup'](arg1);
-}
-
-export function CreateFavoriteList(arg1) {
-  return window['go']['main']['App']['CreateFavoriteList'](arg1);
-}
-
-export function DeleteFavoriteGroup(arg1) {
-  return window['go']['main']['App']['DeleteFavoriteGroup'](arg1);
+export function CreateFavoriteList(arg1, arg2, arg3) {
+  return window['go']['main']['App']['CreateFavoriteList'](arg1, arg2, arg3);
 }
 
 export function DeleteFavoriteList(arg1) {
@@ -122,10 +114,6 @@ export function ListFavoriteContents(arg1) {
   return window['go']['main']['App']['ListFavoriteContents'](arg1);
 }
 
-export function ListFavoriteGroups() {
-  return window['go']['main']['App']['ListFavoriteGroups']();
-}
-
 export function ListFavoriteListRefs(arg1) {
   return window['go']['main']['App']['ListFavoriteListRefs'](arg1);
 }
@@ -178,16 +166,8 @@ export function RemoveFavoriteMod(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['RemoveFavoriteMod'](arg1, arg2, arg3, arg4, arg5);
 }
 
-export function RenameFavoriteGroup(arg1, arg2) {
-  return window['go']['main']['App']['RenameFavoriteGroup'](arg1, arg2);
-}
-
 export function RenameFavoriteList(arg1, arg2) {
   return window['go']['main']['App']['RenameFavoriteList'](arg1, arg2);
-}
-
-export function ReorderFavoriteGroups(arg1) {
-  return window['go']['main']['App']['ReorderFavoriteGroups'](arg1);
 }
 
 export function ReorderFavoriteLists(arg1) {
@@ -212,6 +192,10 @@ export function SaveCacheDirPreference(arg1) {
 
 export function SaveMCIMSettings(arg1) {
   return window['go']['main']['App']['SaveMCIMSettings'](arg1);
+}
+
+export function SaveNetworkSettings(arg1) {
+  return window['go']['main']['App']['SaveNetworkSettings'](arg1);
 }
 
 export function SaveTheme(arg1) {

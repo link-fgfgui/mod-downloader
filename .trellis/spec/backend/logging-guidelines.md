@@ -17,15 +17,19 @@ Configuration:
 
 ```toml
 [logging]
-disabled = false
+enabled = true
 force_file = false
 ```
 
 ```go
 type LoggingConfig struct {
-    Disabled  bool `toml:"disabled" json:"disabled" env:"DISABLED"`
+    Enabled   *bool `toml:"enabled,omitempty" json:"enabled,omitempty" env:"-"`
+    Disabled  *bool `toml:"disabled,omitempty" json:"-" env:"-"`
     ForceFile bool `toml:"force_file" json:"forceFile" env:"FORCE_FILE"`
 }
+
+func (c LoggingConfig) EnabledValue() bool
+func (c LoggingConfig) Canonical() LoggingConfig
 
 type logging.Options struct {
     Disabled  bool
@@ -38,21 +42,30 @@ func logging.Configure(options logging.Options) error
 func logging.Close()
 ```
 
-Environment keys are `LOGGING_DISABLED` and `LOGGING_FORCE_FILE`. The default
-file is `mod-downloader.log` in the process working directory (or appcore
+Canonical environment keys are `LOGGING_ENABLED` and `LOGGING_FORCE_FILE`.
+Legacy `LOGGING_DISABLED` remains read-compatible. The default file is
+`mod-downloader.log` in the process working directory (or appcore
 `Runtime.WorkDir` when explicitly supplied).
 
 ### 3. Contracts
 
-- `disabled=true` has highest priority: all levels go to `io.Discard`, no log
+- `enabled=false` has highest priority: all levels go to `io.Discard`, no log
   file is created, and `force_file` is ignored.
+- When `enabled` is absent, legacy `disabled` is inverted once. If both are
+  present, positive `enabled` wins. Missing values default to enabled.
+- `cleanenv` cannot decode pointer booleans. `LOGGING_ENABLED` and legacy
+  `LOGGING_DISABLED` are parsed explicitly with `strconv.ParseBool` after the
+  rest of the environment; do not change them to plain booleans or presence
+  information is lost.
+- `configs.Save` canonicalizes logging and emits `enabled` only. It never
+  rewrites the legacy `disabled` key.
 - Default mode writes Debug and above to stderr when `os.Stderr.Stat()`
   succeeds. It does not create a file.
 - If stderr is unavailable, default mode appends to `mod-downloader.log`.
 - `force_file=true` always appends to the file and also writes stderr when
   stderr is usable.
 - `Service.Startup` calls the silent `configs.LoadLogging` bootstrap before the
-  regular config loader. Therefore valid `disabled`/`force_file` settings apply
+  regular config loader. Therefore valid `enabled`/`force_file` settings apply
   to the first config-loader message, not only after startup completes.
 - The regular full config remains the source of truth and reconfigures logging
   after config overrides are applied.
@@ -62,12 +75,14 @@ file is `mod-downloader.log` in the process working directory (or appcore
   close cannot close a file during an active write.
 - `Service.Shutdown` and `Service.Close` stop provider background tasks, close
   storage, then close the active log file so every shutdown message is retained.
-- Missing `[logging]` keys use current defaults. Do not add legacy config
-  readers, renames, or migration code.
+- Missing `[logging]` keys use current defaults. Keep the existing legacy
+  `disabled` reader until compatibility is intentionally retired.
 
 ### 4. Validation & Error Matrix
 
-- `disabled=true`, any other values -> discard all logs; no file.
+- `enabled=false`, any other values -> discard all logs; no file.
+- Both positive and legacy keys -> positive `enabled` wins.
+- Invalid `LOGGING_ENABLED` or `LOGGING_DISABLED` boolean -> config load error.
 - `force_file=true`, usable stderr -> stderr plus file.
 - `force_file=false`, unusable stderr -> file only.
 - `force_file=false`, usable stderr -> stderr only.
@@ -85,8 +100,10 @@ file is `mod-downloader.log` in the process working directory (or appcore
 
 - Good: packaged GUI has no stderr, so startup creates and appends
   `mod-downloader.log` automatically.
-- Good: user sets both flags true; disabled wins and even config-load messages
+- Good: user sets `enabled=false` and `force_file=true`; disabled logging wins and even config-load messages
   are suppressed.
+- Good: an old file contains `disabled=true`; it loads as disabled and the next
+  save writes `enabled=false` without `disabled`.
 - Good: CLI runs with stderr redirected to a valid file; stderr remains usable,
   so no additional application log file is created unless forced.
 - Base: terminal/dev startup logs Debug and above to stderr only.
@@ -103,7 +120,9 @@ file is `mod-downloader.log` in the process working directory (or appcore
   and file.
 - Logging unit test: unavailable stderr falls back to file; usable stderr
   default creates no file.
-- Config tests decode TOML and `LOGGING_*` environment variables.
+- Config tests decode canonical and legacy TOML/environment values, assert
+  positive-key precedence, and assert saves contain `enabled` but not
+  `disabled`.
 - Appcore integration test loads `force_file=true` from TOML and asserts the
   config loader's first message plus a later marker are in the file.
 - Appcore integration test loads disabled+forced and asserts no file exists.
@@ -123,9 +142,9 @@ Correct:
 
 ```go
 bootstrap, _ := configs.LoadLogging()
-configureLogging(bootstrap)
+configureLogging(bootstrap.EnabledValue())
 cfg, _ := configs.Load()
-configureLogging(cfg.Logging)
+configureLogging(cfg.Logging.EnabledValue())
 ```
 
 ## Log Levels

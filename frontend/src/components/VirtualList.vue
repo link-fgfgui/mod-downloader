@@ -1,8 +1,9 @@
 <template>
-    <div class="virtual-list-wrapper" @keydown="onKeydown">
-        <v-virtual-scroll :items="virtualItems" class="virtual-list-scroll px-2" :item-height="itemHeight"
+    <div class="virtual-list-wrapper" @keydown="onKeydown" @mousemove="emit('pointer-move')">
+        <v-virtual-scroll ref="virtualScroll" :items="virtualItems" class="virtual-list-scroll px-2" :item-height="itemHeight"
             :style="{ '--virtual-list-item-height': `${itemHeight}px` }"
-            tabindex="0">
+            tabindex="0"
+            @scroll.passive="emit('scroll')">
             <template #default="{ item }">
                 <template v-if="item.type === 'item'">
                     <slot name="item" :item="item.raw" :index="item.index" :selected="selectedIndices.has(item.index)"
@@ -32,7 +33,30 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, reactive, ref, watch } from "vue";
+
+let activeListKeyHandler = null;
+let globalKeyListenerInstalled = false;
+
+const isEditableTarget = (target) => {
+    if (!(target instanceof HTMLElement)) return false;
+    return target.isContentEditable || Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
+};
+
+const hasActiveDialog = () => Boolean(document.querySelector(
+    ".v-overlay--active:not(.v-overlay--contained):not(.v-snackbar):not(.v-tooltip)",
+));
+
+const forwardActiveListKeydown = (event) => {
+    if (event.defaultPrevented || isEditableTarget(event.target) || hasActiveDialog()) return;
+    activeListKeyHandler?.(event);
+};
+
+const installGlobalKeyListener = () => {
+    if (globalKeyListenerInstalled) return;
+    document.addEventListener("keydown", forwardActiveListKeydown);
+    globalKeyListenerInstalled = true;
+};
 
 const props = defineProps({
     items: {
@@ -65,8 +89,9 @@ const props = defineProps({
     },
 });
 
-const emit = defineEmits(["load-more", "item-click"]);
+const emit = defineEmits(["load-more", "item-click", "scroll", "pointer-move"]);
 
+const virtualScroll = ref(null);
 const loadMoreTarget = ref(null);
 let observer = null;
 let lastLoadMoreResultCount = 0;
@@ -126,6 +151,7 @@ const onItemClick = (index, event) => {
     if (!props.selectable) return;
 
     if (event.shiftKey && lastClickedIndex !== null) {
+        event.preventDefault();
         const from = Math.min(lastClickedIndex, index);
         const to = Math.max(lastClickedIndex, index);
         if (!event.ctrlKey && !event.metaKey) {
@@ -178,6 +204,27 @@ const onKeydown = (event) => {
     }
 };
 
+let measureFrame = 0;
+const scheduleMeasure = async () => {
+    await nextTick();
+    cancelAnimationFrame(measureFrame);
+    measureFrame = requestAnimationFrame(() => {
+        virtualScroll.value?.calculateVisibleItems?.();
+    });
+};
+
+const activateList = () => {
+    activeListKeyHandler = onKeydown;
+    installGlobalKeyListener();
+    void scheduleMeasure();
+};
+
+const deactivateList = () => {
+    if (activeListKeyHandler === onKeydown) {
+        activeListKeyHandler = null;
+    }
+};
+
 const visibleSelectedIndices = computed(() => (
     selectedIndices.size > 0 ? selectedIndices : (actionBarSnapshot.value?.indices || selectedIndices)
 ));
@@ -209,6 +256,7 @@ const setLoadMoreTarget = (element) => {
 };
 
 onMounted(() => {
+    activateList();
     observer = new IntersectionObserver((entries) => {
         const count = props.items.length;
         if (entries.some((e) => e.isIntersecting) && count > 2 && count !== lastLoadMoreResultCount && props.hasMore && !props.loadingMore) {
@@ -223,7 +271,12 @@ onMounted(() => {
 
 });
 
+onActivated(activateList);
+onDeactivated(deactivateList);
+
 onUnmounted(() => {
+    deactivateList();
+    cancelAnimationFrame(measureFrame);
     observer?.disconnect();
     observer = null;
 });
@@ -238,7 +291,10 @@ watch(() => props.items, (next, previous) => {
         clearSelection();
     }
     previousItemsRef = next;
+    void scheduleMeasure();
 });
+
+watch(() => props.itemHeight, scheduleMeasure);
 </script>
 
 <style scoped>

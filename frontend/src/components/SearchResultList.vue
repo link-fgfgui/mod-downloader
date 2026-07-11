@@ -52,41 +52,22 @@
         </template>
 
         <template #actions="{ selectedItems, clearSelection }">
-            <v-btn size="small" variant="tonal" color="primary" class="me-1"
-                prepend-icon="mdi-download-multiple"
-                @click="emit('batch-download', selectedItems)">
-                {{ $t('download.selection.downloadAll') }}
-            </v-btn>
-
-            <v-btn size="small" variant="tonal" color="secondary" class="me-1"
-                prepend-icon="mdi-playlist-plus"
-                @click="emit('add-favorite', selectedItems)">
-                {{ $t('favorites.addToFavorites') }}
-            </v-btn>
-
-            <v-btn size="small" variant="tonal" color="secondary" class="me-1"
-                prepend-icon="mdi-pin-off"
-                @click="emit('batch-unpin', selectedItems)">
-                {{ $t('download.selection.unpin') }}
-            </v-btn>
-
-            <v-btn size="small" variant="tonal" class="me-1"
-                prepend-icon="mdi-content-copy"
-                @click="onCopyNames(selectedItems)">
-                {{ $t('download.selection.copyNames') }}
-            </v-btn>
-
-            <v-btn size="small" variant="tonal" color="error"
-                prepend-icon="mdi-selection-off"
-                @click="clearSelection()">
-                {{ $t('download.selection.deselectAll') }}
-            </v-btn>
+            <v-tooltip v-for="action in selectionActions(selectedItems, clearSelection)" :key="action.label"
+                :text="action.label" location="top">
+                <template #activator="{ props: tip }">
+                    <v-btn v-bind="tip" :aria-label="action.label" :icon="action.icon" size="small"
+                        variant="tonal" :color="action.color" @click="action.run"></v-btn>
+                </template>
+            </v-tooltip>
         </template>
     </VirtualList>
 </template>
 
 <script setup>
+import { useI18n } from "vue-i18n";
 import VirtualList from "./VirtualList.vue";
+
+const { t: $t } = useI18n();
 
 const props = defineProps({
     results: {
@@ -123,6 +104,7 @@ const onInstall = (index, allowConfirm) => {
         result: props.results[index],
         key: state?.key,
         status: state?.status,
+        conflictFileName: state?.conflictFileName,
         confirm: allowConfirm,
     });
 };
@@ -150,6 +132,14 @@ const onCopyNames = async (selectedItems) => {
         // fallback: silently fail
     }
 };
+
+const selectionActions = (selectedItems, clearSelection) => [
+    { label: $t("download.selection.downloadAll"), icon: "mdi-download-multiple", color: "primary", run: () => emit("batch-download", selectedItems) },
+    { label: $t("favorites.addToFavorites"), icon: "mdi-playlist-plus", color: "secondary", run: () => emit("add-favorite", selectedItems) },
+    { label: $t("download.selection.unpin"), icon: "mdi-pin-off", color: "secondary", run: () => emit("batch-unpin", selectedItems) },
+    { label: $t("download.selection.copyNames"), icon: "mdi-content-copy", run: () => onCopyNames(selectedItems) },
+    { label: $t("download.selection.deselectAll"), icon: "mdi-selection-off", color: "error", run: clearSelection },
+];
 </script>
 
 <style scoped>

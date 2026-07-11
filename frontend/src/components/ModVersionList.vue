@@ -28,6 +28,14 @@
                         ></v-btn>
                     </template>
                 </v-tooltip>
+                <v-tooltip v-if="showPinAction && action !== 'pin'" :text="$t(isPinned(version) ? 'versions.unpin' : 'versions.pin')" location="top">
+                    <template #activator="{ props: pinTip }">
+                        <v-btn v-bind="pinTip" class="ms-2" :color="isPinned(version) ? 'primary' : 'surface-variant'"
+                            :icon="isPinned(version) ? 'mdi-pin' : 'mdi-pin-outline'" variant="tonal" size="small"
+                            :loading="pinBusyVersionId === versionId(version)" :disabled="Boolean(pinBusyVersionId && pinBusyVersionId !== versionId(version))"
+                            @click="emit('pin', version)"></v-btn>
+                    </template>
+                </v-tooltip>
             </template>
         </v-list-item>
     </v-list>
@@ -48,6 +56,8 @@ const props = withDefaults(defineProps<{
     installedVersionId?: string;
     installedSha1?: string;
     disableInstalledAction?: boolean;
+    showPinAction?: boolean;
+    pinBusyVersionId?: string;
     emptyTextKey?: string;
 }>(), {
     versions: () => [],
@@ -58,11 +68,14 @@ const props = withDefaults(defineProps<{
     installedVersionId: "",
     installedSha1: "",
     disableInstalledAction: false,
+    showPinAction: false,
+    pinBusyVersionId: "",
     emptyTextKey: "download.noMatchingVersions",
 });
 
 const emit = defineEmits<{
     select: [version: models.ModVersion];
+    pin: [version: models.ModVersion];
 }>();
 
 const normalized = (value?: string) => (value || "").trim().toLowerCase();

@@ -143,15 +143,20 @@ Logging defaults to stderr. Configure automatic output behavior in
 
 ```toml
 [logging]
-disabled = false
+enabled = true
 force_file = false
 ```
 
-`disabled = true` suppresses all application logs and takes precedence over
+`enabled = false` suppresses all application logs and takes precedence over
 `force_file`. `force_file = true` appends logs to `mod-downloader.log` while
-continuing to use stderr when it is available. Without either option, the app
-falls back to the log file only when stderr cannot be used. Environment
-equivalents are `LOGGING_DISABLED` and `LOGGING_FORCE_FILE`.
+continuing to use stderr when it is available. With logging enabled and
+`force_file = false`, the app falls back to the log file only when stderr
+cannot be used. Environment equivalents are `LOGGING_ENABLED` and
+`LOGGING_FORCE_FILE`.
+
+For compatibility, existing `disabled` and `LOGGING_DISABLED` values are still
+accepted when the corresponding positive `enabled` setting is absent. Saved
+configuration always uses `enabled`.
 
 ## CLI
 

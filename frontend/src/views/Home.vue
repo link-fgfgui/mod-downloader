@@ -11,14 +11,6 @@
           <v-icon :icon="loadError ? 'mdi-alert-circle-outline' : 'mdi-database-check-outline'" start></v-icon>
           {{ loadError ? $t("home.status.unavailable") : $t("home.status.tracking") }}
         </v-chip>
-        <v-btn
-          icon="mdi-refresh"
-          size="small"
-          variant="text"
-          :loading="isLoading"
-          :aria-label="$t('home.refresh')"
-          @click="loadDashboard"
-        ></v-btn>
       </div>
     </header>
 
@@ -44,81 +36,13 @@
             <v-icon :icon="metric.icon" size="21"></v-icon>
           </v-avatar>
           <div class="metric-copy">
-            <div class="metric-value">{{ formatNumber(metric.value) }}</div>
+            <div class="metric-value">{{ formatCompactNumber(metric.value) }}</div>
             <div class="metric-label text-caption text-medium-emphasis">{{ $t(metric.labelKey) }}</div>
           </div>
         </article>
       </div>
     </section>
 
-    <v-divider class="my-5"></v-divider>
-
-    <section class="status-grid" aria-labelledby="status-heading">
-      <h2 id="status-heading" class="status-grid-title text-subtitle-1 font-weight-bold">{{ $t("home.status.title") }}</h2>
-
-      <article class="status-panel">
-        <div class="status-panel-heading">
-          <v-icon icon="mdi-cube-outline" color="primary"></v-icon>
-          <span>{{ $t("home.status.instance") }}</span>
-        </div>
-        <dl class="status-list">
-          <div>
-            <dt>{{ $t("home.status.selectedInstance") }}</dt>
-            <dd>{{ selectedInstanceName || $t("home.status.none") }}</dd>
-          </div>
-          <div>
-            <dt>{{ $t("home.status.target") }}</dt>
-            <dd>{{ selectedTarget || $t("home.status.none") }}</dd>
-          </div>
-          <div>
-            <dt>{{ $t("home.status.minecraftDir") }}</dt>
-            <dd :title="minecraftDir">{{ minecraftDir || $t("home.status.notConfigured") }}</dd>
-          </div>
-        </dl>
-      </article>
-
-      <article class="status-panel">
-        <div class="status-panel-heading">
-          <v-icon icon="mdi-progress-download" color="secondary"></v-icon>
-          <span>{{ $t("home.status.queue") }}</span>
-        </div>
-        <dl class="status-list">
-          <div>
-            <dt>{{ $t("home.status.queueState") }}</dt>
-            <dd>{{ queueStateLabel }}</dd>
-          </div>
-          <div>
-            <dt>{{ $t("home.status.running") }}</dt>
-            <dd>{{ formatNumber(queue?.running || 0) }}</dd>
-          </div>
-          <div>
-            <dt>{{ $t("home.status.pending") }}</dt>
-            <dd>{{ formatNumber(queue?.pending || 0) }}</dd>
-          </div>
-        </dl>
-      </article>
-
-      <article class="status-panel">
-        <div class="status-panel-heading">
-          <v-icon icon="mdi-database-outline" color="info"></v-icon>
-          <span>{{ $t("home.status.storage") }}</span>
-        </div>
-        <dl class="status-list">
-          <div>
-            <dt>{{ $t("home.status.source") }}</dt>
-            <dd>{{ settings?.mcimEnabled ? $t("home.status.mcim") : $t("home.status.official") }}</dd>
-          </div>
-          <div>
-            <dt>{{ $t("home.status.historyStore") }}</dt>
-            <dd>SQLite · mod-favs.sqlite</dd>
-          </div>
-          <div>
-            <dt>{{ $t("home.status.updated") }}</dt>
-            <dd>{{ refreshedAt || $t("home.status.notAvailable") }}</dd>
-          </div>
-        </dl>
-      </article>
-    </section>
   </v-container>
 </template>
 
@@ -126,33 +50,20 @@
 import { computed, onActivated, onDeactivated, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
-import {
-  GetDownloadQueueState,
-  GetMinecraftDir,
-  GetSelectedVersion,
-  GetSettings,
-  GetUsageStats,
-} from "../../wailsjs/go/main/App";
-import type { main, storage, structs } from "../../wailsjs/go/models";
+import { GetUsageStats } from "../../wailsjs/go/main/App";
+import type { storage } from "../../wailsjs/go/models";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
 
-const downloadQueueUpdatedEvent = "download-queue-updated";
-const minecraftDirChangedEvent = "minecraft-dir-changed";
-const selectedVersionChangedEvent = "selected-version-changed";
+const usageStatsUpdatedEvent = "usage-stats-updated";
 
-const { locale, t } = useI18n();
+const { locale } = useI18n();
 const stats = ref<storage.UsageStats | null>(null);
-const selectedInstance = ref<structs.VersionInfo | null>(null);
-const queue = ref<structs.DownloadQueueState | null>(null);
-const settings = ref<main.SettingsView | null>(null);
-const minecraftDir = ref("");
-const refreshedAt = ref("");
 const isLoading = ref(false);
 const loadError = ref("");
 let loadSequence = 0;
-let stopQueueListener: (() => void) | null = null;
-let stopInstanceListener: (() => void) | null = null;
-let stopDirectoryListener: (() => void) | null = null;
+let stopUsageListener: (() => void) | null = null;
+let refreshQueued = false;
+let active = false;
 
 const totalOperations = computed(() => {
   const value = stats.value;
@@ -174,14 +85,13 @@ const metrics = computed(() => [
   { key: "exports", labelKey: "home.usage.exports", icon: "mdi-package-variant-closed", color: "info", value: stats.value?.packwizExports || 0 },
 ]);
 
-const selectedInstanceName = computed(() => selectedInstance.value?.name || selectedInstance.value?.id || "");
-const selectedTarget = computed(() => [
-  selectedInstance.value?.minecraftVersion,
-  selectedInstance.value?.modLoader,
-].filter(Boolean).join(" · "));
-const queueStateLabel = computed(() => queue.value?.active ? t("home.status.active") : t("home.status.idle"));
-
 const formatNumber = (value: number) => new Intl.NumberFormat(locale.value).format(value);
+const formatCompactNumber = (value: number) => {
+  if (Math.abs(value) < 1_000) return formatNumber(value);
+  const divisor = Math.abs(value) >= 500_000 ? 1_000_000 : 1_000;
+  const suffix = divisor === 1_000_000 ? "M" : "K";
+  return `${new Intl.NumberFormat(locale.value, { maximumSignificantDigits: 3 }).format(value / divisor)}${suffix}`;
+};
 
 const refreshStats = async () => {
   stats.value = await GetUsageStats();
@@ -192,20 +102,9 @@ const loadDashboard = async () => {
   isLoading.value = true;
   loadError.value = "";
   try {
-    const [nextStats, nextInstance, nextQueue, nextSettings, nextMinecraftDir] = await Promise.all([
-      GetUsageStats(),
-      GetSelectedVersion(),
-      GetDownloadQueueState(),
-      GetSettings(),
-      GetMinecraftDir(),
-    ]);
+    const nextStats = await GetUsageStats();
     if (sequence !== loadSequence) return;
     stats.value = nextStats;
-    selectedInstance.value = nextInstance;
-    queue.value = nextQueue;
-    settings.value = nextSettings;
-    minecraftDir.value = nextMinecraftDir || "";
-    refreshedAt.value = new Intl.DateTimeFormat(locale.value, { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date());
   } catch (error) {
     if (sequence === loadSequence) {
       loadError.value = error instanceof Error ? error.message : String(error);
@@ -216,37 +115,30 @@ const loadDashboard = async () => {
 };
 
 const startListeners = () => {
-  if (!stopQueueListener) {
-    stopQueueListener = EventsOn(downloadQueueUpdatedEvent, (nextQueue: structs.DownloadQueueState) => {
-      const completed = Boolean(queue.value?.active) && !nextQueue?.active;
-      queue.value = nextQueue;
-      if (completed) void refreshStats();
-    });
-  }
-  if (!stopInstanceListener) {
-    stopInstanceListener = EventsOn(selectedVersionChangedEvent, (version: structs.VersionInfo) => {
-      selectedInstance.value = version;
-    });
-  }
-  if (!stopDirectoryListener) {
-    stopDirectoryListener = EventsOn(minecraftDirChangedEvent, () => {
-      void loadDashboard();
+  if (!stopUsageListener) {
+    stopUsageListener = EventsOn(usageStatsUpdatedEvent, (nextStats: storage.UsageStats) => {
+      stats.value = nextStats;
+      if (refreshQueued) return;
+      refreshQueued = true;
+      queueMicrotask(() => {
+        refreshQueued = false;
+        if (active) void refreshStats();
+      });
     });
   }
 };
 
 onActivated(() => {
+  active = true;
   startListeners();
   void loadDashboard();
 });
 
 onDeactivated(() => {
-  stopQueueListener?.();
-  stopInstanceListener?.();
-  stopDirectoryListener?.();
-  stopQueueListener = null;
-  stopInstanceListener = null;
-  stopDirectoryListener = null;
+  active = false;
+  stopUsageListener?.();
+  stopUsageListener = null;
+  refreshQueued = false;
 });
 </script>
 
@@ -259,8 +151,7 @@ onDeactivated(() => {
 
 .dashboard-header,
 .section-heading,
-.dashboard-header-actions,
-.status-panel-heading {
+.dashboard-header-actions {
   align-items: center;
   display: flex;
 }
@@ -338,58 +229,8 @@ onDeactivated(() => {
   margin-top: 3px;
 }
 
-.status-grid {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.status-grid-title {
-  grid-column: 1 / -1;
-}
-
-.status-panel {
-  border-left: 3px solid rgb(var(--v-theme-primary));
-  min-width: 0;
-  padding: 4px 4px 4px 14px;
-}
-
-.status-panel-heading {
-  font-size: 0.875rem;
-  font-weight: 600;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.status-list {
-  margin: 0;
-}
-
-.status-list > div {
-  display: grid;
-  gap: 8px;
-  grid-template-columns: minmax(88px, auto) minmax(0, 1fr);
-  padding: 4px 0;
-}
-
-.status-list dt {
-  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
-  font-size: 0.75rem;
-}
-
-.status-list dd {
-  font-size: 0.75rem;
-  font-weight: 500;
-  margin: 0;
-  overflow: hidden;
-  text-align: right;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 @media (max-width: 900px) {
-  .metric-grid,
-  .status-grid {
+  .metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -406,13 +247,9 @@ onDeactivated(() => {
     width: 100%;
   }
 
-  .metric-grid,
-  .status-grid {
+  .metric-grid {
     grid-template-columns: 1fr;
   }
 
-  .status-grid-title {
-    grid-column: auto;
-  }
 }
 </style>

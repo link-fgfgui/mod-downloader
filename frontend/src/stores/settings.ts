@@ -6,10 +6,9 @@ import {
     SaveApiKeys,
     SaveUnusedDependencyCleanupSettings,
     SaveMCIMSettings,
+    SaveNetworkSettings,
     SaveCacheDirPreference,
     ChooseCacheDir,
-    ChooseMinecraftDir,
-    ValidateMinecraftDir,
 } from "../../wailsjs/go/main/App";
 import type { main } from "../../wailsjs/go/models";
 import {
@@ -24,6 +23,7 @@ const themeDark = "dark";
 const themeLight = "light";
 const themeSystem = "system";
 const apiKeyKeepSentinel = "<keep>";
+const autoSaveTimers = new Map<string, number>();
 
 export const useSettingsStore = defineStore("settings", {
     state: () => ({
@@ -35,25 +35,45 @@ export const useSettingsStore = defineStore("settings", {
         isSavingMCIM: false,
         isSavingKeys: false,
         isSavingCacheDir: false,
-        isChoosingDir: false,
         isChoosingCacheDir: false,
-        isValidatingDir: false,
-        dirValid: null as boolean | null,
         draftTheme: "",
         draftAnimationMode: defaultAnimationMode,
         draftAnimationDurationMultiplier: defaultAnimationDurationMultiplier,
-        draftAutoScanUnusedDependencies: true,
+        draftAutoScanUnusedDependencies: false,
         draftMCIMEnabled: false,
+        draftFileConcurrency: 4,
+        draftConcurrentDownloads: 1,
+        draftRequestsPerSecond: 0,
+        isSavingNetwork: false,
         draftCurseforgeKey: "",
         draftModrinthKey: "",
         clearCurseforgeKey: false,
         clearModrinthKey: false,
+        autoSaveError: "",
     }),
     getters: {
         hasCurseforgeKey: (s) => Boolean(s.view?.hasCurseforgeKey),
         hasModrinthKey: (s) => Boolean(s.view?.hasModrinthKey),
     },
     actions: {
+        scheduleAutoSave(kind: "animations" | "cleanup" | "mcim" | "network" | "keys", delay = 600) {
+            const previous = autoSaveTimers.get(kind);
+            if (previous) window.clearTimeout(previous);
+            autoSaveTimers.set(kind, window.setTimeout(async () => {
+                autoSaveTimers.delete(kind);
+                this.autoSaveError = "";
+                try {
+                    if (kind === "animations") await this.saveAnimationSettings();
+                    else if (kind === "cleanup") await this.saveUnusedDependencyCleanupSettings();
+                    else if (kind === "mcim") await this.saveMCIMSettings();
+                    else if (kind === "network") await this.saveNetworkSettings();
+                    else await this.saveApiKeys();
+                } catch (error) {
+                    this.autoSaveError = error instanceof Error ? error.message : String(error);
+                    await this.load();
+                }
+            }, delay));
+        },
         async load() {
             this.isLoading = true;
             try {
@@ -66,13 +86,15 @@ export const useSettingsStore = defineStore("settings", {
                 this.draftAnimationDurationMultiplier = normalizeAnimationDurationMultiplier(
                     this.view?.animationDurationMultiplier ?? defaultAnimationDurationMultiplier
                 );
-                this.draftAutoScanUnusedDependencies = this.view?.autoScanUnusedDependencies ?? true;
+                this.draftAutoScanUnusedDependencies = this.view?.autoScanUnusedDependencies ?? false;
                 this.draftMCIMEnabled = this.view?.mcimEnabled ?? false;
+                this.draftFileConcurrency = this.view?.fileConcurrency ?? 4;
+                this.draftConcurrentDownloads = this.view?.concurrentDownloads ?? 1;
+                this.draftRequestsPerSecond = this.view?.requestsPerSecond ?? 0;
                 this.draftCurseforgeKey = "";
                 this.draftModrinthKey = "";
                 this.clearCurseforgeKey = false;
                 this.clearModrinthKey = false;
-                this.dirValid = null;
             } finally {
                 this.isLoading = false;
             }
@@ -135,6 +157,22 @@ export const useSettingsStore = defineStore("settings", {
                 this.isSavingMCIM = false;
             }
         },
+        async saveNetworkSettings() {
+            this.isSavingNetwork = true;
+            try {
+                this.view = await SaveNetworkSettings({
+                    fileConcurrency: this.draftFileConcurrency,
+                    concurrentDownloads: this.draftConcurrentDownloads,
+                    requestsPerSecond: this.draftRequestsPerSecond,
+                });
+                this.draftFileConcurrency = this.view.fileConcurrency;
+                this.draftConcurrentDownloads = this.view.concurrentDownloads;
+                this.draftRequestsPerSecond = this.view.requestsPerSecond;
+                return this.view;
+            } finally {
+                this.isSavingNetwork = false;
+            }
+        },
         async saveApiKeys() {
             this.isSavingKeys = true;
             try {
@@ -149,18 +187,6 @@ export const useSettingsStore = defineStore("settings", {
                 this.clearModrinthKey = false;
             } finally {
                 this.isSavingKeys = false;
-            }
-        },
-        async chooseMinecraftDir() {
-            this.isChoosingDir = true;
-            try {
-                const result = await ChooseMinecraftDir();
-                if (result) {
-                    await this.load();
-                }
-                return result;
-            } finally {
-                this.isChoosingDir = false;
             }
         },
         async chooseCacheDir() {
@@ -180,14 +206,6 @@ export const useSettingsStore = defineStore("settings", {
                 return this.view;
             } finally {
                 this.isSavingCacheDir = false;
-            }
-        },
-        async validateDir() {
-            this.isValidatingDir = true;
-            try {
-                this.dirValid = await ValidateMinecraftDir();
-            } finally {
-                this.isValidatingDir = false;
             }
         },
     },

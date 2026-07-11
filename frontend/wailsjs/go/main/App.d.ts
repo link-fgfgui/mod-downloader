@@ -28,11 +28,7 @@ export function ClearOptionalDependencyReminders():Promise<boolean>;
 
 export function CopyFavoriteListToList(arg1:appcore.FavoriteListCopyRequest):Promise<appcore.FavoriteBulkOperationResult>;
 
-export function CreateFavoriteGroup(arg1:string):Promise<storage.FavoriteGroup>;
-
-export function CreateFavoriteList(arg1:string):Promise<storage.FavoriteList>;
-
-export function DeleteFavoriteGroup(arg1:string):Promise<boolean>;
+export function CreateFavoriteList(arg1:string,arg2:string,arg3:string):Promise<storage.FavoriteList>;
 
 export function DeleteFavoriteList(arg1:string):Promise<boolean>;
 
@@ -66,8 +62,6 @@ export function InstallOptionalDependencies(arg1:string):Promise<Array<structs.M
 
 export function ListFavoriteContents(arg1:string):Promise<storage.FavoriteListContents>;
 
-export function ListFavoriteGroups():Promise<Array<storage.FavoriteGroup>>;
-
 export function ListFavoriteListRefs(arg1:string):Promise<Array<storage.FavoriteListRef>>;
 
 export function ListFavoriteLists():Promise<Array<storage.FavoriteList>>;
@@ -94,11 +88,7 @@ export function RemoveFavoriteListReference(arg1:string,arg2:string):Promise<boo
 
 export function RemoveFavoriteMod(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<boolean>;
 
-export function RenameFavoriteGroup(arg1:string,arg2:string):Promise<storage.FavoriteGroup>;
-
 export function RenameFavoriteList(arg1:string,arg2:string):Promise<storage.FavoriteList>;
-
-export function ReorderFavoriteGroups(arg1:Array<string>):Promise<boolean>;
 
 export function ReorderFavoriteLists(arg1:Array<string>):Promise<boolean>;
 
@@ -111,6 +101,8 @@ export function SaveApiKeys(arg1:main.SaveApiKeysRequest):Promise<main.SettingsV
 export function SaveCacheDirPreference(arg1:string):Promise<main.SettingsView>;
 
 export function SaveMCIMSettings(arg1:main.SaveMCIMSettingsRequest):Promise<main.SettingsView>;
+
+export function SaveNetworkSettings(arg1:main.SaveNetworkSettingsRequest):Promise<main.SettingsView>;
 
 export function SaveTheme(arg1:string):Promise<string>;
 

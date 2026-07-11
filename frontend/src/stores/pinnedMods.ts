@@ -6,29 +6,9 @@ export const usePinnedModsStore = defineStore("pinnedMods", {
     state: () => ({
         pins: [] as storage.PinnedMod[],
         isLoading: false,
-        filterPlatform: "",
-        filterMinecraftVersion: "",
-        filterModLoader: "",
         pendingUnpinKeys: new Set<string>(),
     }),
     getters: {
-        filteredPins(state): storage.PinnedMod[] {
-            const platform = state.filterPlatform.toLowerCase();
-            const mc = state.filterMinecraftVersion.toLowerCase();
-            const loader = state.filterModLoader.toLowerCase();
-            return state.pins.filter((pin) => {
-                if (platform && !pin.platform.toLowerCase().includes(platform)) {
-                    return false;
-                }
-                if (mc && !pin.minecraftVersion.toLowerCase().includes(mc)) {
-                    return false;
-                }
-                if (loader && !pin.modLoader.toLowerCase().includes(loader)) {
-                    return false;
-                }
-                return true;
-            });
-        },
         pinKey(): (pin: storage.PinnedMod) => string {
             return (pin) => [pin.platform, pin.modId, pin.minecraftVersion, pin.modLoader].join("|");
         },
@@ -61,8 +41,8 @@ export const usePinnedModsStore = defineStore("pinnedMods", {
                 this.pendingUnpinKeys.delete(key);
             }
         },
-        async unpinAllFiltered() {
-            const targets = [...this.filteredPins];
+        async unpinAll() {
+            const targets = [...this.pins];
             for (const pin of targets) {
                 await this.unpin(pin);
             }
