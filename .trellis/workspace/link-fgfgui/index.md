@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 15
-- **Last Active**: 2026-07-07
+- **Total Sessions**: 16
+- **Last Active**: 2026-07-12
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~512 | Active |
+| `journal-1.md` | ~547 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 16 | 2026-07-12 | Complete mod downloader issue backlog | `0613da2`, `987f770` | `master` |
 | 15 | 2026-07-07 | Sidebar version tuple scoped mod state | `1c81ecc` | `master` |
 | 14 | 2026-07-07 | SQLite user data storage | `0f3e500`, `175b83c` | `master` |
 | 13 | 2026-07-07 | Check core CLI compatibility | `f42c5ae` | `master` |
