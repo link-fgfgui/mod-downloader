@@ -13,8 +13,10 @@ are loaded by `configs`, applied by `appcore.Service.Startup`, and consumed by
 
 ```go
 type configs.DownloadConfig struct {
-    FileConcurrency     int
-    ConcurrentDownloads int
+    FileConcurrency          int
+    ConcurrentDownloads      int
+    AdaptiveFileConcurrency  bool
+    TargetDownloadRateMiB    float64
 }
 
 type configs.APIConfig struct { RequestsPerSecond int }
@@ -28,6 +30,8 @@ Configuration keys:
 [downloads]
 file_concurrency = 4
 concurrent_downloads = 1
+adaptive_file_concurrency = false
+target_download_rate_mib = 1.0
 
 [api]
 requests_per_second = 0
@@ -49,6 +53,10 @@ Environment equivalents are `DOWNLOADS_FILE_CONCURRENCY`,
   reconfigures new downloader jobs and the shared provider limiter. Existing
   in-flight downloads are not canceled or resized.
 - Every `filetransfer.Request` receives the configured file concurrency.
+- When adaptive file concurrency is enabled, a transfer starts with the
+  configured file concurrency and adds one range worker per second while its
+  measured throughput is below the normalized 0.1-5 MiB/s target. The number
+  of workers is bounded only by the number of file ranges.
 - The queue exposes every active job in `DownloadQueueState.Items`, and
   `Running` equals the active job count.
 - A parent mod requeued after dependency discovery stays blocked while any of
@@ -65,6 +73,8 @@ Environment equivalents are `DOWNLOADS_FILE_CONCURRENCY`,
 - Download value <= 0 -> its default; do not create a zero-worker queue.
 - Download value above its maximum -> clamp to 32 or 16 respectively.
 - API value below 0 -> 0/no wait; above 100 -> clamp to 100.
+- Adaptive target values at or below zero use 1 MiB/s; values below 0.1 or
+  above 5 clamp to those limits.
 - Request context canceled while rate-limited -> return `ctx.Err()` without
   invoking the base transport.
 - Cancel one running download -> cancel only that job and keep other workers
@@ -89,6 +99,8 @@ Environment equivalents are `DOWNLOADS_FILE_CONCURRENCY`,
   reloaded TOML contain normalized values.
 - Configure two concurrent downloads with a blocking backend; assert both are
   running and each request carries the configured file concurrency.
+- Use a deliberately slow range server and assert adaptive mode starts an
+  additional range worker when the requested target speed is missed.
 - Assert a rate-limited request canceled during its wait never reaches the base
   transport.
 - Preserve cancellation, retry, stall, dependency ordering, and queue snapshot

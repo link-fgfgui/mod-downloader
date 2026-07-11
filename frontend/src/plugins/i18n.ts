@@ -98,7 +98,7 @@ const messages = {
       minecraftDir: { label: ".minecraft 目录", choose: "选择目录", valid: "目录有效", invalid: "目录无效或为空" },
       cacheDir: { label: "缓存目录", path: "实际路径", choose: "选择目录", reset: "恢复默认", default: "默认位置", saved: "缓存目录已保存" },
       mcim: { label: "MCIM API 镜像", hint: "切换 Modrinth、CurseForge 的元数据 API；Mod 文件始终从官方平台下载", useMirror: "API 使用 MCIM", save: "保存", saved: "MCIM API 设置已保存" },
-      network: { label: "下载与 API", fileConcurrency: "单文件分片并发", concurrentDownloads: "并发下载数", requestsPerSecond: "API 每秒请求数（0 为不限速）" },
+      network: { label: "下载与 API", fileConcurrency: "单文件分片并发", adaptiveFileConcurrency: "按目标速度自动增加分片", targetDownloadRateMiB: "目标下载速度（MiB/s）", concurrentDownloads: "并发下载数", requestsPerSecond: "API 每秒请求数（0 为不限速）" },
       apiKeys: {
         curseforge: { label: "CurseForge API Key", status: "已设置", statusEmpty: "未设置", placeholder: "输入新的 API Key", save: "保存", clear: "清除", hint: "官方源需要配置；MCIM 无需 API Key" },
         modrinth: { label: "Modrinth API Key", status: "已设置", statusEmpty: "未设置", placeholder: "输入新的 API Key", save: "保存", clear: "清除", hint: "当前未启用，保留供未来使用" },
@@ -403,7 +403,7 @@ const messages = {
       minecraftDir: { label: ".minecraft Directory", choose: "Choose Directory", valid: "Directory valid", invalid: "Directory invalid or empty" },
       cacheDir: { label: "Cache Directory", path: "Resolved Path", choose: "Choose Directory", reset: "Reset", default: "Default location", saved: "Cache directory saved" },
       mcim: { label: "MCIM API Mirror", hint: "Switch metadata APIs only; mod files always download from the official platforms", useMirror: "Use MCIM APIs", save: "Save", saved: "MCIM API setting saved" },
-      network: { label: "Downloads and API", fileConcurrency: "Chunks per file", concurrentDownloads: "Concurrent downloads", requestsPerSecond: "API requests per second (0 is unlimited)" },
+      network: { label: "Downloads and API", fileConcurrency: "Chunks per file", adaptiveFileConcurrency: "Add chunks until the target speed", targetDownloadRateMiB: "Target download speed (MiB/s)", concurrentDownloads: "Concurrent downloads", requestsPerSecond: "API requests per second (0 is unlimited)" },
       apiKeys: {
         curseforge: { label: "CurseForge API Key", status: "Set", statusEmpty: "Not set", placeholder: "Enter new API Key", save: "Save", clear: "Clear", hint: "Required by the official source; MCIM does not need an API key" },
         modrinth: { label: "Modrinth API Key", status: "Set", statusEmpty: "Not set", placeholder: "Enter new API Key", save: "Save", clear: "Clear", hint: "Not currently enabled; reserved for future use" },

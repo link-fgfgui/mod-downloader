@@ -102,6 +102,13 @@
                         <v-number-input v-model="settingsStore.draftFileConcurrency" :min="1" :max="32"
                             :label="$t('settings.network.fileConcurrency')" control-variant="stacked" hide-details
                             @update:model-value="settingsStore.scheduleAutoSave('network')"></v-number-input>
+                        <v-switch v-model="settingsStore.draftAdaptiveFileConcurrency" color="primary" density="comfortable"
+                            hide-details :label="$t('settings.network.adaptiveFileConcurrency')"
+                            @update:model-value="settingsStore.scheduleAutoSave('network')" />
+                        <v-number-input v-if="settingsStore.draftAdaptiveFileConcurrency"
+                            v-model="settingsStore.draftTargetDownloadRateMiB" :min="0.1" :max="5" :step="0.1"
+                            :label="$t('settings.network.targetDownloadRateMiB')" control-variant="stacked" hide-details
+                            @update:model-value="settingsStore.scheduleAutoSave('network')"></v-number-input>
                         <v-number-input v-model="settingsStore.draftConcurrentDownloads" :min="1" :max="16"
                             :label="$t('settings.network.concurrentDownloads')" control-variant="stacked" hide-details
                             @update:model-value="settingsStore.scheduleAutoSave('network')"></v-number-input>

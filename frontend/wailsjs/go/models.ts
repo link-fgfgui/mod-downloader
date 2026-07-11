@@ -309,6 +309,8 @@ export namespace main {
 	export class SaveNetworkSettingsRequest {
 	    fileConcurrency: number;
 	    concurrentDownloads: number;
+	    adaptiveFileConcurrency: boolean;
+	    targetDownloadRateMiB: number;
 	    requestsPerSecond: number;
 	
 	    static createFrom(source: any = {}) {
@@ -319,6 +321,8 @@ export namespace main {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.fileConcurrency = source["fileConcurrency"];
 	        this.concurrentDownloads = source["concurrentDownloads"];
+	        this.adaptiveFileConcurrency = source["adaptiveFileConcurrency"];
+	        this.targetDownloadRateMiB = source["targetDownloadRateMiB"];
 	        this.requestsPerSecond = source["requestsPerSecond"];
 	    }
 	}
@@ -350,6 +354,8 @@ export namespace main {
 	    modrinthKeyMask: string;
 	    fileConcurrency: number;
 	    concurrentDownloads: number;
+	    adaptiveFileConcurrency: boolean;
+	    targetDownloadRateMiB: number;
 	    requestsPerSecond: number;
 	
 	    static createFrom(source: any = {}) {
@@ -373,6 +379,8 @@ export namespace main {
 	        this.modrinthKeyMask = source["modrinthKeyMask"];
 	        this.fileConcurrency = source["fileConcurrency"];
 	        this.concurrentDownloads = source["concurrentDownloads"];
+	        this.adaptiveFileConcurrency = source["adaptiveFileConcurrency"];
+	        this.targetDownloadRateMiB = source["targetDownloadRateMiB"];
 	        this.requestsPerSecond = source["requestsPerSecond"];
 	    }
 	}

@@ -43,6 +43,8 @@ export const useSettingsStore = defineStore("settings", {
         draftMCIMEnabled: false,
         draftFileConcurrency: 4,
         draftConcurrentDownloads: 1,
+        draftAdaptiveFileConcurrency: false,
+        draftTargetDownloadRateMiB: 1,
         draftRequestsPerSecond: 0,
         isSavingNetwork: false,
         draftCurseforgeKey: "",
@@ -90,6 +92,8 @@ export const useSettingsStore = defineStore("settings", {
                 this.draftMCIMEnabled = this.view?.mcimEnabled ?? false;
                 this.draftFileConcurrency = this.view?.fileConcurrency ?? 4;
                 this.draftConcurrentDownloads = this.view?.concurrentDownloads ?? 1;
+                this.draftAdaptiveFileConcurrency = this.view?.adaptiveFileConcurrency ?? false;
+                this.draftTargetDownloadRateMiB = this.view?.targetDownloadRateMiB ?? 1;
                 this.draftRequestsPerSecond = this.view?.requestsPerSecond ?? 0;
                 this.draftCurseforgeKey = "";
                 this.draftModrinthKey = "";
@@ -163,10 +167,14 @@ export const useSettingsStore = defineStore("settings", {
                 this.view = await SaveNetworkSettings({
                     fileConcurrency: this.draftFileConcurrency,
                     concurrentDownloads: this.draftConcurrentDownloads,
+                    adaptiveFileConcurrency: this.draftAdaptiveFileConcurrency,
+                    targetDownloadRateMiB: this.draftTargetDownloadRateMiB,
                     requestsPerSecond: this.draftRequestsPerSecond,
                 });
                 this.draftFileConcurrency = this.view.fileConcurrency;
                 this.draftConcurrentDownloads = this.view.concurrentDownloads;
+                this.draftAdaptiveFileConcurrency = this.view.adaptiveFileConcurrency;
+                this.draftTargetDownloadRateMiB = this.view.targetDownloadRateMiB;
                 this.draftRequestsPerSecond = this.view.requestsPerSecond;
                 return this.view;
             } finally {

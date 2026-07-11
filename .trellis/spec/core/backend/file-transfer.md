@@ -20,6 +20,8 @@ library only; do not add grab, gdl, req, or another download library.
         Headers           map[string]string
         TempDir           string
         Concurrency       int
+        AdaptiveConcurrency bool
+        TargetBytesPerSecond int64
         ChunkSize         int64
         MemoryLimit       int64
         OverwriteExisting bool
@@ -35,6 +37,9 @@ library only; do not add grab, gdl, req, or another download library.
 - Larger files store resumable chunks under
   temp/mod-downloader/md5(url|destination), then merge atomically.
 - A server without range support streams directly to destination.part.
+- Adaptive range mode observes completed bytes once per second and adds a
+  worker when throughput is below `TargetBytesPerSecond`; it leaves direct
+  downloads unchanged.
 - Every request receives caller-provided headers and
   Accept-Encoding: identity unless explicitly overridden.
 - Progress is atomically queryable and may also invoke a callback.

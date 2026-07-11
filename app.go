@@ -298,6 +298,8 @@ type SettingsView struct {
 	ModrinthKeyMask             string  `json:"modrinthKeyMask"`
 	FileConcurrency             int     `json:"fileConcurrency"`
 	ConcurrentDownloads         int     `json:"concurrentDownloads"`
+	AdaptiveFileConcurrency     bool    `json:"adaptiveFileConcurrency"`
+	TargetDownloadRateMiB       float64 `json:"targetDownloadRateMiB"`
 	RequestsPerSecond           int     `json:"requestsPerSecond"`
 }
 
@@ -327,9 +329,11 @@ type SaveMCIMSettingsRequest struct {
 }
 
 type SaveNetworkSettingsRequest struct {
-	FileConcurrency     int `json:"fileConcurrency"`
-	ConcurrentDownloads int `json:"concurrentDownloads"`
-	RequestsPerSecond   int `json:"requestsPerSecond"`
+	FileConcurrency         int     `json:"fileConcurrency"`
+	ConcurrentDownloads     int     `json:"concurrentDownloads"`
+	AdaptiveFileConcurrency bool    `json:"adaptiveFileConcurrency"`
+	TargetDownloadRateMiB   float64 `json:"targetDownloadRateMiB"`
+	RequestsPerSecond       int     `json:"requestsPerSecond"`
 }
 
 // Convention: a field value of "<keep>" means do not modify the original value (since the frontend cannot access plaintext).
@@ -380,9 +384,11 @@ func (a *App) SaveMCIMSettings(req SaveMCIMSettingsRequest) SettingsView {
 
 func (a *App) SaveNetworkSettings(req SaveNetworkSettingsRequest) SettingsView {
 	next := a.service().SaveNetworkSettings(appcore.SaveNetworkSettingsRequest{
-		FileConcurrency:     req.FileConcurrency,
-		ConcurrentDownloads: req.ConcurrentDownloads,
-		RequestsPerSecond:   req.RequestsPerSecond,
+		FileConcurrency:         req.FileConcurrency,
+		ConcurrentDownloads:     req.ConcurrentDownloads,
+		AdaptiveFileConcurrency: req.AdaptiveFileConcurrency,
+		TargetDownloadRateMiB:   req.TargetDownloadRateMiB,
+		RequestsPerSecond:       req.RequestsPerSecond,
 	})
 	a.config = a.core.Config()
 	return settingsViewFromCore(next)
@@ -551,6 +557,8 @@ func settingsViewFromCore(sv appcore.SettingsView) SettingsView {
 		ModrinthKeyMask:             sv.ModrinthKeyMask,
 		FileConcurrency:             sv.FileConcurrency,
 		ConcurrentDownloads:         sv.ConcurrentDownloads,
+		AdaptiveFileConcurrency:     sv.AdaptiveFileConcurrency,
+		TargetDownloadRateMiB:       sv.TargetDownloadRateMiB,
 		RequestsPerSecond:           sv.RequestsPerSecond,
 	}
 }

@@ -46,6 +46,8 @@ mcim_enabled = false
 [downloads]
 file_concurrency = 4
 concurrent_downloads = 1
+adaptive_file_concurrency = false
+target_download_rate_mib = 1.0
 
 [api]
 requests_per_second = 0
@@ -60,13 +62,15 @@ Environment variables:
 - `PREFERS_MCIM_ENABLED`
 - `DOWNLOADS_FILE_CONCURRENCY`
 - `DOWNLOADS_CONCURRENT_DOWNLOADS`
+- `DOWNLOADS_ADAPTIVE_FILE_CONCURRENCY`
+- `DOWNLOADS_TARGET_DOWNLOAD_RATE_MIB`
 - `API_REQUESTS_PER_SECOND`
 - `HTTP_PROXY` / `HTTPS_PROXY`
 - `NO_PROXY`
 
 `theme` supports `dark`, `light`, or `system`. The Modrinth key field is currently reserved for future use; Modrinth requests are made with the app user agent, while CurseForge requires `curseforge_api_key` or `KEYS_CF_API_KEY` to enable that source.
 
-`file_concurrency` controls the number of ranged chunks used for one file, and `concurrent_downloads` controls how many files may download at once. `requests_per_second` limits the combined CurseForge and Modrinth API request rate; `0` disables rate limiting.
+`file_concurrency` controls the initial number of ranged chunks used for one file, and `concurrent_downloads` controls how many files may download at once. When `adaptive_file_concurrency` is enabled, the downloader adds range workers each second while throughput is below `target_download_rate_mib` (0.1-5 MiB/s). `requests_per_second` limits the combined CurseForge and Modrinth API request rate; `0` disables rate limiting.
 
 All outbound API, metadata, and file requests automatically use the process system proxy environment. `NO_PROXY` exclusions are honored; lowercase proxy variable names are also supported by Go.
 
