@@ -4,7 +4,10 @@
         <v-main>
             <v-container fluid class="position-relative">
                 <router-view v-slot="{ Component, route }">
-                    <transition v-bind="routeTransitionProps">
+                    <keep-alive v-if="animationsOff">
+                        <component :is="Component" :key="route.path" />
+                    </keep-alive>
+                    <transition v-else v-bind="routeTransitionProps">
                         <keep-alive>
                             <component :is="Component" :key="route.path" />
                         </keep-alive>
@@ -284,9 +287,7 @@ const routeTransitionProps = computed(() => (
             onLeave: leaveGsapRoute,
             onAfterLeave: afterGsapRouteLeave,
         }
-        : animationsOff.value
-            ? { css: false, mode: "out-in" as const }
-            : { name: "slide-fade", mode: "out-in" as const }
+        : { name: "slide-fade", mode: "out-in" as const }
 ));
 const fabTransitionProps = computed(() => (
     gsapAnimationsActive.value
