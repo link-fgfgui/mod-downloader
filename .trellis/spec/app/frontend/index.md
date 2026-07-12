@@ -11,6 +11,7 @@ app adapter or `core/` specs.
 - [UI State Lifecycle](./ui-state-lifecycle.md)
 - [Local Mod Version Selection](./local-mod-version-selection.md)
 - [Download Completion Sound](./download-completion-sound.md)
+- [Language Preference](./language-preference.md)
 - [Shared Thinking Guides](../../guides/index.md)
 
 ## Pre-Development Checklist
@@ -26,6 +27,9 @@ app adapter or `core/` specs.
   [Local Mod Version Selection](./local-mod-version-selection.md).
 - Preserve the success-event plus queue-drain plus unfocused gate for audible
   download notifications; see [Download Completion Sound](./download-completion-sound.md).
+- Keep persisted language values, startup resolution, Settings behavior, and
+  localized native-dialog locale arguments aligned; see
+  [Language Preference](./language-preference.md).
 
 ## Quality Check
 

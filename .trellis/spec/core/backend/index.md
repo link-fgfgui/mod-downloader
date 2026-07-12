@@ -19,6 +19,7 @@ provider, download, storage, Minecraft parsing, and HTTP bridge logic.
 - [Provider API Source](./provider-api-source.md)
 - [System Proxy](./system-proxy.md)
 - [Local Mod Online Version Metadata](./local-mod-online-version.md)
+- [Language Preference](../../app/frontend/language-preference.md)
 
 ## Pre-Development Checklist
 
@@ -38,6 +39,8 @@ provider, download, storage, Minecraft parsing, and HTTP bridge logic.
 - Route every outbound HTTP client through [System Proxy](./system-proxy.md).
 - Preserve parsed JAR versions when adding provider version metadata; see
   [Local Mod Online Version Metadata](./local-mod-online-version.md).
+- Keep config parsing and appcore language fields aligned with the app/frontend
+  contract; see [Language Preference](../../app/frontend/language-preference.md).
 
 ## Quality Check
 

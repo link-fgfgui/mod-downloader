@@ -11,6 +11,7 @@ code in `app.go`. Reusable domain logic belongs in the `core/` submodule.
 - [Directory Structure](../../backend/directory-structure.md)
 - [Quality Guidelines](../../backend/quality-guidelines.md)
 - [Build Version](./build-version.md)
+- [Language Preference](../frontend/language-preference.md)
 
 ## Pre-Development Checklist
 
@@ -20,6 +21,8 @@ code in `app.go`. Reusable domain logic belongs in the `core/` submodule.
 - Preserve `replace github.com/link-fgfgui/mod-downloader-core => ./core`.
 - Inject release identity through `APP_VERSION` and Go `-X`; see
   [Build Version](./build-version.md).
+- When changing language fields or native dialog signatures, preserve the
+  cross-layer contract in [Language Preference](../frontend/language-preference.md).
 
 ## Quality Check
 
