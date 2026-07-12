@@ -425,6 +425,14 @@ func (a *App) QueueModDownload(req appstructs.ModDownloadRequest) appstructs.Mod
 	return a.service().QueueModDownload(req)
 }
 
+func (a *App) AnalyzeLocalModDisableImpact(req appstructs.LocalModDisableImpactRequest) (appstructs.LocalModDisableImpactResult, error) {
+	return a.service().AnalyzeLocalModDisableImpact(req)
+}
+
+func (a *App) RestoreCachedDependency(req appstructs.RestoreCachedDependencyRequest) appstructs.ModDownloadResult {
+	return a.service().RestoreCachedDependency(req)
+}
+
 func (a *App) GetDownloadQueueState() appstructs.DownloadQueueState {
 	return a.service().GetDownloadQueueState()
 }

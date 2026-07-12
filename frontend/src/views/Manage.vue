@@ -203,6 +203,82 @@
             </v-card>
         </v-dialog>
 
+        <v-dialog v-model="disableImpactDialog" max-width="680" @after-leave="clearClosedDisableImpactDialog">
+            <v-card>
+                <v-card-title>{{ $t("manage.disableImpact.title") }}</v-card-title>
+                <v-card-text>
+                    <div class="text-body-2 mb-3">{{ $t("manage.disableImpact.body") }}</div>
+                    <v-list density="compact" class="disable-impact-list">
+                        <v-list-item
+                            v-for="impact in disableImpacts"
+                            :key="impact.modId"
+                            :title="$t('manage.disableImpact.missing', { id: impact.modId })"
+                            :subtitle="disableImpactSubtitle(impact)"
+                        >
+                            <template #prepend>
+                                <v-icon icon="mdi-alert-circle-outline" color="warning"></v-icon>
+                            </template>
+                            <template #append>
+                                <v-tooltip v-if="impact.candidates?.length === 1" :text="$t('manage.disableImpact.restore')" location="top">
+                                    <template #activator="{ props: tip }">
+                                        <v-btn
+                                            v-bind="tip"
+                                            icon="mdi-download"
+                                            size="small"
+                                            variant="tonal"
+                                            color="primary"
+                                            :loading="restoringDependencyId === impact.modId"
+                                            :disabled="Boolean(restoringDependencyId) || restoredDependencies[impact.modId]"
+                                            @click="restoreDependency(impact, impact.candidates[0])"
+                                        ></v-btn>
+                                    </template>
+                                </v-tooltip>
+                                <v-menu v-else-if="impact.candidates?.length > 1">
+                                    <template #activator="{ props: menu }">
+                                        <v-btn
+                                            v-bind="menu"
+                                            icon="mdi-download-multiple"
+                                            size="small"
+                                            variant="tonal"
+                                            color="primary"
+                                            :title="$t('manage.disableImpact.chooseSource')"
+                                            :aria-label="$t('manage.disableImpact.chooseSource')"
+                                            :loading="restoringDependencyId === impact.modId"
+                                            :disabled="Boolean(restoringDependencyId) || restoredDependencies[impact.modId]"
+                                        ></v-btn>
+                                    </template>
+                                    <v-list density="compact">
+                                        <v-list-item
+                                            v-for="candidate in impact.candidates"
+                                            :key="`${candidate.platform}:${candidate.projectId}:${candidate.versionId}`"
+                                            :title="candidate.title || candidate.projectId"
+                                            :subtitle="candidate.platform"
+                                            prepend-icon="mdi-download"
+                                            @click="restoreDependency(impact, candidate)"
+                                        ></v-list-item>
+                                    </v-list>
+                                </v-menu>
+                                <v-tooltip v-else :text="$t('manage.disableImpact.cacheMiss')" location="top">
+                                    <template #activator="{ props: tip }">
+                                        <v-icon v-bind="tip" icon="mdi-cloud-off-outline" class="text-medium-emphasis"></v-icon>
+                                    </template>
+                                </v-tooltip>
+                            </template>
+                        </v-list-item>
+                    </v-list>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer></v-spacer>
+                    <v-btn variant="text" :disabled="isBatchBusy || Boolean(restoringDependencyId)" @click="disableImpactDialog = false">
+                        {{ $t("manage.disableImpact.cancel") }}
+                    </v-btn>
+                    <v-btn color="warning" variant="tonal" :loading="Boolean(batchOperation)" :disabled="Boolean(restoringDependencyId)" @click="confirmDisableImpact">
+                        {{ $t("manage.disableImpact.continue") }}
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
         <v-dialog v-model="versionDialog" max-width="680" @after-leave="clearClosedVersionDialog">
             <v-card class="version-dialog">
                 <v-toolbar density="compact" color="surface">
@@ -249,7 +325,7 @@ import AddToFavoriteDialog from "../components/AddToFavoriteDialog.vue";
 import ModVersionList from "../components/ModVersionList.vue";
 import { useMinecraftStore } from "../stores/minecraft";
 import { useSettingsStore } from "../stores/settings";
-import { ApplyLocalModBatchOperation, GetPinnedModVersion, ListMatchingProjectVersions, PinModVersion, QueueModDownload, ScanUnusedDependencies } from "../../wailsjs/go/main/App";
+import { AnalyzeLocalModDisableImpact, ApplyLocalModBatchOperation, GetPinnedModVersion, ListMatchingProjectVersions, PinModVersion, QueueModDownload, RestoreCachedDependency, ScanUnusedDependencies } from "../../wailsjs/go/main/App";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
 
 const minecraftStore = useMinecraftStore();
@@ -264,6 +340,10 @@ const cleanupOperation = ref(false);
 const deleteDialog = ref(false);
 const cleanupDialog = ref(false);
 const cleanupCandidates = ref([]);
+const disableImpactDialog = ref(false);
+const disableImpacts = ref([]);
+const restoringDependencyId = ref("");
+const restoredDependencies = ref({});
 const pendingDeleteGroups = ref([]);
 const pendingDeleteCount = ref(0);
 const operationError = ref("");
@@ -283,6 +363,7 @@ const pinningVersionId = ref("");
 let replacementQueued = false;
 let stopListeningDownloadQueue = null;
 let pendingDeleteClearSelection = null;
+let pendingDisableOperation = null;
 let listScrollTimer = 0;
 
 const restoreListTooltips = () => {
@@ -619,7 +700,7 @@ const manageSelectionActions = (groups, clearSelection) => {
     ];
 };
 
-const applyBatchOperation = async (groups, action, clearSelection) => {
+const executeBatchOperation = async (groups, action, clearSelection) => {
     const paths = selectedGroupPaths(groups);
     if (!paths.length || batchOperation.value) {
         return;
@@ -640,6 +721,83 @@ const applyBatchOperation = async (groups, action, clearSelection) => {
     } finally {
         batchOperation.value = "";
     }
+};
+
+const applyBatchOperation = async (groups, action, clearSelection) => {
+    const paths = selectedGroupPaths(groups);
+    if (!paths.length || batchOperation.value) return;
+    if (action !== "disable" && action !== "invert") {
+        return await executeBatchOperation(groups, action, clearSelection);
+    }
+
+    batchOperation.value = "analyze";
+    operationError.value = "";
+    showOperationError.value = false;
+    try {
+        const result = await AnalyzeLocalModDisableImpact({ paths, action });
+        const impacts = result?.impacts || [];
+        if (!impacts.length) {
+            batchOperation.value = "";
+            return await executeBatchOperation(groups, action, clearSelection);
+        }
+        disableImpacts.value = impacts;
+        restoredDependencies.value = {};
+        pendingDisableOperation = { groups: [...groups], action, clearSelection };
+        disableImpactDialog.value = true;
+        return false;
+    } catch (error) {
+        operationError.value = errorMessage(error);
+        showOperationError.value = true;
+        return false;
+    } finally {
+        if (batchOperation.value === "analyze") batchOperation.value = "";
+    }
+};
+
+const disableImpactSubtitle = (impact) => {
+    const names = (impact.affectedMods || []).map((mod) => mod.name || mod.fileName || mod.path).filter(Boolean);
+    return t("manage.disableImpact.affected", { mods: names.join(", ") });
+};
+
+const restoreDependency = async (impact, candidate) => {
+    if (!candidate || restoringDependencyId.value) return;
+    restoringDependencyId.value = impact.modId;
+    try {
+        const result = await RestoreCachedDependency({
+            modId: impact.modId,
+            platform: candidate.platform,
+            projectId: candidate.projectId,
+            versionId: candidate.versionId,
+        });
+        if (result?.queued) {
+            restoredDependencies.value = { ...restoredDependencies.value, [impact.modId]: true };
+            replacementQueued = true;
+            showSnackbar("manage.disableImpact.queued", "success", { id: impact.modId });
+        } else {
+            operationError.value = result?.reason || t("manage.disableImpact.restoreFailed");
+            showOperationError.value = true;
+        }
+    } catch (error) {
+        operationError.value = errorMessage(error);
+        showOperationError.value = true;
+    } finally {
+        restoringDependencyId.value = "";
+    }
+};
+
+const confirmDisableImpact = async () => {
+    const pending = pendingDisableOperation;
+    if (!pending || batchOperation.value) return;
+    const ok = await executeBatchOperation(pending.groups, pending.action, pending.clearSelection);
+    if (ok) disableImpactDialog.value = false;
+};
+
+const clearClosedDisableImpactDialog = () => {
+    if (disableImpactDialog.value) return;
+    disableImpacts.value = [];
+    restoredDependencies.value = {};
+    restoringDependencyId.value = "";
+    pendingDisableOperation = null;
 };
 
 const toggleGroup = async (group) => {
@@ -926,6 +1084,11 @@ onDeactivated(() => {
 
 .manage-status-toggle {
     min-width: 96px;
+}
+
+.disable-impact-list {
+    max-height: min(48vh, 420px);
+    overflow-y: auto;
 }
 
 @media (max-width: 599.98px) {

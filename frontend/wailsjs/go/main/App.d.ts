@@ -14,6 +14,8 @@ export function AddFavoriteModsToLists(arg1:appcore.FavoriteBulkAddRequest):Prom
 
 export function AnalyzeBatchIncompatibleConflicts(arg1:structs.BatchDownloadRequest):Promise<structs.BatchIncompatibleAnalysis>;
 
+export function AnalyzeLocalModDisableImpact(arg1:structs.LocalModDisableImpactRequest):Promise<structs.LocalModDisableImpactResult>;
+
 export function ApplyFavoriteListMigration(arg1:appcore.FavoriteMigrationRequest):Promise<appcore.FavoriteMigrationApplyResult>;
 
 export function ApplyLocalModBatchOperation(arg1:structs.LocalModBatchOperationRequest):Promise<structs.VersionInfo>;
@@ -91,6 +93,8 @@ export function RemoveFavoriteMod(arg1:string,arg2:string,arg3:string,arg4:strin
 export function RenameFavoriteList(arg1:string,arg2:string):Promise<storage.FavoriteList>;
 
 export function ReorderFavoriteLists(arg1:Array<string>):Promise<boolean>;
+
+export function RestoreCachedDependency(arg1:structs.RestoreCachedDependencyRequest):Promise<structs.ModDownloadResult>;
 
 export function RetryDownload(arg1:string):Promise<boolean>;
 

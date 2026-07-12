@@ -18,6 +18,10 @@ export function AnalyzeBatchIncompatibleConflicts(arg1) {
   return window['go']['main']['App']['AnalyzeBatchIncompatibleConflicts'](arg1);
 }
 
+export function AnalyzeLocalModDisableImpact(arg1) {
+  return window['go']['main']['App']['AnalyzeLocalModDisableImpact'](arg1);
+}
+
 export function ApplyFavoriteListMigration(arg1) {
   return window['go']['main']['App']['ApplyFavoriteListMigration'](arg1);
 }
@@ -172,6 +176,10 @@ export function RenameFavoriteList(arg1, arg2) {
 
 export function ReorderFavoriteLists(arg1) {
   return window['go']['main']['App']['ReorderFavoriteLists'](arg1);
+}
+
+export function RestoreCachedDependency(arg1) {
+  return window['go']['main']['App']['RestoreCachedDependency'](arg1);
 }
 
 export function RetryDownload(arg1) {
