@@ -71,6 +71,7 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
     }),
     getters: {
         confirmStatuses: () => new Set(["update", "conflict", "incompatible"]),
+        metadataRetryStatuses: () => new Set(["metadataLoading", "metadataFailed"]),
     },
     actions: {
         showSnackbar(key: string, color = "success", params: Record<string, string> = {}) {
@@ -186,6 +187,10 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
         async installMod(payload: { result?: SearchModSnapshot; key?: string; status?: string; conflictFileName?: string; confirm?: boolean }) {
             const { result, key, status, conflictFileName, confirm } = payload || {};
             if (!key || this.downloadingKeys[key] || !this.hasSelectedInstance || !this.selectedVersion || !this.selectedModLoader) {
+                return;
+            }
+            if (this.metadataRetryStatuses.has(status || "")) {
+                await this.refreshDownloadStates();
                 return;
             }
             if (confirm && this.confirmStatuses.has(status || "")) {
