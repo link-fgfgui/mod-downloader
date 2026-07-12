@@ -652,3 +652,38 @@ Made enabled JIJ entries satisfy local required dependencies, added projected di
 ### Next Steps
 
 - None - task complete
+
+
+## Session 20: Refactor project structure for AI navigation
+
+**Date**: 2026-07-13
+**Task**: Refactor project structure for AI navigation
+**Package**: app
+**Branch**: `master`
+
+### Summary
+
+Added architecture and package navigation maps, separated Wails and appcore contracts, corrected stale CLI documentation, verified Go/frontend quality gates, and confirmed a single mimo run could trace a real search workflow.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `74596b7` | (see git log) |
+| `3b7e143` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
