@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import {
     GetSettings,
+    SaveLanguage,
     SaveTheme,
     SaveAnimationSettings,
     SaveApiKeys,
@@ -18,6 +19,12 @@ import {
     normalizeAnimationMode,
     normalizeAnimationDurationMultiplier,
 } from "../composables/useAnimationSettings";
+import {
+    applyLanguagePreference,
+    currentLocale,
+    languageSystem,
+    normalizeLanguagePreference,
+} from "../plugins/i18n";
 
 const themeDark = "dark";
 const themeLight = "light";
@@ -30,6 +37,7 @@ export const useSettingsStore = defineStore("settings", {
         view: null as main.SettingsView | null,
         isLoading: false,
         isSavingTheme: false,
+        isSavingLanguage: false,
         isSavingAnimations: false,
         isSavingUnusedDependencyCleanup: false,
         isSavingMCIM: false,
@@ -37,6 +45,7 @@ export const useSettingsStore = defineStore("settings", {
         isSavingCacheDir: false,
         isChoosingCacheDir: false,
         draftTheme: "",
+        draftLanguage: languageSystem,
         draftAnimationMode: defaultAnimationMode,
         draftAnimationDurationMultiplier: defaultAnimationDurationMultiplier,
         draftAutoScanUnusedDependencies: false,
@@ -81,6 +90,7 @@ export const useSettingsStore = defineStore("settings", {
             try {
                 this.view = await GetSettings();
                 this.draftTheme = this.view?.theme || themeDark;
+                this.draftLanguage = normalizeLanguagePreference(this.view?.language);
                 this.draftAnimationMode = normalizeAnimationMode(
                     this.view?.animationMode,
                     this.view?.animationEnabled
@@ -112,6 +122,18 @@ export const useSettingsStore = defineStore("settings", {
                 return next;
             } finally {
                 this.isSavingTheme = false;
+            }
+        },
+        async saveLanguage() {
+            this.isSavingLanguage = true;
+            try {
+                const next = normalizeLanguagePreference(await SaveLanguage(this.draftLanguage));
+                if (this.view) this.view.language = next;
+                this.draftLanguage = next;
+                applyLanguagePreference(next);
+                return next;
+            } finally {
+                this.isSavingLanguage = false;
             }
         },
         async saveAnimationSettings() {
@@ -201,7 +223,7 @@ export const useSettingsStore = defineStore("settings", {
             this.isChoosingCacheDir = true;
             try {
                 const previous = this.view?.cacheDir || "";
-                this.view = await ChooseCacheDir();
+                this.view = await ChooseCacheDir(currentLocale());
                 return (this.view?.cacheDir || "") !== previous;
             } finally {
                 this.isChoosingCacheDir = false;

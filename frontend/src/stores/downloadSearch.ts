@@ -1,4 +1,5 @@
 import { defineStore } from "pinia";
+import i18n from "../plugins/i18n";
 
 import {
     AnalyzeBatchIncompatibleConflicts,
@@ -348,8 +349,8 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
                 void this.refreshDownloadStates();
             });
             this.stopListeningDownloadFailed = EventsOn(downloadFailedEvent, (event) => {
-                const fileName = event?.fileName || event?.FileName || "File";
-                const reason = event?.reason || event?.Reason || "Download failed";
+                const fileName = event?.fileName || event?.FileName || i18n.global.t("download.errors.unknownFile");
+                const reason = event?.reason || event?.Reason || i18n.global.t("download.errors.generic");
                 this.showSnackbar("download.errors.failedWithReason", "error", { fileName, reason });
                 void this.refreshDownloadStates();
             });

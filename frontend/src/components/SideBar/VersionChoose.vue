@@ -7,7 +7,7 @@
                     <v-select
                         v-model="selectedVersionName"
                         :items="versionList"
-                        label="Version"
+                        :label="$t('sidebar.version')"
                         density="compact"
                         hide-details
                         variant="outlined"
@@ -20,6 +20,7 @@
                         :disabled="isRefreshing || isLoading"
                         density="compact"
                         size="small"
+                        :aria-label="$t('sidebar.refresh')"
                         @click="refreshSelectedMods"
                     ></v-btn>
                 </div>
@@ -28,12 +29,14 @@
                     v-model:mod-loader="selectedModLoader"
                     :versions="releaseVersionList"
                     :mod-loaders="modLoaderList"
+                    :minecraft-version-label="$t('sidebar.minecraftVersion')"
+                    :mod-loader-label="$t('sidebar.modLoader')"
                     class="mt-2"
                     stacked
                 ></MinecraftTargetFields>
                 <v-text-field
                     v-model="downloadFolder"
-                    label=".minecraft folder"
+                    :label="$t('sidebar.minecraftDir')"
                     density="compact"
                     hide-details
                     variant="outlined"
@@ -47,8 +50,8 @@
         <div
             v-show="!isExpanded"
             class="version-rail-summary"
-            :title="selectedVersionName || 'Version'"
-            :aria-label="selectedVersionName || 'Version'"
+            :title="selectedVersionName || $t('sidebar.version')"
+            :aria-label="selectedVersionName || $t('sidebar.version')"
         >
             <v-icon icon="mdi-cube-outline" size="24"></v-icon>
         </div>

@@ -20,9 +20,9 @@ export function ApplyLocalModBatchOperation(arg1:structs.LocalModBatchOperationR
 
 export function CancelDownload(arg1:string):Promise<boolean>;
 
-export function ChooseCacheDir():Promise<main.SettingsView>;
+export function ChooseCacheDir(arg1:string):Promise<main.SettingsView>;
 
-export function ChooseMinecraftDir():Promise<string>;
+export function ChooseMinecraftDir(arg1:string):Promise<string>;
 
 export function ClearOptionalDependencyReminders():Promise<boolean>;
 
@@ -34,7 +34,7 @@ export function DeleteFavoriteList(arg1:string):Promise<boolean>;
 
 export function DismissOptionalDependencyReminder(arg1:string):Promise<boolean>;
 
-export function ExportFavoriteListPackwizZip(arg1:string,arg2:string,arg3:string):Promise<main.ExportFavoritePackwizResult>;
+export function ExportFavoriteListPackwizZip(arg1:string,arg2:string,arg3:string,arg4:string):Promise<main.ExportFavoritePackwizResult>;
 
 export function GetAppVersion():Promise<string>;
 
@@ -99,6 +99,8 @@ export function SaveAnimationSettings(arg1:main.SaveAnimationSettingsRequest):Pr
 export function SaveApiKeys(arg1:main.SaveApiKeysRequest):Promise<main.SettingsView>;
 
 export function SaveCacheDirPreference(arg1:string):Promise<main.SettingsView>;
+
+export function SaveLanguage(arg1:string):Promise<string>;
 
 export function SaveMCIMSettings(arg1:main.SaveMCIMSettingsRequest):Promise<main.SettingsView>;
 

@@ -375,6 +375,50 @@ func TestSaveThemePersistsAndNormalizes(t *testing.T) {
 	}
 }
 
+func TestSaveLanguagePersistsAndNormalizes(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(oldwd); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	app := &App{config: &configs.Config{}}
+	if got := app.SaveLanguage("zh-CN"); got != "zh" {
+		t.Fatalf("SaveLanguage(zh-CN) = %q, want zh", got)
+	}
+	if got := app.GetPreferences().Language; got != "zh" {
+		t.Fatalf("GetPreferences().Language = %q, want zh", got)
+	}
+	if got := app.GetSettings().Language; got != "zh" {
+		t.Fatalf("GetSettings().Language = %q, want zh", got)
+	}
+
+	loaded, err := configs.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := loaded.Prefers.Language.Normalized(); got != configs.LanguageChinese {
+		t.Fatalf("persisted language = %q, want zh", got)
+	}
+}
+
+func TestLocalizedDialogText(t *testing.T) {
+	if got := localizedDialogText("zh-TW").chooseCacheDir; got != "选择缓存文件夹" {
+		t.Fatalf("Chinese cache dialog title = %q", got)
+	}
+	if got := localizedDialogText("fr-FR").chooseCacheDir; got != "Choose cache folder" {
+		t.Fatalf("fallback cache dialog title = %q", got)
+	}
+}
+
 func TestSaveAnimationSettingsPersistsAndNormalizes(t *testing.T) {
 	oldwd, err := os.Getwd()
 	if err != nil {

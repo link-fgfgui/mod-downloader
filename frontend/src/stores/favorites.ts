@@ -18,6 +18,7 @@ import {
     UpdateFavoriteListMetadata,
 } from "../../wailsjs/go/main/App";
 import type { appcore, main, storage } from "../../wailsjs/go/models";
+import { currentLocale } from "../plugins/i18n";
 
 export type FavoriteModDraft = {
     platform: string;
@@ -287,7 +288,12 @@ export const useFavoritesStore = defineStore("favorites", {
             if (!targetListId || this.isExportingPackwiz) return null;
             this.isExportingPackwiz = true;
             try {
-                return await ExportFavoriteListPackwizZip(targetListId, this.displayMinecraftVersion, this.displayModLoader);
+                return await ExportFavoriteListPackwizZip(
+                    targetListId,
+                    this.displayMinecraftVersion,
+                    this.displayModLoader,
+                    currentLocale(),
+                );
             } finally {
                 this.isExportingPackwiz = false;
             }

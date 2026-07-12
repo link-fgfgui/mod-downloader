@@ -234,6 +234,7 @@ export namespace main {
 	
 	export class AppPreferences {
 	    theme: string;
+	    language: string;
 	    animationMode: string;
 	    animationEnabled: boolean;
 	    animationDurationMultiplier: number;
@@ -245,6 +246,7 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.theme = source["theme"];
+	        this.language = source["language"];
 	        this.animationMode = source["animationMode"];
 	        this.animationEnabled = source["animationEnabled"];
 	        this.animationDurationMultiplier = source["animationDurationMultiplier"];
@@ -340,6 +342,7 @@ export namespace main {
 	}
 	export class SettingsView {
 	    theme: string;
+	    language: string;
 	    animationMode: string;
 	    animationEnabled: boolean;
 	    animationDurationMultiplier: number;
@@ -365,6 +368,7 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.theme = source["theme"];
+	        this.language = source["language"];
 	        this.animationMode = source["animationMode"];
 	        this.animationEnabled = source["animationEnabled"];
 	        this.animationDurationMultiplier = source["animationDurationMultiplier"];

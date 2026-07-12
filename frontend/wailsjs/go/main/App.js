@@ -30,12 +30,12 @@ export function CancelDownload(arg1) {
   return window['go']['main']['App']['CancelDownload'](arg1);
 }
 
-export function ChooseCacheDir() {
-  return window['go']['main']['App']['ChooseCacheDir']();
+export function ChooseCacheDir(arg1) {
+  return window['go']['main']['App']['ChooseCacheDir'](arg1);
 }
 
-export function ChooseMinecraftDir() {
-  return window['go']['main']['App']['ChooseMinecraftDir']();
+export function ChooseMinecraftDir(arg1) {
+  return window['go']['main']['App']['ChooseMinecraftDir'](arg1);
 }
 
 export function ClearOptionalDependencyReminders() {
@@ -58,8 +58,8 @@ export function DismissOptionalDependencyReminder(arg1) {
   return window['go']['main']['App']['DismissOptionalDependencyReminder'](arg1);
 }
 
-export function ExportFavoriteListPackwizZip(arg1, arg2, arg3) {
-  return window['go']['main']['App']['ExportFavoriteListPackwizZip'](arg1, arg2, arg3);
+export function ExportFavoriteListPackwizZip(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['ExportFavoriteListPackwizZip'](arg1, arg2, arg3, arg4);
 }
 
 export function GetAppVersion() {
@@ -188,6 +188,10 @@ export function SaveApiKeys(arg1) {
 
 export function SaveCacheDirPreference(arg1) {
   return window['go']['main']['App']['SaveCacheDirPreference'](arg1);
+}
+
+export function SaveLanguage(arg1) {
+  return window['go']['main']['App']['SaveLanguage'](arg1);
 }
 
 export function SaveMCIMSettings(arg1) {

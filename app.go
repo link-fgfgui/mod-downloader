@@ -38,6 +38,7 @@ type App struct {
 
 type AppPreferences struct {
 	Theme                       string  `json:"theme"`
+	Language                    string  `json:"language"`
 	AnimationMode               string  `json:"animationMode"`
 	AnimationEnabled            bool    `json:"animationEnabled"`
 	AnimationDurationMultiplier float64 `json:"animationDurationMultiplier"`
@@ -238,13 +239,14 @@ func (a *App) RemoveFavoriteMod(listID, platform, modID, mcVersion, modLoader st
 	return a.service().RemoveFavoriteMod(listID, platform, modID, mcVersion, modLoader)
 }
 
-func (a *App) ExportFavoriteListPackwizZip(listID, minecraftVersion, modLoader string) ExportFavoritePackwizResult {
+func (a *App) ExportFavoriteListPackwizZip(listID, minecraftVersion, modLoader, locale string) ExportFavoritePackwizResult {
+	dialogText := localizedDialogText(locale)
 	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		Title:                "Export packwiz modpack",
+		Title:                dialogText.exportPackwizTitle,
 		DefaultFilename:      a.service().FavoriteListPackwizDefaultFilename(listID),
 		CanCreateDirectories: true,
 		Filters: []runtime.FileFilter{{
-			DisplayName: "ZIP archives (*.zip)",
+			DisplayName: dialogText.zipArchives,
 			Pattern:     "*.zip",
 		}},
 	})
@@ -274,6 +276,7 @@ func (a *App) GetPreferences() AppPreferences {
 	prefs := a.service().GetPreferences()
 	return AppPreferences{
 		Theme:                       prefs.Theme,
+		Language:                    prefs.Language,
 		AnimationMode:               prefs.AnimationMode,
 		AnimationEnabled:            prefs.AnimationEnabled,
 		AnimationDurationMultiplier: prefs.AnimationDurationMultiplier,
@@ -284,6 +287,7 @@ func (a *App) GetPreferences() AppPreferences {
 // not sending raw keys back to the frontend; the frontend overwrites via SaveApiKeys.
 type SettingsView struct {
 	Theme                       string  `json:"theme"` // dark | light | system
+	Language                    string  `json:"language"`
 	AnimationMode               string  `json:"animationMode"`
 	AnimationEnabled            bool    `json:"animationEnabled"`
 	AnimationDurationMultiplier float64 `json:"animationDurationMultiplier"`
@@ -354,6 +358,12 @@ func maskKey(s string) string {
 // Invalid values fall back to dark.
 func (a *App) SaveTheme(theme string) string {
 	next := a.service().SaveTheme(theme)
+	a.config = a.core.Config()
+	return next
+}
+
+func (a *App) SaveLanguage(language string) string {
+	next := a.service().SaveLanguage(language)
 	a.config = a.core.Config()
 	return next
 }
@@ -459,9 +469,9 @@ func (a *App) shutdown(ctx context.Context) {
 	a.config = a.core.Config()
 }
 
-func (a *App) ChooseMinecraftDir() string {
+func (a *App) ChooseMinecraftDir(locale string) string {
 	dir, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
-		Title:           "Choose .minecraft folder",
+		Title:           localizedDialogText(locale).chooseMinecraftDir,
 		ShowHiddenFiles: true,
 	})
 	if err != nil {
@@ -471,9 +481,9 @@ func (a *App) ChooseMinecraftDir() string {
 	return a.service().SetMinecraftDir(dir)
 }
 
-func (a *App) ChooseCacheDir() SettingsView {
+func (a *App) ChooseCacheDir(locale string) SettingsView {
 	dir, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
-		Title:           "Choose cache folder",
+		Title:           localizedDialogText(locale).chooseCacheDir,
 		ShowHiddenFiles: true,
 	})
 	if err != nil {
@@ -543,6 +553,7 @@ func (a *App) SelectVersion(versionKey string) (structs.VersionInfo, error) {
 func settingsViewFromCore(sv appcore.SettingsView) SettingsView {
 	return SettingsView{
 		Theme:                       sv.Theme,
+		Language:                    sv.Language,
 		AnimationMode:               sv.AnimationMode,
 		AnimationEnabled:            sv.AnimationEnabled,
 		AnimationDurationMultiplier: sv.AnimationDurationMultiplier,
@@ -560,6 +571,30 @@ func settingsViewFromCore(sv appcore.SettingsView) SettingsView {
 		AdaptiveFileConcurrency:     sv.AdaptiveFileConcurrency,
 		TargetDownloadRateMiB:       sv.TargetDownloadRateMiB,
 		RequestsPerSecond:           sv.RequestsPerSecond,
+	}
+}
+
+type dialogText struct {
+	chooseMinecraftDir string
+	chooseCacheDir     string
+	exportPackwizTitle string
+	zipArchives        string
+}
+
+func localizedDialogText(locale string) dialogText {
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(locale)), "zh") {
+		return dialogText{
+			chooseMinecraftDir: "选择 .minecraft 文件夹",
+			chooseCacheDir:     "选择缓存文件夹",
+			exportPackwizTitle: "导出 packwiz 整合包",
+			zipArchives:        "ZIP 压缩包 (*.zip)",
+		}
+	}
+	return dialogText{
+		chooseMinecraftDir: "Choose .minecraft folder",
+		chooseCacheDir:     "Choose cache folder",
+		exportPackwizTitle: "Export packwiz modpack",
+		zipArchives:        "ZIP archives (*.zip)",
 	}
 }
 

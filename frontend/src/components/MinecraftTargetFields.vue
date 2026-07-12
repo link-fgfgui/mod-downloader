@@ -3,7 +3,7 @@
         <v-combobox
             v-model="minecraftVersion"
             :items="versions"
-            :label="minecraftVersionLabel"
+            :label="minecraftVersionLabel || t('sidebar.minecraftVersion')"
             density="compact"
             hide-details
             variant="outlined"
@@ -12,7 +12,7 @@
         <v-select
             v-model="modLoader"
             :items="modLoaders"
-            :label="modLoaderLabel"
+            :label="modLoaderLabel || t('sidebar.modLoader')"
             density="compact"
             hide-details
             variant="outlined"
@@ -21,6 +21,10 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
+
 withDefaults(defineProps<{
     versions: string[];
     modLoaders: string[];
@@ -28,8 +32,8 @@ withDefaults(defineProps<{
     modLoaderLabel?: string;
     stacked?: boolean;
 }>(), {
-    minecraftVersionLabel: "Minecraft Version",
-    modLoaderLabel: "Mod Loader",
+    minecraftVersionLabel: "",
+    modLoaderLabel: "",
     stacked: false,
 });
 

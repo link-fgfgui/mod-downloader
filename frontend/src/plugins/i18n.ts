@@ -55,6 +55,8 @@ const messages = {
       },
     },
     search: {
+      label: "搜索 Mod",
+      action: "搜索",
       noMoreResults: "没有更多结果",
     },
     unpin: {
@@ -81,11 +83,19 @@ const messages = {
     },
     settings: {
       title: "设置",
+      language: {
+        label: "语言",
+        system: "跟随系统",
+        zh: "简体中文",
+        en: "English",
+        saved: "语言已应用",
+      },
       theme: { label: "主题", dark: "深色", light: "浅色", system: "跟随系统", saved: "主题已应用" },
       animations: {
         label: "动画",
         mode: "模式",
-        modes: { off: "关", vuetify: "Vuetify", gsap: "GSAP\n(实验性)" },
+        modes: {
+          off: "关", vuetify: "Vuetify", gsap: "GSAP(EXP)" },
         save: "保存",
         saved: "动画设置已应用",
       },
@@ -245,9 +255,10 @@ const messages = {
       },
     },
     download: {
+      versionsTitle: "Mod 版本",
       selectDirTitle: "需要先选择有效的 .minecraft 目录",
-      selectDirDesc: "当前目录为空或不可用，请先在左侧底部选择 .minecraft folder。",
-      noMatchingVersions: "没有匹配当前 Minecraft 版本和 Mod Loader 的版本。",
+      selectDirDesc: "当前目录为空或不可用，请先在左侧底部选择 .minecraft 目录。",
+      noMatchingVersions: "没有匹配当前 Minecraft 版本和加载器的版本。",
       queued: "已加入下载队列",
       queue: {
         title: "下载队列",
@@ -303,6 +314,13 @@ const messages = {
       },
     },
     versions: { installed: "已安装", pin: "固定此版本", unpin: "取消固定", replace: "替换为此版本" },
+    sidebar: {
+      version: "实例版本",
+      refresh: "刷新实例",
+      minecraftDir: ".minecraft 目录",
+      minecraftVersion: "Minecraft 版本",
+      modLoader: "加载器",
+    },
     aboutDescription:
       "这是一个基于 Wails + Vue3 + Vuetify + Router + i18n 的高配置桌面端模板。",
   },
@@ -360,6 +378,8 @@ const messages = {
       },
     },
     search: {
+      label: "Search mods",
+      action: "Search",
       noMoreResults: "No more results",
     },
     unpin: {
@@ -386,6 +406,13 @@ const messages = {
     },
     settings: {
       title: "Settings",
+      language: {
+        label: "Language",
+        system: "System",
+        zh: "简体中文",
+        en: "English",
+        saved: "Language applied",
+      },
       theme: { label: "Theme", dark: "Dark", light: "Light", system: "System", saved: "Theme applied" },
       animations: {
         label: "Animations",
@@ -550,6 +577,7 @@ const messages = {
       },
     },
     download: {
+      versionsTitle: "Mod Versions",
       selectDirTitle: "Please select a valid .minecraft directory first",
       selectDirDesc:
         "The current directory is empty or unavailable. Please select a .minecraft folder at the bottom-left first.",
@@ -610,16 +638,67 @@ const messages = {
       },
     },
     versions: { installed: "Installed", pin: "Pin this version", unpin: "Unpin", replace: "Replace with this version" },
+    sidebar: {
+      version: "Instance Version",
+      refresh: "Refresh instances",
+      minecraftDir: ".minecraft Directory",
+      minecraftVersion: "Minecraft Version",
+      modLoader: "Mod Loader",
+    },
     aboutDescription:
       "A feature-rich desktop template based on Wails + Vue3 + Vuetify + Router + i18n.",
   },
 };
 
+export const languageSystem = "system";
+export const languageChinese = "zh";
+export const languageEnglish = "en";
+
+export type LanguagePreference = typeof languageSystem | typeof languageChinese | typeof languageEnglish;
+export type AppLocale = typeof languageChinese | typeof languageEnglish;
+
+export function normalizeLanguagePreference(value: unknown): LanguagePreference {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (normalized === languageChinese || normalized === "zh-cn" || normalized === "zh-hans") {
+    return languageChinese;
+  }
+  if (normalized === languageEnglish) return languageEnglish;
+  return languageSystem;
+}
+
+export function resolveLanguagePreference(
+  preference: unknown,
+  systemLocales?: readonly string[],
+): AppLocale {
+  const normalized = normalizeLanguagePreference(preference);
+  if (normalized !== languageSystem) return normalized;
+  const locales = systemLocales ?? (typeof navigator === "undefined"
+    ? []
+    : [...(navigator.languages || []), navigator.language]);
+  const primaryLocale = locales.find((locale) => String(locale).trim()) ?? "";
+  return String(primaryLocale).trim().toLowerCase().startsWith("zh")
+    ? languageChinese
+    : languageEnglish;
+}
+
 const i18n = createI18n({
-  legacy: false, // Set to false to use Composition API in Vue 3
-  locale: "zh", // Default language
+  legacy: false,
+  locale: resolveLanguagePreference(languageSystem),
   fallbackLocale: "en",
   messages,
 });
+
+export function applyLanguagePreference(preference: unknown): AppLocale {
+  const locale = resolveLanguagePreference(preference);
+  i18n.global.locale.value = locale;
+  if (typeof document !== "undefined") {
+    document.documentElement.lang = locale === languageChinese ? "zh-CN" : "en";
+  }
+  return locale;
+}
+
+export function currentLocale(): AppLocale {
+  return i18n.global.locale.value as AppLocale;
+}
 
 export default i18n;

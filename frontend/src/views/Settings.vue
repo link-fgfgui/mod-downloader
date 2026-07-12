@@ -7,6 +7,21 @@
         <v-row>
             <v-col cols="12" md="6">
                 <v-card class="mb-4">
+                    <v-card-title>{{ $t('settings.language.label') }}</v-card-title>
+                    <v-card-text>
+                        <v-select
+                            v-model="settingsStore.draftLanguage"
+                            :items="languageOptions"
+                            item-title="title"
+                            item-value="value"
+                            :loading="settingsStore.isSavingLanguage"
+                            hide-details
+                            @update:model-value="onLanguageChange"
+                        />
+                    </v-card-text>
+                </v-card>
+
+                <v-card class="mb-4">
                     <v-card-title>{{ $t('settings.theme.label') }}</v-card-title>
                     <v-card-text>
                         <v-radio-group v-model="settingsStore.draftTheme" @update:model-value="onThemeChange">
@@ -195,6 +210,11 @@ const { t } = useI18n();
 const settingsStore = useSettingsStore();
 const snackbar = ref({ show: false, message: "", color: "success" });
 const animationsDisabled = computed(() => settingsStore.draftAnimationMode === animationModeOff);
+const languageOptions = computed(() => [
+    { title: t('settings.language.system'), value: 'system' },
+    { title: t('settings.language.zh'), value: 'zh' },
+    { title: t('settings.language.en'), value: 'en' },
+]);
 
 onActivated(() => {
     void settingsStore.load();
@@ -208,6 +228,11 @@ async function onThemeChange() {
     const next = await settingsStore.saveTheme();
     applyVuetifyTheme(next);
     snackbar.value = { show: true, message: t('settings.theme.saved'), color: "success" };
+}
+
+async function onLanguageChange() {
+    await settingsStore.saveLanguage();
+    snackbar.value = { show: true, message: t('settings.language.saved'), color: "success" };
 }
 
 async function chooseCacheDir() {
@@ -284,8 +309,6 @@ function clearModrinth() {
 .animation-mode-toggle :deep(.v-btn) {
     flex: 1 1 0;
     min-width: 0;
-    min-height: 56px;
-    white-space: pre-line;
 }
 
 .network-settings-grid {

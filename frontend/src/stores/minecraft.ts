@@ -12,6 +12,7 @@ import {
 } from "../../wailsjs/go/main/App";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
 import type { structs } from "../../wailsjs/go/models";
+import { currentLocale } from "../plugins/i18n";
 
 const minecraftDirChangedEvent = "minecraft-dir-changed";
 const selectedVersionChangedEvent = "selected-version-changed";
@@ -104,7 +105,7 @@ export const useMinecraftStore = defineStore("minecraft", {
             }
         },
         async chooseMinecraftDir() {
-            const result = await ChooseMinecraftDir();
+            const result = await ChooseMinecraftDir(currentLocale());
             if (result) {
                 await this.refreshMinecraftDir();
                 this.isLoading = true;

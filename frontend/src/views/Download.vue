@@ -13,7 +13,7 @@
                     <v-text-field
                         v-model="searchText"
                         placeholder="emi"
-                        label="Search mods"
+                        :label="$t('search.label')"
                         prepend-inner-icon="mdi-magnify"
                         variant="outlined"
                         density="comfortable"
@@ -32,7 +32,7 @@
                         :loading="isSearching"
                         @click="searchMods"
                     >
-                        Search
+                        {{ $t("search.action") }}
                     </v-btn>
                 </v-col>
             </v-row>
@@ -105,7 +105,7 @@
             >
                 <v-toolbar density="compact" color="surface">
                     <v-toolbar-title>{{
-                        selectedMod?.title || "Mod Versions"
+                        selectedMod?.title || $t("download.versionsTitle")
                     }}</v-toolbar-title>
                     <v-btn
                         icon="mdi-close"
