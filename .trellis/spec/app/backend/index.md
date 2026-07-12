@@ -27,6 +27,36 @@ code in `app.go`. Reusable domain logic belongs in the `core/` submodule.
 - Run `go build ./...` when Go signatures or imports change.
 - If public Wails API signatures change, regenerate frontend bindings.
 
+## Convention: Linux Wails Dev And Browser Automation
+
+- Unless a task explicitly requires native-app verification, do not start
+  `wails dev`; use the normal non-native checks instead.
+- When native-app verification is explicitly required on Linux, start it with
+  both WebKit build-tag arguments:
+
+  ```bash
+  wails dev -tags webkit2_41
+  ```
+
+- For browser automation against a running Wails development instance, parse
+  the Wails dev server URL/port from the `wails dev` process output. Do not use
+  the Vite port: it is an internal frontend development endpoint and is not the
+  browser-facing Wails runtime under test.
+
+Wrong:
+
+```bash
+wails dev
+# Automation opens the Vite URL/port.
+```
+
+Correct:
+
+```bash
+wails dev -tags webkit2_41
+# Automation waits for output, extracts the Wails dev URL/port, and opens it.
+```
+
 ## Scenario: Wails API And Frontend Binding Changes
 
 ### 1. Scope / Trigger
