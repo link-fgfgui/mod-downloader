@@ -9,3 +9,5 @@ exampleJars/
 dev.sh
 mods.gob.zst
 mods.gob.zst.*.tmp
+mod-metadata.tmp
+mod-favs.sqlite
