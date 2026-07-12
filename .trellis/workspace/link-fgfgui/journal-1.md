@@ -580,3 +580,39 @@ Added fsnotify monitoring for the selected mods directory, debounced event handl
 ### Next Steps
 
 - None - task complete
+
+
+## Session 18: Complete i18n language settings
+
+**Date**: 2026-07-12
+**Task**: Complete i18n language settings
+**Package**: app
+**Branch**: `master`
+
+### Summary
+
+Added persisted system/Chinese/English language preference across core config, appcore, Wails bindings, Settings, startup locale resolution, localized native dialogs, and remaining frontend UI text; added tests and a cross-layer language contract.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `123508f` | (see git log) |
+| `779c373` | (see git log) |
+| `253f393` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

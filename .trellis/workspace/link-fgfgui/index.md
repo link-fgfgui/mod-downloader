@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 17
+- **Total Sessions**: 18
 - **Last Active**: 2026-07-12
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~582 | Active |
+| `journal-1.md` | ~618 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 18 | 2026-07-12 | Complete i18n language settings | `123508f`, `779c373`, `253f393` | `master` |
 | 17 | 2026-07-12 | Incremental local mod refresh | `ec592ef`, `62acf6b` | `master` |
 | 16 | 2026-07-12 | Complete mod downloader issue backlog | `0613da2`, `987f770` | `master` |
 | 15 | 2026-07-07 | Sidebar version tuple scoped mod state | `1c81ecc` | `master` |
