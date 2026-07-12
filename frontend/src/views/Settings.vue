@@ -284,6 +284,8 @@ function clearModrinth() {
 .animation-mode-toggle :deep(.v-btn) {
     flex: 1 1 0;
     min-width: 0;
+    min-height: 56px;
+    white-space: pre-line;
 }
 
 .network-settings-grid {

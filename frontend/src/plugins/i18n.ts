@@ -85,7 +85,7 @@ const messages = {
       animations: {
         label: "动画",
         mode: "模式",
-        modes: { off: "关", vuetify: "Vuetify", gsap: "GSAP（实验性）" },
+        modes: { off: "关", vuetify: "Vuetify", gsap: "GSAP\n(实验性)" },
         save: "保存",
         saved: "动画设置已应用",
       },

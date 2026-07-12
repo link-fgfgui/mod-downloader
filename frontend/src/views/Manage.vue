@@ -835,7 +835,7 @@ onDeactivated(() => {
 .manage-search {
     flex: 0 0 auto;
     margin-bottom: 16px;
-    max-width: 520px;
+    width: 100%;
 }
 
 .empty-state {
