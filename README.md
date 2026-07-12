@@ -109,17 +109,9 @@ export APP_VERSION=v1.2.3
 wails build -ldflags "-X main.appVersion=${APP_VERSION}"
 ```
 
-Build the CLI binary:
-
-```bash
-go build ./cmd/mod-downloader-cli
-```
-
-Run the CLI during development:
-
-```bash
-go run ./cmd/mod-downloader-cli --help
-```
+The standalone CLI is maintained in the sibling `mod-downloader-cli`
+repository and is not part of this Wails checkout. It reuses this repository's
+`core` module; do not expect `./cmd/mod-downloader-cli` to exist here.
 
 Run tests:
 

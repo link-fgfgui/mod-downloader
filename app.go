@@ -36,14 +36,6 @@ type App struct {
 	server *httpserver.Server
 }
 
-type AppPreferences struct {
-	Theme                       string  `json:"theme"`
-	Language                    string  `json:"language"`
-	AnimationMode               string  `json:"animationMode"`
-	AnimationEnabled            bool    `json:"animationEnabled"`
-	AnimationDurationMultiplier float64 `json:"animationDurationMultiplier"`
-}
-
 // NewApp creates a new App application struct
 func NewApp() *App {
 	return &App{}
@@ -282,67 +274,6 @@ func (a *App) GetPreferences() AppPreferences {
 		AnimationDurationMultiplier: prefs.AnimationDurationMultiplier,
 	}
 }
-
-// SettingsView is a settings snapshot returned to the frontend. API keys use an "existence + mask" strategy,
-// not sending raw keys back to the frontend; the frontend overwrites via SaveApiKeys.
-type SettingsView struct {
-	Theme                       string  `json:"theme"` // dark | light | system
-	Language                    string  `json:"language"`
-	AnimationMode               string  `json:"animationMode"`
-	AnimationEnabled            bool    `json:"animationEnabled"`
-	AnimationDurationMultiplier float64 `json:"animationDurationMultiplier"`
-	AutoScanUnusedDependencies  bool    `json:"autoScanUnusedDependencies"`
-	MCIMEnabled                 bool    `json:"mcimEnabled"`
-	MinecraftDir                string  `json:"minecraftDir"` // simplified path (with env vars)
-	CacheDir                    string  `json:"cacheDir"`
-	CachePath                   string  `json:"cachePath"`
-	HasCurseforgeKey            bool    `json:"hasCurseforgeKey"`
-	CurseforgeKeyMask           string  `json:"curseforgeKeyMask"` // e.g. "abcd****wxyz" or ""
-	HasModrinthKey              bool    `json:"hasModrinthKey"`
-	ModrinthKeyMask             string  `json:"modrinthKeyMask"`
-	FileConcurrency             int     `json:"fileConcurrency"`
-	ConcurrentDownloads         int     `json:"concurrentDownloads"`
-	AdaptiveFileConcurrency     bool    `json:"adaptiveFileConcurrency"`
-	TargetDownloadRateMiB       float64 `json:"targetDownloadRateMiB"`
-	RequestsPerSecond           int     `json:"requestsPerSecond"`
-}
-
-// SaveApiKeysRequest is the request structure for the frontend to save API keys.
-type SaveApiKeysRequest struct {
-	CurseforgeApiKey string `json:"curseforgeApiKey"`
-	ModrinthApiKey   string `json:"modrinthApiKey"`
-}
-
-type SaveAnimationSettingsRequest struct {
-	AnimationMode               string  `json:"animationMode"`
-	AnimationEnabled            bool    `json:"animationEnabled"`
-	AnimationDurationMultiplier float64 `json:"animationDurationMultiplier"`
-}
-
-type ExportFavoritePackwizResult struct {
-	Path     string `json:"path"`
-	Canceled bool   `json:"canceled"`
-}
-
-type SaveUnusedDependencyCleanupSettingsRequest struct {
-	AutoScanUnusedDependencies bool `json:"autoScanUnusedDependencies"`
-}
-
-type SaveMCIMSettingsRequest struct {
-	MCIMEnabled bool `json:"mcimEnabled"`
-}
-
-type SaveNetworkSettingsRequest struct {
-	FileConcurrency         int     `json:"fileConcurrency"`
-	ConcurrentDownloads     int     `json:"concurrentDownloads"`
-	AdaptiveFileConcurrency bool    `json:"adaptiveFileConcurrency"`
-	TargetDownloadRateMiB   float64 `json:"targetDownloadRateMiB"`
-	RequestsPerSecond       int     `json:"requestsPerSecond"`
-}
-
-// Convention: a field value of "<keep>" means do not modify the original value (since the frontend cannot access plaintext).
-// An empty string "" means clear. Any other value means overwrite.
-const apiKeyKeepSentinel = appcore.APIKeyKeepSentinel
 
 // GetSettings returns a read-only view of the current settings.
 func (a *App) GetSettings() SettingsView {

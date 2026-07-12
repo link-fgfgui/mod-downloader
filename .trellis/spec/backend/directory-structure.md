@@ -1381,3 +1381,19 @@ modIDs := minecraft.PrimaryModIDs(mods)
 - Well-organized canonical-type package: `core/models/models.go`
 - Converter functions following the naming convention: `core/providers/modprovider.go` (`modToModProject`, `fileToModVersion`, etc.)
 - Bridge package for cross-domain convergence: `core/modbridge/modbridge.go`
+
+## AI Navigation And Contract Placement
+
+`ARCHITECTURE.md` is the repository entry point for cross-layer workflow
+tracing. Keep it synchronized when adding a route, Wails method, or core
+package. The frontend route/store map lives in `frontend/README.md`.
+
+The root `main` package keeps Wails-facing request/response types in
+`app_contracts.go`; lifecycle and forwarding behavior remains in `app.go`.
+The core service keeps adapter-neutral event/options/settings contracts in
+`core/appcore/contracts.go`, while workflow implementation remains in
+`service.go` or an existing focused appcore file. This split is organizational
+only: public method names, JSON fields, and import paths stay stable.
+
+Do not document or invoke `./cmd/mod-downloader-cli` from this repository. The
+standalone CLI is a sibling repository that reuses `core/`.
