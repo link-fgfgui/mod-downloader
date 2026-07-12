@@ -3,7 +3,8 @@
 > Package-scoped entry point for the Wails app shell in `mod-downloader`.
 
 The app package owns Wails runtime integration, frontend bindings, and adapter
-code in `app.go`. Reusable domain logic belongs in the `core/` submodule.
+code in `app.go` plus `app_contracts.go`. Reusable domain logic belongs in the
+`core/` submodule.
 
 ## Required References
 
@@ -15,8 +16,8 @@ code in `app.go`. Reusable domain logic belongs in the `core/` submodule.
 
 ## Pre-Development Checklist
 
-- Check whether the change belongs in `app.go` / frontend bindings or in the
-  `core/` submodule.
+- Check whether the change belongs in `app.go`/`app_contracts.go` and frontend
+  bindings or in the `core/` submodule.
 - Keep Wails runtime imports in the app adapter layer only.
 - Preserve `replace github.com/link-fgfgui/mod-downloader-core => ./core`.
 - Inject release identity through `APP_VERSION` and Go `-X`; see

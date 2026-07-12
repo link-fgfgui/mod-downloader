@@ -1,97 +1,39 @@
 # Thinking Guides
 
-> **Purpose**: Expand your thinking to catch things you might not have considered.
-
----
-
-## Why Thinking Guides?
-
-**Most bugs and tech debt come from "didn't think of that"**, not from lack of skill:
-
-- Didn't think about what happens at layer boundaries → cross-layer bugs
-- Didn't think about code patterns repeating → duplicated code everywhere
-- Didn't think about edge cases → runtime errors
-- Didn't think about future maintainers → unreadable code
-
-These guides help you **ask the right questions before coding**.
-
----
+These are short decision checklists, not implementation specifications. Read
+only the guide whose trigger matches the change, then follow the linked package
+contract for signatures and tests.
 
 ## Available Guides
 
-| Guide | Purpose | When to Use |
-|-------|---------|-------------|
-| [Code Reuse Thinking Guide](./code-reuse-thinking-guide.md) | Identify patterns and reduce duplication | When you notice repeated patterns |
-| [Cross-Layer Thinking Guide](./cross-layer-thinking-guide.md) | Think through data flow across layers | Features spanning multiple layers |
+| Guide | Use when |
+| --- | --- |
+| [Code Reuse](./code-reuse-thinking-guide.md) | Adding helpers, constants, converters, components, or payload readers |
+| [Cross-Layer](./cross-layer-thinking-guide.md) | Data crosses frontend, Wails, service, provider, downloader, storage, or Minecraft layers |
 
----
+## Review Triggers
 
-## Quick Reference: Thinking Triggers
+- Cross-layer change, changed payload, or new event: read the Cross-Layer guide.
+- New utility, constant, converter, or duplicated state update: read Code Reuse.
+- Before changing a config key, event, or shared field, use `rg` to find every
+  reference and update its owner plus consumers.
+- Verify review warnings against the actual data source and call path; do not
+  accept a finding based only on a generic trust-boundary assumption.
 
-### When to Think About Cross-Layer Issues
+After a bug, add a concise project-specific prevention rule to the smallest
+relevant guide. Do not copy generic Trellis implementation guidance into this
+directory.
 
-- [ ] Feature touches 3+ layers (API, Service, Component, Database)
-- [ ] Data format changes between layers
-- [ ] Multiple consumers need the same data
-- [ ] You're not sure where to put some logic
-- [ ] You are adding an event kind, JSONL record, RPC payload, or config field
-- [ ] UI / command code starts casting raw payload fields directly
+## Trellis Runtime Boundary
 
-→ Read [Cross-Layer Thinking Guide](./cross-layer-thinking-guide.md)
+In an initialized project, Trellis runtime inputs include `.trellis/workflow.md`,
+`.trellis/scripts/`, `.trellis/tasks/`, `.trellis/spec/`, `.trellis/.runtime/`,
+`.trellis/.template-hashes.json`, and `.trellis/config.yaml`. Changes to these
+files can affect hooks, task context, or `trellis update`; verify the relevant
+script and parser before editing them.
 
-### When to Think About Code Reuse
-
-- [ ] You're writing similar code to something that exists
-- [ ] You see the same pattern repeated 3+ times
-- [ ] You're adding a new field to multiple places
-- [ ] **You're modifying any constant or config**
-- [ ] **You're creating a new utility/helper function** ← Search first!
-- [ ] Two files read the same untyped payload field with local casts
-- [ ] Multiple branches update the same derived state from `kind` / `action`
-
-→ Read [Code Reuse Thinking Guide](./code-reuse-thinking-guide.md)
-
-### When Verifying AI Cross-Review Results
-
-- [ ] Reviewer claims "user input can be malicious" → Check the actual data source (internal manifest? user config? external API?)
-- [ ] Reviewer flags "missing validation" → Is the data from a trusted internal source?
-- [ ] Reviewer says "behavior change" → Read the code comments — is it intentional design?
-- [ ] Reviewer identifies a "bug" in test → Mentally delete the feature being tested — does the test still pass? If yes → tautological test
-
-**Common AI reviewer false-positive patterns**:
-1. **Trust boundary confusion**: Treating internal data (bundled JSON manifests) as untrusted external input
-2. **Ignoring design comments**: Flagging intentional behavior documented in code comments as bugs
-3. **Variable misreading**: Not tracing a variable to its actual definition (e.g., Map keyed by path vs name)
-
-**Verification rule**: Every CRITICAL/WARNING finding must be verified against the actual code before prioritizing. Budget ~35% false-positive rate for AI reviews.
-
----
-
-## Pre-Modification Rule (CRITICAL)
-
-> **Before changing ANY value, ALWAYS search first!**
-
-```bash
-# Search for the value you're about to change
-grep -r "value_to_change" .
-```
-
-This single habit prevents most "forgot to update X" bugs.
-
----
-
-## How to Use This Directory
-
-1. **Before coding**: Skim the relevant thinking guide
-2. **During coding**: If something feels repetitive or complex, check the guides
-3. **After bugs**: Add new insights to the relevant guide (learn from mistakes)
-
----
-
-## Contributing
-
-Found a new "didn't think of that" moment? Add it to the relevant guide.
-
----
-
-**Core Principle**: 30 minutes of thinking saves 3 hours of debugging.
+The Trellis source repository has additional concerns such as registering
+Python template files and maintaining versioned docs-site trees. Those rules
+belong to Trellis source maintenance, not to this application's business-code
+specs. Do not delete initialized runtime files merely because their source
+template machinery is not present here.

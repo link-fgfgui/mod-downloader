@@ -6,6 +6,10 @@ The core package is the local checkout of
 `github.com/link-fgfgui/mod-downloader-core`. It owns app-independent service,
 provider, download, storage, Minecraft parsing, and HTTP bridge logic.
 
+Start with `core/appcore/README.md` for the service map and
+`core/models/README.md` for canonical model ownership before reading a large
+workflow file.
+
 ## Required References
 
 - [Shared Backend Guidelines](../../backend/index.md)

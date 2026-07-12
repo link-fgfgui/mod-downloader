@@ -40,13 +40,10 @@ mod-downloader/
 └── .gitmodules                  # pins the local core/ submodule
 ```
 
-```
-mod-downloader-cli/
-├── cliapp/                      # CLI command definitions and output formatting
-├── cmd/mod-downloader-cli/       # CLI binary entrypoint
-├── core/                        # git submodule: github.com/link-fgfgui/mod-downloader-core
-└── go.mod                       # requires mod-downloader-core and replaces it with ./core
-```
+The standalone `mod-downloader-cli` repository has its own `cliapp/`,
+`cmd/mod-downloader-cli/`, `core/` submodule, and `go.mod`. Those paths are not
+part of this checkout; this repository only provides the reusable `core/`
+module.
 
 ---
 
@@ -107,8 +104,8 @@ Adapters:
 func (a *App) SearchMods(req structs.SearchModsRequest)
 func (a *App) QueueModDownload(req structs.ModDownloadRequest) structs.ModDownloadResult
 
-// CLI binary entrypoint lives in the sibling mod-downloader-cli repository.
-go run ./cmd/mod-downloader-cli <command> [flags]
+// CLI binary entrypoint lives in the sibling mod-downloader-cli repository;
+// run its commands from that repository, not from this checkout.
 ```
 
 #### 3. Contracts
