@@ -11,3 +11,4 @@ mods.gob.zst
 mods.gob.zst.*.tmp
 mod-metadata.tmp
 mod-favs.sqlite
+mod-downloader.log
