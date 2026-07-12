@@ -616,3 +616,39 @@ Added persisted system/Chinese/English language preference across core config, a
 ### Next Steps
 
 - None - task complete
+
+
+## Session 19: Implement JIJ dependency safeguards
+
+**Date**: 2026-07-12
+**Task**: Implement JIJ dependency safeguards
+**Package**: app
+**Branch**: `master`
+
+### Summary
+
+Made enabled JIJ entries satisfy local required dependencies, added projected disable warnings, cache-only prerequisite restoration with candidate selection, Wails/frontend integration, tests, FAQ, and executable specs.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `93a8a23` | (see git log) |
+| `79db5de` | (see git log) |
+| `54ea084` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
