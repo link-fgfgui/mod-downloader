@@ -64,3 +64,59 @@ versions[index] = version
 versionMap[version.ID] = version
 versionMap[version.Name] = version
 ```
+
+## Scenario: Incremental Local Mod Refresh
+
+### 1. Scope / Trigger
+
+Use this contract for `fsnotify` events and local enable/disable operations
+that update the selected instance without rescanning unrelated JAR files.
+
+### 2. Signatures
+
+```go
+func minecraft.ScanModFile(path, instanceID, minecraftVersion, modLoader, pathRoot string) []structs.ModInfo
+func (s *appcore.Service) RefreshSelectedVersionMods() structs.VersionInfo
+```
+
+### 3. Contracts
+
+- A changed path is removed from the local index before its replacement is
+  inserted.
+- Only `.jar` paths are parsed; `.jar.disabled` paths remove/retain state but
+  are not parsed as active mods.
+- Watcher events are debounced and emitted through the existing
+  `selected-version-changed` snapshot event.
+- Watchers are bound to the selected instance and stopped on instance change
+  or service shutdown.
+
+### 4. Validation & Error Matrix
+
+- Missing or non-JAR path -> no parsed records; caller may remove stale path.
+- Watcher initialization failure -> log warning and retain manual full refresh
+  as recovery path.
+- Selected instance changed before debounce fires -> ignore stale event batch.
+
+### 5. Good/Base/Bad Cases
+
+- Good: one changed JAR is removed and rescanned while unrelated `ModInfo`
+  records remain unchanged.
+- Base: manual refresh still performs a complete directory scan.
+- Bad: every filesystem event clears all local mods and rehashes all JARs.
+
+### 6. Tests Required
+
+- Assert a changed single file appears in `GetSelectedVersion().Mods`.
+- Assert a deleted path disappears while an unchanged path remains.
+- Assert watcher events from a previous instance do not update the new one.
+
+### 7. Wrong vs Correct
+
+```go
+// Wrong: refresh the complete directory for every one-file event.
+s.RefreshSelectedVersionMods()
+
+// Correct: remove and scan only the event path, then publish one snapshot.
+global.RemoveLocalModByPath(path)
+minecraft.ScanModFile(path, instanceID, version, loader, root)
+```
