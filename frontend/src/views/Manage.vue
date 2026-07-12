@@ -796,7 +796,7 @@ onActivated(async () => {
     }
     await minecraftStore.start();
     await settingsStore.load();
-    await minecraftStore.refreshSelectedMods();
+    await minecraftStore.ensureSelectedModsLoaded();
 });
 
 onDeactivated(() => {

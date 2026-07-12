@@ -21,6 +21,11 @@ type VersionInfoSnapshot = Partial<structs.VersionInfo> & Record<string, any>;
 const valueOf = (source: VersionInfoSnapshot | null, lowerKey: string, upperKey: string) =>
     source?.[lowerKey] || source?.[upperKey] || "";
 
+const selectedModsKey = (minecraftDir: string, version: VersionInfoSnapshot | null) => {
+    const versionKey = valueOf(version, "id", "ID") || valueOf(version, "name", "Name");
+    return minecraftDir && versionKey ? `${minecraftDir}\u0000${versionKey}` : "";
+};
+
 const defaultModLoader = "Fabric";
 const modLoaderOptions = ["Fabric", "Forge", "NeoForge"];
 
@@ -40,6 +45,7 @@ export const useMinecraftStore = defineStore("minecraft", {
         minecraftDir: "",
         isRefreshing: false,
         isLoading: false,
+        initializedSelectedModsKey: "",
         stopListeningMinecraftDirChanged: null as (() => void) | null,
         stopListeningSelectedVersionChanged: null as (() => void) | null,
     }),
@@ -74,15 +80,25 @@ export const useMinecraftStore = defineStore("minecraft", {
             try {
                 const version = await RefreshSelectedVersionMods();
                 this.applySelectedVersion(version);
+                this.initializedSelectedModsKey = selectedModsKey(this.minecraftDir, version);
                 return version;
             } finally {
                 this.isRefreshing = false;
             }
         },
+        async ensureSelectedModsLoaded() {
+            const key = selectedModsKey(this.minecraftDir, this.selectedVersion);
+            if (!key || key === this.initializedSelectedModsKey) {
+                return this.selectedVersion;
+            }
+            return await this.refreshSelectedMods();
+        },
         async selectVersion(version: string) {
             this.isLoading = true;
             try {
-                this.applySelectedVersion(await SelectVersion(version));
+                const selected = await SelectVersion(version);
+                this.applySelectedVersion(selected);
+                this.initializedSelectedModsKey = selectedModsKey(this.minecraftDir, selected);
             } finally {
                 this.isLoading = false;
             }
@@ -90,10 +106,11 @@ export const useMinecraftStore = defineStore("minecraft", {
         async chooseMinecraftDir() {
             const result = await ChooseMinecraftDir();
             if (result) {
-                this.minecraftDir = result;
+                await this.refreshMinecraftDir();
                 this.isLoading = true;
                 try {
                     await this.refreshVersions(true);
+                    await this.ensureSelectedModsLoaded();
                 } finally {
                     this.isLoading = false;
                 }

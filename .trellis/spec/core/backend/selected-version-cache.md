@@ -89,6 +89,12 @@ func (s *appcore.Service) RefreshSelectedVersionMods() structs.VersionInfo
   `selected-version-changed` snapshot event.
 - Watchers are bound to the selected instance and stopped on instance change
   or service shutdown.
+- Selecting an instance performs its initial full scan and binds its watcher in
+  the same service operation. Changing the Minecraft directory stops the old
+  watcher before invalidating version state.
+- The Manage view may perform one initial full scan for an uninitialized
+  directory/instance pair. Re-activating the view must reuse the selected
+  snapshot; only manual refresh and explicit recovery paths remain full scans.
 
 ### 4. Validation & Error Matrix
 
@@ -109,6 +115,8 @@ func (s *appcore.Service) RefreshSelectedVersionMods() structs.VersionInfo
 - Assert a changed single file appears in `GetSelectedVersion().Mods`.
 - Assert a deleted path disappears while an unchanged path remains.
 - Assert watcher events from a previous instance do not update the new one.
+- Assert selecting an instance binds its `mods` directory watcher.
+- Run the frontend build and lint after changing Manage initialization logic.
 
 ### 7. Wrong vs Correct
 
