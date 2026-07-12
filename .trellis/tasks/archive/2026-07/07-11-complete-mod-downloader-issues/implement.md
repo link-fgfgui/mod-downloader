@@ -66,7 +66,7 @@
 - [x] Run `go test ./...` in `core/`.
 - [x] Run `npm run lint` and `npm run build` in `frontend/`.
 - [x] Verify all changed Wails contracts match regenerated bindings.
-- [ ] Perform desktop UI smoke checks for virtual lists, dialogs, drag/drop,
+- [x] Perform desktop UI smoke checks for virtual lists, dialogs, drag/drop,
   settings auto-save, route animations, and Home activation lifecycle.
 - [x] Check every I01-I29 and nested checkbox in `issues.md` only when evidence
   exists, then mark the corresponding exact-list Microsoft To Do task complete.
@@ -84,7 +84,9 @@
 
 ## Final Verification Note
 
-The production frontend build, live Vite endpoint, lifecycle source audit, and
-all automated gates passed. Native Wails launch could not run on this host
-because `pkg-config` cannot find the required `webkit2gtk-4.0` development
-package; `wails build` was attempted and failed only at that system dependency.
+The production frontend build, lifecycle source audit, and all automated gates
+passed. Native Wails development mode was verified on Linux with
+`wails dev -tags webkit2_41`. Desktop smoke checks covered virtual-list sizing
+and KeepAlive reactivation, local-version and favorites dialogs, HTML5 favorites
+reordering, settings auto-save with value restoration, all three route-animation
+modes, and repeated Home deactivate/reactivate cycles.
