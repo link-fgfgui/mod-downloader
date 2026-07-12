@@ -545,3 +545,38 @@ Completed and verified all 29 mod-downloader issues, synchronized the exact Micr
 ### Next Steps
 
 - None - task complete
+
+
+## Session 17: Incremental local mod refresh
+
+**Date**: 2026-07-12
+**Task**: Incremental local mod refresh
+**Package**: app
+**Branch**: `master`
+
+### Summary
+
+Added fsnotify monitoring for the selected mods directory, debounced event handling, single-file scanning, incremental index updates for local mod operations and external file changes, lifecycle cleanup, code-spec coverage, and full Go/frontend validation.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ec592ef` | (see git log) |
+| `62acf6b` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
