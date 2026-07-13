@@ -49,19 +49,41 @@
                     </template>
                     <v-sheet class="download-queue-panel" elevation="8">
                         <div class="download-queue-header">
-                            <div>
-                                <div class="download-queue-title">{{ $t("download.queue.title") }}</div>
-                                <div class="download-queue-summary">
-                                    {{ $t("download.queue.summary", { running: visibleDownloadQueue.running, pending: visibleDownloadQueue.pending }) }}
+                            <div class="download-queue-heading">
+                                <div>
+                                    <div class="download-queue-title">{{ $t("download.queue.title") }}</div>
+                                    <div class="download-queue-summary">
+                                        {{ $t("download.queue.summary", { running: visibleDownloadQueue.running, pending: visibleDownloadQueue.pending }) }}
+                                    </div>
+                                </div>
+                                <v-btn
+                                    icon="mdi-close"
+                                    variant="text"
+                                    size="small"
+                                    :aria-label="$t('download.queue.close')"
+                                    @click="downloadQueueOpen = false"
+                                />
+                            </div>
+                            <div v-if="visibleActiveDownloadCount > 0" class="download-queue-aggregate">
+                                <div class="download-progress-labels">
+                                    <span>{{ $t("download.queue.totalProgress") }}</span>
+                                    <span v-if="visibleDownloadQueue.totalBytes > 0">
+                                        {{ formatBytes(visibleDownloadQueue.bytesComplete) }} / {{ formatBytes(visibleDownloadQueue.totalBytes) }} · {{ totalProgressPercent }}%
+                                    </span>
+                                    <span v-else>{{ $t("download.queue.unknownSize") }}</span>
+                                </div>
+                                <v-progress-linear
+                                    color="primary"
+                                    height="6"
+                                    :indeterminate="visibleDownloadQueue.totalBytes <= 0"
+                                    :model-value="totalProgressPercent"
+                                />
+                                <div class="download-total-speed">
+                                    <v-icon icon="mdi-speedometer" size="15" />
+                                    <span>{{ $t("download.queue.totalSpeed") }}</span>
+                                    <strong>{{ formatSpeed(visibleDownloadQueue.bytesPerSecond) }}</strong>
                                 </div>
                             </div>
-                            <v-btn
-                                icon="mdi-close"
-                                variant="text"
-                                size="small"
-                                :aria-label="$t('download.queue.close')"
-                                @click="downloadQueueOpen = false"
-                            />
                         </div>
                         <v-divider />
                         <v-tabs v-model="downloadQueueTab" density="compact" class="download-queue-tabs">
@@ -91,6 +113,21 @@
                                             </div>
                                             <div v-if="item.reason" class="download-queue-item-reason">
                                                 {{ item.reason }}
+                                            </div>
+                                            <div v-if="isActiveQueueItem(item)" class="download-item-progress">
+                                                <v-progress-linear
+                                                    color="primary"
+                                                    height="4"
+                                                    :indeterminate="item.totalBytes <= 0"
+                                                    :model-value="itemProgressPercent(item)"
+                                                />
+                                                <div class="download-item-progress-meta">
+                                                    <span v-if="item.totalBytes > 0">
+                                                        {{ formatBytes(item.bytesComplete) }} / {{ formatBytes(item.totalBytes) }}
+                                                    </span>
+                                                    <span v-else>{{ $t("download.queue.unknownSize") }}</span>
+                                                    <span v-if="item.totalBytes > 0">{{ itemProgressPercent(item) }}%</span>
+                                                </div>
                                             </div>
                                         </div>
                                         <div class="download-queue-actions">
@@ -242,6 +279,9 @@ type DownloadQueueSnapshot = {
     pending: number;
     running: number;
     messageCount: number;
+    bytesComplete: number;
+    totalBytes: number;
+    bytesPerSecond: number;
     items?: structs.DownloadQueueItem[];
     optionalReminders?: OptionalDependencyReminderSnapshot[];
 };
@@ -251,6 +291,9 @@ const cloneDownloadQueue = (queue: DownloadQueueSnapshot): DownloadQueueSnapshot
     pending: queue.pending || 0,
     running: queue.running || 0,
     messageCount: queue.messageCount || 0,
+    bytesComplete: queue.bytesComplete || 0,
+    totalBytes: queue.totalBytes || 0,
+    bytesPerSecond: queue.bytesPerSecond || 0,
     items: (queue.items || []).map((item) => ({ ...item })),
     optionalReminders: (queue.optionalReminders || []).map((reminder) => ({
         ...reminder,
@@ -265,6 +308,10 @@ const visibleDownloadQueue = computed(() => (
 ));
 const visibleActiveDownloadCount = computed(() => (visibleDownloadQueue.value.pending || 0) + (visibleDownloadQueue.value.running || 0));
 const queueBadgeCount = computed(() => visibleActiveDownloadCount.value + (visibleDownloadQueue.value.messageCount || 0));
+const totalProgressPercent = computed(() => progressPercent(
+    visibleDownloadQueue.value.bytesComplete,
+    visibleDownloadQueue.value.totalBytes,
+));
 const queueSurfaceVisible = computed(() => downloadQueueStore.hasAnyQueueSurface);
 const reminderOnly = computed(() => downloadQueueStore.reminderOnly);
 const queueFabIcon = computed(() => (reminderOnly.value ? "mdi-bell-outline" : "mdi-download"));
@@ -332,6 +379,32 @@ const queueStatusIcon = (status: string) => {
 
 const queueItemMeta = (item: structs.DownloadQueueItem) =>
     [item.platform, item.minecraftVersion, item.modLoader, item.fileName].filter(Boolean).join(" · ");
+
+const progressPercent = (complete: number, total: number) => {
+    if (!Number.isFinite(complete) || !Number.isFinite(total) || total <= 0) return 0;
+    return Math.round(Math.min(100, Math.max(0, (complete / total) * 100)));
+};
+
+const itemProgressPercent = (item: structs.DownloadQueueItem) =>
+    progressPercent(item.bytesComplete, item.totalBytes);
+
+const isActiveQueueItem = (item: structs.DownloadQueueItem) =>
+    item.status === "pending" || item.status === "running";
+
+const formatBytes = (bytes: number) => {
+    const value = Number.isFinite(bytes) ? Math.max(0, bytes) : 0;
+    const units = ["B", "KiB", "MiB", "GiB", "TiB"];
+    let scaled = value;
+    let unitIndex = 0;
+    while (scaled >= 1024 && unitIndex < units.length - 1) {
+        scaled /= 1024;
+        unitIndex += 1;
+    }
+    const digits = unitIndex === 0 || scaled >= 100 ? 0 : scaled >= 10 ? 1 : 2;
+    return `${Number(scaled.toFixed(digits))} ${units[unitIndex]}`;
+};
+
+const formatSpeed = (bytesPerSecond: number) => `${formatBytes(bytesPerSecond)}/s`;
 
 const optionalStatusIcon = (status: string) => {
     switch (status) {
@@ -462,11 +535,16 @@ onUnmounted(() => {
 }
 
 .download-queue-header {
+    display: grid;
+    gap: 12px;
+    padding: 14px 14px 10px;
+}
+
+.download-queue-heading {
     align-items: center;
     display: flex;
     gap: 16px;
     justify-content: space-between;
-    padding: 14px 14px 10px;
 }
 
 .download-queue-title {
@@ -480,6 +558,33 @@ onUnmounted(() => {
     font-size: 0.78rem;
     line-height: 1.4;
     margin-top: 2px;
+}
+
+.download-queue-aggregate {
+    display: grid;
+    gap: 6px;
+}
+
+.download-progress-labels,
+.download-item-progress-meta,
+.download-total-speed {
+    align-items: center;
+    color: rgba(var(--v-theme-on-surface), 0.68);
+    display: flex;
+    font-size: 0.72rem;
+    gap: 6px;
+    justify-content: space-between;
+    line-height: 1.3;
+}
+
+.download-total-speed {
+    justify-content: flex-start;
+}
+
+.download-total-speed strong {
+    color: rgb(var(--v-theme-on-surface));
+    font-weight: 650;
+    margin-left: auto;
 }
 
 .download-queue-tabs {
@@ -544,6 +649,13 @@ onUnmounted(() => {
 
 .download-queue-item-main {
     min-width: 0;
+}
+
+.download-item-progress {
+    display: grid;
+    gap: 4px;
+    margin-top: 7px;
+    min-height: 23px;
 }
 
 .download-queue-item-title,

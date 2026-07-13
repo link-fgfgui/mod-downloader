@@ -973,12 +973,22 @@ func (a *App) RetryDownload(id string) bool
 Queue item projection:
 
 ```go
+type DownloadQueueState struct {
+    Pending        int   `json:"pending"`
+    Running        int   `json:"running"`
+    BytesComplete  int64 `json:"bytesComplete"`
+    TotalBytes     int64 `json:"totalBytes"`
+    BytesPerSecond int64 `json:"bytesPerSecond"`
+}
+
 type DownloadQueueItem struct {
-    ID         string `json:"id"`
-    Status     string `json:"status"` // running, pending, failed, canceled
-    Cancelable bool   `json:"cancelable"`
-    Retryable  bool   `json:"retryable"`
-    Reason     string `json:"reason,omitempty"`
+    ID            string `json:"id"`
+    Status        string `json:"status"` // running, pending, failed, canceled
+    Cancelable    bool   `json:"cancelable"`
+    Retryable     bool   `json:"retryable"`
+    Reason        string `json:"reason,omitempty"`
+    BytesComplete int64  `json:"bytesComplete"`
+    TotalBytes    int64  `json:"totalBytes"`
 }
 ```
 
@@ -991,6 +1001,25 @@ type DownloadQueueItem struct {
   Retry goes through `RetryDownload(id)` so backend-owned job context is replayed.
 - `download-queue-updated` carries `DownloadQueueState`; Wails event name
   mapping stays in `app.go`.
+- `models.ModVersion.FileSize` carries provider file-size metadata for pending
+  progress. CurseForge maps `File.FileLength`; Modrinth maps `File.Size`. A
+  missing/non-positive size is unknown and remains backward-compatible with
+  older cached version snapshots.
+- `core/downloader` owns one mutex-protected progress registry. Transfer
+  `ProgressTracker` snapshots replace provider totals when the transfer reports
+  a positive total, and the existing stall ticker emits progress approximately
+  once per active file per second plus a final short-transfer sample.
+- Aggregate progress is byte-weighted across known-size work in the current
+  active cycle. Pending jobs contribute zero/known total; successful
+  contributions remain until pending/running work drains. Unknown-size jobs
+  are excluded until a positive total is known. Failed, canceled, replaced,
+  and retried attempts must not remain double-counted.
+- `BytesPerSecond` sums the latest non-negative samples for current running
+  IDs only. It becomes zero when jobs stop moving or leave `current`.
+- Progress makes `download-queue-updated` a high-frequency event. Consumers
+  that only care about queue membership/status must compare a stable
+  `id:status` signature and skip progress-only updates; the queue Pinia store
+  still accepts every event for rendering.
 - `DownloadQueueState.Pending` and `Running` count active work only. Retryable
   failed/canceled history may keep `Active` true but must not inflate active
   count badges.
@@ -1000,10 +1029,10 @@ type DownloadQueueItem struct {
   a restart action: it cancels the active transfer attempt and requeues the same
   backend-owned job with a fresh queue ID, without creating a `canceled` history
   row.
-- Network transfers use a stall watchdog around `grab.Response.BytesComplete()`.
-  If byte count does not advance for the configured stall timeout, the current
-  transfer attempt is canceled and retried automatically up to the bounded
-  stall-retry limit.
+- Network transfers use a stall watchdog around
+  `filetransfer.ProgressTracker.Snapshot().BytesComplete`. If byte count does
+  not advance for the configured stall timeout, the current transfer attempt
+  is canceled and retried automatically up to the bounded stall-retry limit.
 
 #### 4. Validation & Error Matrix
 
@@ -1026,6 +1055,16 @@ type DownloadQueueItem struct {
   `download-failed`.
 - Retry failed/canceled item -> remove history row, enqueue a copy with a fresh
   queue ID, emit queue state.
+- Provider or transfer total <= 0 -> item progress is indeterminate and the
+  item is excluded from aggregate complete/total bytes.
+- Transfer reports a positive total -> replace a stale provider total and
+  include the item in aggregate bytes.
+- Completed job while other work remains -> retain its full byte contribution
+  but remove its visible active item.
+- Final pending/running job leaves -> clear the aggregate cycle; retryable-only
+  queue surfaces expose zero active bytes/speed.
+- Byte counter reset or negative delta -> report zero speed for that sample;
+  never project negative bytes or speed.
 
 #### 5. Good/Base/Bad Cases
 
@@ -1034,12 +1073,16 @@ type DownloadQueueItem struct {
 - Good: `core/downloader` distinguishes `cancelRequested`,
   `restartRequested`, and stall sentinel errors so user cancel, user restart,
   and automatic retry do not leak into one another.
+- Good: the queue panel renders every progress event, while search-result
+  button state refreshes only when sorted `id:status` membership changes.
 - Base: A successful download disappears from queue state after completion.
 - Bad: Vue builds a new `ModDownloadRequest` from `DownloadQueueItem.Platform`,
   `VersionID`, and `FileName`; this loses resolved target and dependency/API-key
   context.
 - Bad: Treating `context.Canceled` from a stall watchdog as a user cancellation;
   it would create a canceled history row instead of automatic retrying.
+- Bad: every `download-queue-updated` consumer performs an API refresh; progress
+  sampling then turns a lifecycle signal into repeated unrelated work.
 
 #### 6. Tests Required
 
@@ -1051,6 +1094,14 @@ type DownloadQueueItem struct {
   not mark user cancellation.
 - Downloader unit test: stalled jobs requeue until the bounded retry limit and
   then fall through to failure handling.
+- Downloader unit test: differently sized known tasks aggregate by bytes,
+  unknown totals are excluded, completed contributions remain while another
+  job is active, and active speed sums only current IDs.
+- Downloader unit test: a short transfer emits a final 100% tracker snapshot
+  before its running item is removed; race tests cover queue callbacks and
+  progress locking.
+- Provider unit test: CurseForge and Modrinth converters preserve file size,
+  while absent Modrinth size does not overwrite a known value.
 - Frontend type check/build must pass after Wails binding regeneration when
   queue fields or Wails methods change.
 
@@ -1070,6 +1121,26 @@ Correct:
 
 ```typescript
 await RetryDownload(item.id);
+```
+
+Wrong:
+
+```typescript
+EventsOn("download-queue-updated", () => refreshDownloadStates());
+```
+
+Correct:
+
+```typescript
+EventsOn("download-queue-updated", (state) => {
+  const membership = state.items
+    .map((item) => `${item.id}:${item.status}`)
+    .sort()
+    .join("|");
+  if (membership === previousMembership) return;
+  previousMembership = membership;
+  void refreshDownloadStates();
+});
 ```
 
 ---

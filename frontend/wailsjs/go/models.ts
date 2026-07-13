@@ -459,6 +459,7 @@ export namespace models {
 	    name: string;
 	    version: string;
 	    fileName: string;
+	    fileSize: number;
 	    downloadUrl: string;
 	    sha1: string;
 	    publishedAt: number;
@@ -481,6 +482,7 @@ export namespace models {
 	        this.name = source["name"];
 	        this.version = source["version"];
 	        this.fileName = source["fileName"];
+	        this.fileSize = source["fileSize"];
 	        this.downloadUrl = source["downloadUrl"];
 	        this.sha1 = source["sha1"];
 	        this.publishedAt = source["publishedAt"];
@@ -932,6 +934,8 @@ export namespace structs {
 	    cancelable: boolean;
 	    retryable: boolean;
 	    reason?: string;
+	    bytesComplete: number;
+	    totalBytes: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new DownloadQueueItem(source);
@@ -950,6 +954,8 @@ export namespace structs {
 	        this.cancelable = source["cancelable"];
 	        this.retryable = source["retryable"];
 	        this.reason = source["reason"];
+	        this.bytesComplete = source["bytesComplete"];
+	        this.totalBytes = source["totalBytes"];
 	    }
 	}
 	export class OptionalDependencyCandidate {
@@ -1025,6 +1031,9 @@ export namespace structs {
 	    pending: number;
 	    running: number;
 	    messageCount: number;
+	    bytesComplete: number;
+	    totalBytes: number;
+	    bytesPerSecond: number;
 	    items?: DownloadQueueItem[];
 	    optionalReminders?: OptionalDependencyReminder[];
 	
@@ -1038,6 +1047,9 @@ export namespace structs {
 	        this.pending = source["pending"];
 	        this.running = source["running"];
 	        this.messageCount = source["messageCount"];
+	        this.bytesComplete = source["bytesComplete"];
+	        this.totalBytes = source["totalBytes"];
+	        this.bytesPerSecond = source["bytesPerSecond"];
 	        this.items = this.convertValues(source["items"], DownloadQueueItem);
 	        this.optionalReminders = this.convertValues(source["optionalReminders"], OptionalDependencyReminder);
 	    }

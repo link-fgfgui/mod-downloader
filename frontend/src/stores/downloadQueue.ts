@@ -19,13 +19,19 @@ import {
 const downloadQueueUpdatedEvent = "download-queue-updated";
 const downloadCompletedEvent = "download-completed";
 
-type DownloadQueueSnapshot = Pick<structs.DownloadQueueState, "active" | "pending" | "running" | "messageCount" | "items" | "optionalReminders">;
+type DownloadQueueSnapshot = Pick<
+    structs.DownloadQueueState,
+    "active" | "pending" | "running" | "messageCount" | "bytesComplete" | "totalBytes" | "bytesPerSecond" | "items" | "optionalReminders"
+>;
 
 const emptyQueue = (): DownloadQueueSnapshot => ({
     active: false,
     pending: 0,
     running: 0,
     messageCount: 0,
+    bytesComplete: 0,
+    totalBytes: 0,
+    bytesPerSecond: 0,
 });
 
 export const useDownloadQueueStore = defineStore("downloadQueue", {

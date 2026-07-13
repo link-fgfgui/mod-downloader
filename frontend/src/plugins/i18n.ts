@@ -276,6 +276,9 @@ const messages = {
       queue: {
         title: "下载队列",
         summary: "运行 {running} · 等待 {pending}",
+        totalProgress: "总进度",
+        totalSpeed: "总速度",
+        unknownSize: "大小未知",
         tabs: {
           downloads: "下载",
           optional: "可选依赖",
@@ -613,6 +616,9 @@ const messages = {
       queue: {
         title: "Download Queue",
         summary: "Running {running} · Pending {pending}",
+        totalProgress: "Total progress",
+        totalSpeed: "Total speed",
+        unknownSize: "Size unknown",
         tabs: {
           downloads: "Downloads",
           optional: "Optional",

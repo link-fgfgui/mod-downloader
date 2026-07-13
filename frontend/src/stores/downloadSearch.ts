@@ -24,6 +24,13 @@ const searchPageSize = 10;
 type SearchModSnapshot = models.ModProject;
 type ProjectVersionSnapshot = models.ModVersion;
 type DownloadStateSnapshot = structs.ModDownloadButtonState;
+type DownloadQueueEvent = Pick<structs.DownloadQueueState, "items">;
+
+const downloadQueueMembershipKey = (state?: DownloadQueueEvent | null) =>
+    (state?.items || [])
+        .map((item) => `${item.id}:${item.status}`)
+        .sort()
+        .join("|");
 
 const downloadErrorKeys: Record<string, string> = {
     "invalid request": "invalidRequest",
@@ -56,6 +63,7 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
         downloadStates: [] as DownloadStateSnapshot[],
         activeDownloadStateRequestID: "",
         downloadingKeys: {} as Record<string, boolean>,
+        downloadQueueMembership: "",
         snackbar: { show: false, key: "", params: {} as Record<string, string>, color: "success" },
         confirmDialog: { show: false, status: "", result: null as SearchModSnapshot | null, key: "", conflictFileName: "" },
         batchConfirmDialog: {
@@ -347,7 +355,12 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
                 return;
             }
 
-            this.stopListeningDownloadQueueUpdated = EventsOn(downloadQueueUpdatedEvent, () => {
+            this.stopListeningDownloadQueueUpdated = EventsOn(downloadQueueUpdatedEvent, (state: DownloadQueueEvent) => {
+                const membership = downloadQueueMembershipKey(state);
+                if (membership === this.downloadQueueMembership) {
+                    return;
+                }
+                this.downloadQueueMembership = membership;
                 void this.refreshDownloadStates();
             });
             this.stopListeningDownloadStatesUpdated = EventsOn(downloadStatesUpdatedEvent, () => {
@@ -404,6 +417,7 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
             this.stopListeningDownloadFailed = null;
             this.stopListeningExtensionModsAccepted = null;
             this.stopListeningDownloadStatesUpdated = null;
+            this.downloadQueueMembership = "";
         },
     },
 });
