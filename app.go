@@ -329,6 +329,7 @@ func (a *App) SaveNetworkSettings(req SaveNetworkSettingsRequest) SettingsView {
 		ConcurrentDownloads:     req.ConcurrentDownloads,
 		AdaptiveFileConcurrency: req.AdaptiveFileConcurrency,
 		TargetDownloadRateMiB:   req.TargetDownloadRateMiB,
+		VerifySHA1:              req.VerifySHA1,
 		RequestsPerSecond:       req.RequestsPerSecond,
 	})
 	a.config = a.core.Config()
@@ -509,6 +510,7 @@ func settingsViewFromCore(sv appcore.SettingsView) SettingsView {
 		ConcurrentDownloads:         sv.ConcurrentDownloads,
 		AdaptiveFileConcurrency:     sv.AdaptiveFileConcurrency,
 		TargetDownloadRateMiB:       sv.TargetDownloadRateMiB,
+		VerifySHA1:                  sv.VerifySHA1,
 		RequestsPerSecond:           sv.RequestsPerSecond,
 	}
 }

@@ -313,6 +313,7 @@ export namespace main {
 	    concurrentDownloads: number;
 	    adaptiveFileConcurrency: boolean;
 	    targetDownloadRateMiB: number;
+	    verifySha1: boolean;
 	    requestsPerSecond: number;
 	
 	    static createFrom(source: any = {}) {
@@ -325,6 +326,7 @@ export namespace main {
 	        this.concurrentDownloads = source["concurrentDownloads"];
 	        this.adaptiveFileConcurrency = source["adaptiveFileConcurrency"];
 	        this.targetDownloadRateMiB = source["targetDownloadRateMiB"];
+	        this.verifySha1 = source["verifySha1"];
 	        this.requestsPerSecond = source["requestsPerSecond"];
 	    }
 	}
@@ -359,6 +361,7 @@ export namespace main {
 	    concurrentDownloads: number;
 	    adaptiveFileConcurrency: boolean;
 	    targetDownloadRateMiB: number;
+	    verifySha1: boolean;
 	    requestsPerSecond: number;
 	
 	    static createFrom(source: any = {}) {
@@ -385,6 +388,7 @@ export namespace main {
 	        this.concurrentDownloads = source["concurrentDownloads"];
 	        this.adaptiveFileConcurrency = source["adaptiveFileConcurrency"];
 	        this.targetDownloadRateMiB = source["targetDownloadRateMiB"];
+	        this.verifySha1 = source["verifySha1"];
 	        this.requestsPerSecond = source["requestsPerSecond"];
 	    }
 	}

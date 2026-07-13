@@ -54,6 +54,7 @@ export const useSettingsStore = defineStore("settings", {
         draftConcurrentDownloads: 1,
         draftAdaptiveFileConcurrency: false,
         draftTargetDownloadRateMiB: 1,
+        draftVerifySHA1: false,
         draftRequestsPerSecond: 0,
         isSavingNetwork: false,
         draftCurseforgeKey: "",
@@ -104,6 +105,7 @@ export const useSettingsStore = defineStore("settings", {
                 this.draftConcurrentDownloads = this.view?.concurrentDownloads ?? 1;
                 this.draftAdaptiveFileConcurrency = this.view?.adaptiveFileConcurrency ?? false;
                 this.draftTargetDownloadRateMiB = this.view?.targetDownloadRateMiB ?? 1;
+                this.draftVerifySHA1 = this.view?.verifySha1 ?? false;
                 this.draftRequestsPerSecond = this.view?.requestsPerSecond ?? 0;
                 this.draftCurseforgeKey = "";
                 this.draftModrinthKey = "";
@@ -191,12 +193,14 @@ export const useSettingsStore = defineStore("settings", {
                     concurrentDownloads: this.draftConcurrentDownloads,
                     adaptiveFileConcurrency: this.draftAdaptiveFileConcurrency,
                     targetDownloadRateMiB: this.draftTargetDownloadRateMiB,
+                    verifySha1: this.draftVerifySHA1,
                     requestsPerSecond: this.draftRequestsPerSecond,
                 });
                 this.draftFileConcurrency = this.view.fileConcurrency;
                 this.draftConcurrentDownloads = this.view.concurrentDownloads;
                 this.draftAdaptiveFileConcurrency = this.view.adaptiveFileConcurrency;
                 this.draftTargetDownloadRateMiB = this.view.targetDownloadRateMiB;
+                this.draftVerifySHA1 = this.view.verifySha1;
                 this.draftRequestsPerSecond = this.view.requestsPerSecond;
                 return this.view;
             } finally {

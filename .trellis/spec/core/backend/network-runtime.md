@@ -17,9 +17,18 @@ type configs.DownloadConfig struct {
     ConcurrentDownloads      int
     AdaptiveFileConcurrency  bool
     TargetDownloadRateMiB    float64
+    VerifySHA1               bool
 }
 
 type configs.APIConfig struct { RequestsPerSecond int }
+
+type downloader.Config struct {
+    FileConcurrency         int
+    ConcurrentDownloads     int
+    AdaptiveFileConcurrency bool
+    TargetDownloadRateMiB   float64
+    VerifySHA1              bool
+}
 
 func downloader.Configure(downloader.Config)
 ```
@@ -32,13 +41,15 @@ file_concurrency = 4
 concurrent_downloads = 1
 adaptive_file_concurrency = false
 target_download_rate_mib = 1.0
+verify_sha1 = false
 
 [api]
 requests_per_second = 0
 ```
 
 Environment equivalents are `DOWNLOADS_FILE_CONCURRENCY`,
-`DOWNLOADS_CONCURRENT_DOWNLOADS`, and `API_REQUESTS_PER_SECOND`.
+`DOWNLOADS_CONCURRENT_DOWNLOADS`, `DOWNLOADS_VERIFY_SHA1`, and
+`API_REQUESTS_PER_SECOND`.
 
 ### 3. Contracts
 
@@ -66,6 +77,11 @@ Environment equivalents are `DOWNLOADS_FILE_CONCURRENCY`,
   context cancellation.
 - File downloads are not API-rate-limited; their bandwidth and concurrency are
   controlled by the download settings.
+- When `verify_sha1` is enabled and provider metadata contains a SHA1, the
+  downloader verifies the completed temporary file before installation. A
+  mismatch removes that file and retries the transfer up to two times; after
+  the third mismatch the job fails and no bad file is installed. Missing SHA1
+  metadata skips verification.
 
 ### 4. Validation & Error Matrix
 
@@ -79,6 +95,8 @@ Environment equivalents are `DOWNLOADS_FILE_CONCURRENCY`,
   invoking the base transport.
 - Cancel one running download -> cancel only that job and keep other workers
   active.
+- SHA1 mismatch -> retry the same download, then return a verification error
+  without leaving the mismatched temporary file after retries are exhausted.
 
 ### 5. Good/Base/Bad Cases
 
@@ -105,6 +123,8 @@ Environment equivalents are `DOWNLOADS_FILE_CONCURRENCY`,
   transport.
 - Preserve cancellation, retry, stall, dependency ordering, and queue snapshot
   regression tests.
+- Enable SHA1 verification with a deliberately incorrect then correct backend;
+  assert the retry count, final bytes, and cleanup after exhausted retries.
 - Run `go test -race ./downloader/...`, then core and app test/vet/build checks.
 
 ### 7. Wrong vs Correct

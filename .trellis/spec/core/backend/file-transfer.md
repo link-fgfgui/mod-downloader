@@ -23,8 +23,8 @@ library only; do not add grab, gdl, req, or another download library.
         AdaptiveConcurrency bool
         TargetBytesPerSecond int64
         ChunkSize         int64
-        MemoryLimit       int64
-        OverwriteExisting bool
+        MemoryLimit          int64
+        OverwriteExisting    bool
     }
 
     func (p *ProgressTracker) Snapshot() Progress
@@ -55,6 +55,8 @@ library only; do not add grab, gdl, req, or another download library.
 - Range response other than 206 or wrong byte count -> error; completed temp
   parts remain available for retry.
 - Context cancellation -> stop active requests and return the context error.
+- SHA1 verification mismatch -> handled by downloader after a successful
+  transfer; the backend returns the downloaded path and does not install it.
 
 ### 5. Good/Base/Bad Cases
 
@@ -71,6 +73,8 @@ library only; do not add grab, gdl, req, or another download library.
 - Large file: MD5 temp path, partial chunk resume, cleanup after merge.
 - Non-range file: probe plus direct request and final progress.
 - Queue integration: versioned UA, selected filename, cancellation, and stall.
+- Downloader integration: configured SHA1 verification retries a mismatched
+  completed file and removes it after the retry limit.
 - Run go test -race ./downloader/... plus core/app full test, build, and vet.
 
 ### 7. Wrong vs Correct
