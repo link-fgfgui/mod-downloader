@@ -196,7 +196,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onActivated, ref, watch } from "vue";
+import { computed, onActivated, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useSettingsStore } from "../stores/settings";
 import { applyVuetifyTheme } from "../composables/useTheme";
@@ -204,7 +204,6 @@ import {
     animationModeGsap,
     animationModeOff,
     animationModeVuetify,
-    applyAnimationSettings,
     maxAnimationDurationMultiplier,
     minAnimationDurationMultiplier,
 } from "../composables/useAnimationSettings";
@@ -221,10 +220,6 @@ const languageOptions = computed(() => [
 
 onActivated(() => {
     void settingsStore.load();
-});
-
-watch(() => settingsStore.view?.animationMode, () => {
-    if (settingsStore.view) applyAnimationSettings(settingsStore.view);
 });
 
 async function onThemeChange() {

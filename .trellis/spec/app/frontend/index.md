@@ -9,6 +9,7 @@ app adapter or `core/` specs.
 ## Required References
 
 - [UI State Lifecycle](./ui-state-lifecycle.md)
+- [Animation Modes](./animation-modes.md)
 - [Local Mod Version Selection](./local-mod-version-selection.md)
 - [Download Completion Sound](./download-completion-sound.md)
 - [Language Preference](./language-preference.md)
@@ -18,6 +19,10 @@ app adapter or `core/` specs.
 
 - Read [UI State Lifecycle](./ui-state-lifecycle.md) before changing dialogs,
   overlays, transitions, action bars, or other leaving UI surfaces.
+- Read [Animation Modes](./animation-modes.md) before changing `animations.css`,
+  `useAnimationSettings.ts`, the settings animation flow, or route/FAB
+  transitions. Keep one application entry, non-overlapping mode ownership, and
+  `animation ... both` as the only source of an entrance's hidden state.
 - Keep UI-only state in Vue components or Pinia stores; do not change Wails
   backend contracts for visual-only behavior.
 - Before adding a shared composable, search `frontend/src/composables/` and

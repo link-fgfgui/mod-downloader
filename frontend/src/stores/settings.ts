@@ -14,6 +14,7 @@ import {
 import type { main } from "../../wailsjs/go/models";
 import {
     animationModeEnabled,
+    applyAnimationSettings,
     defaultAnimationMode,
     defaultAnimationDurationMultiplier,
     normalizeAnimationMode,
@@ -111,6 +112,7 @@ export const useSettingsStore = defineStore("settings", {
                 this.draftModrinthKey = "";
                 this.clearCurseforgeKey = false;
                 this.clearModrinthKey = false;
+                if (this.view) applyAnimationSettings(this.view);
             } finally {
                 this.isLoading = false;
             }
@@ -154,6 +156,9 @@ export const useSettingsStore = defineStore("settings", {
                 this.draftAnimationDurationMultiplier = normalizeAnimationDurationMultiplier(
                     this.view.animationDurationMultiplier
                 );
+                // Single source of truth: apply the persisted result live so both
+                // mode AND duration-multiplier changes take effect immediately.
+                applyAnimationSettings(this.view);
                 return {
                     animationMode: this.draftAnimationMode,
                     animationEnabled: animationModeEnabled(this.draftAnimationMode),

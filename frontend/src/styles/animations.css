@@ -211,10 +211,12 @@
   border-radius: 4px;
 }
 
-/* Stagger children animations */
+/* Stagger children animations.
+ * The hidden initial state comes ONLY from the `both` fill of the animation,
+ * never a standalone `opacity: 0`. That way, disabling the animation (off / gsap
+ * modes) leaves the element at its natural `opacity: 1` instead of stuck hidden. */
 .md-stagger > * {
-  opacity: 0;
-  animation: md-fade-in-up var(--md-transition-slow) var(--md-ease-out) forwards;
+  animation: md-fade-in-up var(--md-transition-slow) var(--md-ease-out) both;
 }
 
 .md-stagger > *:nth-child(1) { animation-delay: calc(var(--md-stagger-delay) * 1); }
@@ -334,8 +336,33 @@
   animation: md-fade-in-up var(--md-transition-slow) var(--md-ease-out) both;
 }
 
-/* User-configured animation suppression. Utility classes are restored to their
- * final visible state so their first keyframe cannot flash for one frame. */
+/* --------------------------------------------------
+ * Mode suppression
+ *
+ * Ownership model — each mode owns exactly one motion layer, no overlap:
+ *   off     → no motion at all (CSS + Vuetify + GSAP all silenced)
+ *   vuetify → CSS utilities + Vuetify transitions own motion (GSAP inactive)
+ *   gsap    → GSAP owns page/route/FAB entrances; CSS entrance utilities are
+ *             silenced, but Vuetify's own micro-transitions stay live.
+ *
+ * "Silencing" an entrance utility means `animation: none` only. Because every
+ * entrance utility carries its hidden state via `animation … both`, removing the
+ * animation reverts the element to its natural `opacity: 1` — no separate
+ * `opacity`/`transform` reset and no per-frame flash. GSAP sets its own inline
+ * opacity/transform before paint, so it is unaffected by these rules.
+ * -------------------------------------------------- */
+
+/* Shared token: the set of CSS entrance utilities that a mode may silence. */
+:root[data-md-animations="off"] [class*="md-animate-"],
+:root[data-md-animations="off"] .md-page,
+:root[data-md-animations="off"] .md-stagger > *,
+:root[data-md-animations="gsap"] [class*="md-animate-"],
+:root[data-md-animations="gsap"] .md-page,
+:root[data-md-animations="gsap"] .md-stagger > * {
+  animation: none !important;
+}
+
+/* off mode also kills interaction transitions, hover lifts, and infinite loops. */
 :root[data-md-animations="off"] *,
 :root[data-md-animations="off"] *::before,
 :root[data-md-animations="off"] *::after {
@@ -346,38 +373,7 @@
   transition-duration: 0s !important;
 }
 
-:root[data-md-animations="off"] [class*="md-animate-"],
-:root[data-md-animations="off"] .md-page,
-:root[data-md-animations="off"] .md-stagger > * {
-  animation: none !important;
-  opacity: 1 !important;
-  transform: none !important;
-}
-
-/* GSAP mode: CSS and Vuetify transitions are suppressed so GSAP owns motion. */
-:root[data-md-animations="gsap"] *,
-:root[data-md-animations="gsap"] *::before,
-:root[data-md-animations="gsap"] *::after {
-  animation-delay: 0ms !important;
-  animation-duration: 0s !important;
-  scroll-behavior: auto !important;
-  transition-delay: 0ms !important;
-  transition-duration: 0s !important;
-}
-
-:root[data-md-animations="gsap"] [class*="md-animate-"],
-:root[data-md-animations="gsap"] .md-page,
-:root[data-md-animations="gsap"] .md-stagger > * {
-  animation: none !important;
-}
-
-/* Keep staggered content visible after GSAP clears its inline properties. */
-:root[data-md-animations="gsap"] [data-md-gsap-ready] .md-stagger > * {
-  opacity: 1 !important;
-  transform: none !important;
-}
-
-/* Reduced motion respect */
+/* Reduced motion respect (OS-level; overrides every mode). */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -4,10 +4,7 @@
         <v-main>
             <v-container fluid class="position-relative">
                 <router-view v-slot="{ Component, route }">
-                    <keep-alive v-if="animationsOff">
-                        <component :is="Component" :key="route.path" />
-                    </keep-alive>
-                    <transition v-else v-bind="routeTransitionProps">
+                    <transition v-bind="routeTransitionProps">
                         <keep-alive>
                             <component :is="Component" :key="route.path" />
                         </keep-alive>
@@ -277,29 +274,46 @@ const downloadQueueReminders = computed(() => visibleDownloadQueue.value.optiona
 const gsapAnimationsActive = computed(() => activeAnimationMode.value === animationModeGsap);
 const animationsOff = computed(() => activeAnimationMode.value === animationModeOff);
 
-const routeTransitionProps = computed(() => (
-    gsapAnimationsActive.value
-        ? {
+// Route transition — one <transition>, props swapped per mode. `appear` makes the
+// first paint (initial load / reload on any route) animate too, so gsap-owned
+// entrances are never skipped and content can't get stuck hidden.
+const routeTransitionProps = computed(() => {
+    if (animationsOff.value) {
+        return { css: false, mode: "out-in" as const };
+    }
+    if (gsapAnimationsActive.value) {
+        return {
             css: false,
+            appear: true,
             mode: "out-in" as const,
             onBeforeEnter: beforeGsapRouteEnter,
             onEnter: enterGsapRoute,
             onLeave: leaveGsapRoute,
             onAfterLeave: afterGsapRouteLeave,
-        }
-        : { name: "slide-fade", mode: "out-in" as const }
-));
-const fabTransitionProps = computed(() => (
-    animationsOff.value
-        ? { css: false, onAfterLeave: clearDownloadQueueSnapshot }
-        : {
+        };
+    }
+    return { name: "slide-fade", appear: true, mode: "out-in" as const };
+});
+
+// FAB transition — each mode owns one layer, no cross-mode leakage:
+//   off     → no-op (only the snapshot cleanup hook)
+//   vuetify → CSS `md-fab-*` classes
+//   gsap    → GSAP hooks
+const fabTransitionProps = computed(() => {
+    if (animationsOff.value) {
+        return { css: false, onAfterLeave: clearDownloadQueueSnapshot };
+    }
+    if (gsapAnimationsActive.value) {
+        return {
             css: false,
             onBeforeEnter: beforeGsapFabEnter,
             onEnter: enterGsapFab,
             onLeave: leaveGsapFab,
             onAfterLeave: clearDownloadQueueSnapshot,
-        }
-));
+        };
+    }
+    return { name: "md-fab", onAfterLeave: clearDownloadQueueSnapshot };
+});
 
 const queueStatusIcon = (status: string) => {
     switch (status) {
