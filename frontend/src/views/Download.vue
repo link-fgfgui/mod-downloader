@@ -357,6 +357,7 @@ const syncDownloadPageState = async () => {
         minecraftStore.selectedModLoader,
         minecraftStore.hasSelectedInstance,
     );
+    await downloadStore.refreshDownloadStates();
 };
 
 onActivated(syncDownloadPageState);
