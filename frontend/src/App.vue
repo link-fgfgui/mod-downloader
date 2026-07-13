@@ -290,17 +290,15 @@ const routeTransitionProps = computed(() => (
         : { name: "slide-fade", mode: "out-in" as const }
 ));
 const fabTransitionProps = computed(() => (
-    gsapAnimationsActive.value
-        ? {
+    animationsOff.value
+        ? { css: false, onAfterLeave: clearDownloadQueueSnapshot }
+        : {
             css: false,
             onBeforeEnter: beforeGsapFabEnter,
             onEnter: enterGsapFab,
             onLeave: leaveGsapFab,
             onAfterLeave: clearDownloadQueueSnapshot,
         }
-        : animationsOff.value
-            ? { css: false, onAfterLeave: clearDownloadQueueSnapshot }
-            : { name: "md-fab", onAfterLeave: clearDownloadQueueSnapshot }
 ));
 
 const queueStatusIcon = (status: string) => {

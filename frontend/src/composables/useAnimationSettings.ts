@@ -206,33 +206,70 @@ export function afterGsapRouteLeave(el: Element) {
 export function beforeGsapFabEnter(el: Element) {
     gsap.killTweensOf(el);
     trackGsapElements([el]);
-    gsap.set(el, { opacity: 0, scale: 0, rotation: -90 });
+    gsap.set(el, {
+        opacity: 0,
+        scale: 0.35,
+        x: 30,
+        y: 30,
+        rotation: 18,
+        transformOrigin: "center center",
+    });
 }
 
 export function enterGsapFab(el: Element, done: () => void) {
     trackGsapElements([el]);
     pendingGsapDone.set(el, done);
-    gsap.to(el, {
-        opacity: 1,
-        scale: 1,
-        rotation: 0,
-        duration: gsapDuration(0.48),
-        ease: "back.out(1.8)",
+    const timeline = gsap.timeline({
         onComplete: () => finishGsapAnimation(el, [el], done),
     });
+
+    timeline
+        .to(el, {
+            opacity: 1,
+            scale: 1,
+            x: 0,
+            y: 0,
+            rotation: 0,
+            duration: gsapDuration(0.55),
+            ease: "elastic.out(1, 0.65)",
+        })
+        .to(el, {
+            scaleX: 1.08,
+            scaleY: 0.94,
+            duration: gsapDuration(0.09),
+            ease: "power2.out",
+        }, `-=${gsapDuration(0.08)}`)
+        .to(el, {
+            scaleX: 1,
+            scaleY: 1,
+            duration: gsapDuration(0.16),
+            ease: "back.out(2)",
+        });
 }
 
 export function leaveGsapFab(el: Element, done: () => void) {
+    gsap.killTweensOf(el);
     trackGsapElements([el]);
     pendingGsapDone.set(el, done);
-    gsap.to(el, {
-        opacity: 0,
-        scale: 0.5,
-        rotation: 45,
-        duration: gsapDuration(0.22),
-        ease: "power2.in",
+    const timeline = gsap.timeline({
         onComplete: () => finishGsapAnimation(el, [el], done),
     });
+
+    timeline
+        .to(el, {
+            scale: 1.08,
+            duration: gsapDuration(0.08),
+            ease: "power2.out",
+        })
+        .to(el, {
+            opacity: 0,
+            scale: 0.35,
+            x: 26,
+            y: 26,
+            rotation: 16,
+            duration: gsapDuration(0.24),
+            ease: "power3.in",
+        });
 }
 
 export interface GsapPageContentOptions {
