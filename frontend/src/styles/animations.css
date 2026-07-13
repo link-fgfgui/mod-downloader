@@ -369,9 +369,10 @@
 :root[data-md-animations="gsap"] .md-page,
 :root[data-md-animations="gsap"] .md-stagger > * {
   animation: none !important;
-  /* These utility animations initialize elements at opacity: 0. GSAP is
-     optional, so pages must remain visible even when no GSAP hook targets
-     the element (for example, during the initial render). */
+}
+
+/* Keep staggered content visible after GSAP clears its inline properties. */
+:root[data-md-animations="gsap"] [data-md-gsap-ready] .md-stagger > * {
   opacity: 1 !important;
   transform: none !important;
 }

@@ -1,5 +1,5 @@
 import { gsap } from "gsap";
-import { onActivated, onDeactivated, onMounted, onUnmounted, readonly, ref, type Ref } from "vue";
+import { onActivated, onDeactivated, onMounted, onUnmounted, readonly, ref, type ComponentPublicInstance, type Ref } from "vue";
 
 const animationModeOff = "off";
 const animationModeVuetify = "vuetify";
@@ -25,6 +25,7 @@ const pageContentSelector = [
     ".empty-state",
     ".search-controls",
     ".manage-header",
+    ".md-stagger > *",
 ].join(", ");
 
 type AnimationMode = typeof animationModeOff | typeof animationModeVuetify | typeof animationModeGsap;
@@ -142,6 +143,7 @@ function routeAnimationTargets(el: Element): Element[] {
 }
 
 export function beforeGsapRouteEnter(el: Element) {
+    el.removeAttribute("data-md-gsap-ready");
     const targets = [el, ...getVisiblePageContentTargets(el)];
     gsap.killTweensOf(targets);
     trackGsapElements(targets);
@@ -157,7 +159,10 @@ export function enterGsapRoute(el: Element, done: () => void) {
     trackGsapElements(allTargets);
     pendingGsapDone.set(el, done);
     const timeline = gsap.timeline({
-        onComplete: () => finishGsapAnimation(el, allTargets, done),
+        onComplete: () => {
+            el.setAttribute("data-md-gsap-ready", "true");
+            finishGsapAnimation(el, allTargets, done);
+        },
     });
 
     timeline.to(el, {
@@ -272,25 +277,32 @@ export function animateGsapPageContent(
 }
 
 export function useGsapPageAnimations(
-    containerRef: Ref<Element | null>,
+    containerRef: Ref<Element | ComponentPublicInstance | null>,
     options?: GsapPageContentOptions,
 ) {
     let ctx: gsap.Context | null = null;
     const mode = useActiveAnimationMode();
+    const resolveContainer = () => {
+        const value = containerRef.value;
+        if (value instanceof Element) return value;
+        return value?.$el instanceof Element ? value.$el : null;
+    };
 
     const animate = () => {
         if (mode.value !== animationModeGsap) return;
-        if (!containerRef.value) return;
+        const container = resolveContainer();
+        if (!container) return;
         ctx?.revert();
         ctx = gsap.context(() => {
-            animateGsapPageContent(containerRef.value, options);
-        }, containerRef.value);
+            animateGsapPageContent(container, options);
+        }, container);
     };
 
     const cleanup = () => {
         ctx?.revert();
-        if (containerRef.value) {
-            const targets = [containerRef.value, ...getPageContentTargets(containerRef.value, options?.selector ?? pageContentSelector)];
+        const container = resolveContainer();
+        if (container) {
+            const targets = [container, ...getPageContentTargets(container, options?.selector ?? pageContentSelector)];
             gsap.killTweensOf(targets);
             clearGsapProps(targets);
             targets.forEach((target) => activeGsapElements.delete(target));
