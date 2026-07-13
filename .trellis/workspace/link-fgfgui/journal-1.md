@@ -687,3 +687,38 @@ Added architecture and package navigation maps, separated Wails and appcore cont
 ### Next Steps
 
 - None - task complete
+
+
+## Session 21: Implement download queue aggregate progress
+
+**Date**: 2026-07-13
+**Task**: Implement download queue aggregate progress
+**Package**: app
+**Branch**: `master`
+
+### Summary
+
+Added provider file-size metadata, byte-weighted queue-cycle progress, per-task progress, aggregate download speed, transfer sampling with race-safe queue events, frontend queue metrics and localized responsive presentation, membership-gated search refreshes, focused tests, Wails regeneration, and updated download queue cross-layer spec. Verified core/app tests, race, build, vet, frontend lint/build; archived task 07-13-download-queue-aggregate-progress.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8e93113` | (see git log) |
+| `e42e43f` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
