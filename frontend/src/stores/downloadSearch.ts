@@ -189,6 +189,22 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
                 }
             }
         },
+        async showResults(results: SearchModSnapshot[]) {
+            this.searchText = "";
+            this.searchResults = results || [];
+            this.downloadStates = [];
+            this.activeSearchRequestID = "";
+            this.activeSearchAppend = false;
+            this.appendBaseResults = [];
+            this.nextSearchOffset = 0;
+            this.hasMoreResults = false;
+            this.isSearching = false;
+            this.isLoadingMore = false;
+            this.selectedMod = null;
+            this.matchingVersions = [];
+            this.showVersionsOverlay = false;
+            await this.refreshDownloadStates();
+        },
         async loadMoreSearchResults() {
             await this.runSearch({ append: true });
         },

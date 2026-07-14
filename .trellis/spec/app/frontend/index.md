@@ -12,6 +12,7 @@ app adapter or `core/` specs.
 - [Animation Modes](./animation-modes.md)
 - [Local Mod Version Selection](./local-mod-version-selection.md)
 - [Download Completion Sound](./download-completion-sound.md)
+- [Download Result Snapshots](./download-result-snapshots.md)
 - [Language Preference](./language-preference.md)
 - [Shared Thinking Guides](../../guides/index.md)
 

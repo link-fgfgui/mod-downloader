@@ -92,6 +92,7 @@
                         @click="favoritesStore.setListPinned(listMenu.list, !listMenu.list.pinned)"></v-list-item>
                     <v-list-item prepend-icon="mdi-palette" :title="$t('favorites.actions.customize')" @click="openMetadata(listMenu.list)"></v-list-item>
                     <v-list-item prepend-icon="mdi-content-copy" :title="$t('favorites.actions.copyList')" @click="openListCopy(listMenu.list)"></v-list-item>
+                    <v-list-item prepend-icon="mdi-view-list" :title="$t('favorites.actions.asSearchResults')" @click="openListAsSearchResults(listMenu.list)"></v-list-item>
                     <v-list-item prepend-icon="mdi-link-variant" :title="$t('favorites.actions.referenceList')" @click="openReference(listMenu.list)"></v-list-item>
                     <v-list-item prepend-icon="mdi-swap-horizontal" :title="$t('favorites.actions.migrate')" @click="openMigration(listMenu.list)"></v-list-item>
                     <v-list-item prepend-icon="mdi-delete" :title="$t('favorites.actions.delete')" @click="openDelete(listMenu.list)"></v-list-item>
@@ -340,16 +341,20 @@
 
 <script setup>
 import { computed, onActivated, reactive, ref, watch } from "vue";
+import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import MinecraftTargetFields from "../components/MinecraftTargetFields.vue";
 import ModVersionList from "../components/ModVersionList.vue";
 import VirtualList from "../components/VirtualList.vue";
 import { useFavoritesStore } from "../stores/favorites";
+import { useDownloadSearchStore } from "../stores/downloadSearch";
 import { useMinecraftStore } from "../stores/minecraft";
 import { GetPinnedModVersion, ListMatchingProjectVersions, PinModVersion } from "../../wailsjs/go/main/App";
 
 const favoritesStore = useFavoritesStore();
+const downloadStore = useDownloadSearchStore();
 const minecraftStore = useMinecraftStore();
+const router = useRouter();
 const { t } = useI18n();
 const selectedList = computed(() => favoritesStore.selectedList);
 const draggedListId = ref("");
@@ -423,6 +428,13 @@ const openListMenu = (list, event) => {
     listMenu.list = list;
     listMenu.target = event.type === "contextmenu" ? [event.clientX, event.clientY] : event.currentTarget;
     listMenu.show = true;
+};
+const openListAsSearchResults = async (list) => {
+    if (!list?.id) return;
+    await favoritesStore.selectList(list.id);
+    await downloadStore.showResults((favoritesStore.items || []).map(projectFromFavorite));
+    listMenu.show = false;
+    await router.push({ name: "Download" });
 };
 const syncFavoriteDisplayScope = () => {
     favoritesStore.setDisplayScope(
