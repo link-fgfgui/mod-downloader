@@ -99,6 +99,39 @@ Avoid hard-coded timeout delays. Prefer Vue/Vuetify transition lifecycle hooks
 such as `@after-leave`, or the existing GSAP `done`/`onAfterLeave` transition
 path when GSAP owns the motion.
 
+## Menus Inside Dialogs
+
+Vuetify positions a select or combobox menu against the viewport, not against
+the dialog's remaining content area. A downward-opening menu can therefore
+cover `v-card-actions` while remaining above the dialog in the overlay stack.
+The visible Cancel/Add buttons then receive no click because a menu item is the
+actual hit target.
+
+Keep nested menu state explicit, close it from the dialog's close path, and
+place or size the menu so its content cannot cover the action row.
+
+```vue
+<!-- Correct: the nested overlay stays clear of the dialog actions. -->
+<v-combobox
+  v-model="selectedChoice"
+  v-model:menu="listMenuOpen"
+  :menu-props="{ location: 'top', maxHeight: 200, offset: 4 }"
+/>
+<v-btn @click="closeDialog">Cancel</v-btn>
+```
+
+```ts
+function closeDialog() {
+  listMenuOpen.value = false;
+  dialogOpen.value = false;
+}
+```
+
+Do not accept a visual screenshot alone as verification. With the nested menu
+open, assert that `document.elementFromPoint()` at the center of each dialog
+action resolves to that action, then click Cancel and assert that both the menu
+and dialog overlays become inactive. Repeat at desktop and narrow viewports.
+
 ## Virtual Lists and Route Animation
 
 Virtualized rows are recycled while scrolling. Their wrapper height is part of
