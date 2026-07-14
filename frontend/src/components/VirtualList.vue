@@ -1,9 +1,9 @@
 <template>
-    <div class="virtual-list-wrapper" @keydown="onKeydown" @mousemove="emit('pointer-move')">
+    <div ref="wrapperRef" class="virtual-list-wrapper" @keydown="onKeydown" @mousemove="emit('pointer-move')">
         <v-virtual-scroll ref="virtualScroll" :items="virtualItems" class="virtual-list-scroll px-2" :item-height="itemHeight"
             :style="{ '--virtual-list-item-height': `${itemHeight}px` }"
             tabindex="0"
-            @scroll.passive="emit('scroll')">
+            @scroll.passive="onScroll">
             <template #default="{ item }">
                 <template v-if="item.type === 'item'">
                     <slot name="item" :item="item.raw" :index="item.index" :selected="selectedIndices.has(item.index)"
@@ -91,9 +91,11 @@ const props = defineProps({
 
 const emit = defineEmits(["load-more", "item-click", "scroll", "pointer-move"]);
 
+const wrapperRef = ref(null);
 const virtualScroll = ref(null);
 const loadMoreTarget = ref(null);
 let observer = null;
+let resizeObserver = null;
 let lastLoadMoreResultCount = 0;
 
 const selectedIndices = reactive(new Set());
@@ -205,21 +207,65 @@ const onKeydown = (event) => {
 };
 
 let measureFrame = 0;
+let restoreFrame = 0;
+let isActive = false;
+let savedScrollTop = 0;
+let restoreScrollOnMeasure = false;
+let syncingViewport = false;
+
+const onScroll = (event) => {
+    if (syncingViewport) return;
+    savedScrollTop = event.currentTarget?.scrollTop || 0;
+    emit("scroll");
+};
+
+const dispatchViewportScroll = (scrollContainer) => {
+    syncingViewport = true;
+    scrollContainer.dispatchEvent(new Event("scroll"));
+    syncingViewport = false;
+};
+
 const scheduleMeasure = async () => {
     await nextTick();
     cancelAnimationFrame(measureFrame);
     measureFrame = requestAnimationFrame(() => {
-        virtualScroll.value?.calculateVisibleItems?.();
+        if (!isActive || !wrapperRef.value || wrapperRef.value.clientHeight <= 0) return;
+
+        const scrollContainer = virtualScroll.value?.$el;
+        if (!(scrollContainer instanceof HTMLElement)) return;
+
+        const shouldRestoreScroll = restoreScrollOnMeasure;
+        restoreScrollOnMeasure = false;
+        if (shouldRestoreScroll) {
+            scrollContainer.scrollTop = savedScrollTop;
+        }
+        dispatchViewportScroll(scrollContainer);
+
+        if (shouldRestoreScroll) {
+            cancelAnimationFrame(restoreFrame);
+            restoreFrame = requestAnimationFrame(() => {
+                if (!isActive || !wrapperRef.value || wrapperRef.value.clientHeight <= 0) {
+                    restoreScrollOnMeasure = true;
+                    return;
+                }
+                scrollContainer.scrollTop = savedScrollTop;
+                dispatchViewportScroll(scrollContainer);
+            });
+        }
     });
 };
 
 const activateList = () => {
+    isActive = true;
+    restoreScrollOnMeasure = true;
     activeListKeyHandler = onKeydown;
     installGlobalKeyListener();
     void scheduleMeasure();
 };
 
 const deactivateList = () => {
+    isActive = false;
+    cancelAnimationFrame(restoreFrame);
     if (activeListKeyHandler === onKeydown) {
         activeListKeyHandler = null;
     }
@@ -257,6 +303,16 @@ const setLoadMoreTarget = (element) => {
 
 onMounted(() => {
     activateList();
+
+    resizeObserver = new ResizeObserver(([entry]) => {
+        if (entry.contentRect.height > 0) {
+            void scheduleMeasure();
+        }
+    });
+    if (wrapperRef.value) {
+        resizeObserver.observe(wrapperRef.value);
+    }
+
     observer = new IntersectionObserver((entries) => {
         const count = props.items.length;
         if (entries.some((e) => e.isIntersecting) && count > 2 && count !== lastLoadMoreResultCount && props.hasMore && !props.loadingMore) {
@@ -277,6 +333,9 @@ onDeactivated(deactivateList);
 onUnmounted(() => {
     deactivateList();
     cancelAnimationFrame(measureFrame);
+    cancelAnimationFrame(restoreFrame);
+    resizeObserver?.disconnect();
+    resizeObserver = null;
     observer?.disconnect();
     observer = null;
 });

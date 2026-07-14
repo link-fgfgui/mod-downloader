@@ -140,6 +140,12 @@ the scrollbar calculation and must remain equal to the `item-height` passed to
 `height`/`min-height`/`max-height`, `contain: layout size style`, and a stable
 scrollbar gutter to the virtual wrapper items.
 
+Shared virtual-list components must preserve the scroll container's `scrollTop`
+across KeepAlive activation and re-enter Vuetify's native scroll handler after
+the wrapper becomes visible or changes size. Calling `calculateVisibleItems`
+alone is insufficient because it calculates from Vuetify's cached scroll
+offset instead of reading the current DOM offset.
+
 Do not attach CSS or GSAP entrance animations to virtualized rows. Recycling an
 animated row during a scrollbar drag causes flashes, unnecessary main-thread
 work, and a changing scroll range. Hover and direct-interaction transitions are
