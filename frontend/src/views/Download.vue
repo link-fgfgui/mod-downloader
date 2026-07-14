@@ -403,6 +403,7 @@ watch(
 
 .search-controls {
     flex: 0 0 auto;
+    padding-top: 12px;
 }
 
 .search-result-list {
