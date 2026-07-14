@@ -5,9 +5,10 @@
 ### 1. Scope / Trigger
 
 Use this contract when adding or changing download workers, per-file range
-concurrency, provider HTTP transports, or their configuration. These settings
-are loaded by `configs`, applied by `appcore.Service.Startup`, and consumed by
-`downloader` and the CurseForge/Modrinth clients.
+concurrency, remote JAR metadata parsing, provider HTTP transports, or their
+configuration. These settings are loaded by `configs`, applied by
+`appcore.Service.Startup`, and consumed by `downloader`, `modbridge`, and the
+CurseForge/Modrinth clients.
 
 ### 2. Signatures
 
@@ -31,6 +32,7 @@ type downloader.Config struct {
 }
 
 func downloader.Configure(downloader.Config)
+func modbridge.ConfigureRemoteModIDConcurrency(limit int)
 ```
 
 Configuration keys:
@@ -61,8 +63,19 @@ Environment equivalents are `DOWNLOADS_FILE_CONCURRENCY`,
   download values below the minimum use their compatibility defaults.
 - `Service.Startup` applies download settings before accepting queue work.
 - `Service.SaveNetworkSettings` persists normalized values and immediately
-  reconfigures new downloader jobs and the shared provider limiter. Existing
-  in-flight downloads are not canceled or resized.
+  reconfigures new downloader jobs, remote JAR metadata parsing, and the shared
+  provider limiter. Existing in-flight work is not canceled or resized.
+- `concurrent_downloads` is the shared numeric limit for simultaneous file
+  downloads and distinct uncached remote JAR mod-ID parses. These consumers
+  use separate gates, so one workload does not consume the other's slots.
+- Remote JAR parsing acquires its gate only after memory/DB lookup and
+  URL/loader cache ownership are resolved. Cache hits and callers coalesced
+  behind an existing parse do not consume slots.
+- Lowering remote JAR concurrency lets active parses finish and blocks new
+  parses until the active count falls below the new limit. Increasing it wakes
+  waiters immediately.
+- Each remote JAR metadata parse has one 45-second overall deadline covering
+  URL resolution, Range size probing, ZIP directory reads, and metadata reads.
 - Every `filetransfer.Request` receives the configured file concurrency.
 - When adaptive file concurrency is enabled, a transfer starts with the
   configured file concurrency and adds one range worker per second while its
@@ -88,6 +101,12 @@ Environment equivalents are `DOWNLOADS_FILE_CONCURRENCY`,
 - Missing config sections -> defaults (4, 1, unlimited API).
 - Download value <= 0 -> its default; do not create a zero-worker queue.
 - Download value above its maximum -> clamp to 32 or 16 respectively.
+- Missing or invalid concurrent downloads -> both file downloads and remote
+  JAR metadata parsing default to one concurrent task.
+- Remote JAR limit reduced below the active count -> active parses continue;
+  queued parses wait until enough active work completes.
+- Remote JAR parsing exceeds 45 seconds -> the shared per-JAR deadline cancels
+  its HTTP work and the gate slot is released.
 - API value below 0 -> 0/no wait; above 100 -> clamp to 100.
 - Adaptive target values at or below zero use 1 MiB/s; values below 0.1 or
   above 5 clamp to those limits.
@@ -102,11 +121,14 @@ Environment equivalents are `DOWNLOADS_FILE_CONCURRENCY`,
 
 - Good: `file_concurrency=8`, `concurrent_downloads=3`, and
   `requests_per_second=10` starts up to three files, each with eight range
-  workers, while provider API starts share a ten-per-second limiter.
+  workers, allows up to three distinct remote JAR metadata parses through a
+  separate gate, and gives provider API starts a ten-per-second limiter.
 - Base: an existing config without these sections preserves the old four-way
-  file transfer and serial queue behavior.
+  file transfer, serial file queue, and serial remote JAR parsing behavior.
 - Bad: use one semaphore for API calls and file chunks; a large file can then
   starve metadata requests.
+- Bad: acquire remote JAR capacity before checking the URL/loader cache;
+  duplicate callers can occupy every slot while waiting for one physical JAR.
 - Bad: dequeue a dependency-blocked parent into a spare worker before its
   required dependency jobs leave pending/running state.
 
@@ -117,6 +139,13 @@ Environment equivalents are `DOWNLOADS_FILE_CONCURRENCY`,
   reloaded TOML contain normalized values.
 - Configure two concurrent downloads with a blocking backend; assert both are
   running and each request carries the configured file concurrency.
+- Configure two remote mod-ID parses with blocking fakes; assert two distinct
+  URLs enter, a third waits, and same-URL callers still invoke one parse.
+- Reduce remote JAR concurrency while parses are active; assert in-flight work
+  continues and a waiter starts only after the active count is below the new
+  limit.
+- Assert startup and saved network settings pass the normalized
+  `concurrent_downloads` value to the remote mod-ID gate.
 - Use a deliberately slow range server and assert adaptive mode starts an
   additional range worker when the requested target speed is missed.
 - Assert a rate-limited request canceled during its wait never reaches the base
@@ -143,6 +172,7 @@ downloader.Configure(downloader.Config{
     FileConcurrency: cfg.Downloads.FileConcurrencyValue(),
     ConcurrentDownloads: cfg.Downloads.ConcurrentDownloadsValue(),
 })
+modbridge.ConfigureRemoteModIDConcurrency(cfg.Downloads.ConcurrentDownloadsValue())
 request.Concurrency = configuredFileConcurrency()
 client.Transport = rateLimitedTransport{limiter: sharedLimiter}
 ```
