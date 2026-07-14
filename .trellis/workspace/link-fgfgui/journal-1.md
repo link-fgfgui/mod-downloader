@@ -757,3 +757,38 @@ Raised remote JAR mod-ID parsing timeout to 45 seconds, parallelized search back
 ### Next Steps
 
 - None - task complete
+
+
+## Session 23: Add simple mode
+
+**Date**: 2026-07-15
+**Task**: Add simple mode
+**Package**: app
+**Branch**: `master`
+
+### Summary
+
+Added a persisted simple mode that blocks new remote Mod ID parsing, disables dependency/conflict preflight, preserves local-parse downloads, updates Wails/Vue settings, and adds concurrency and fallback regression coverage.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a92e390` | (see git log) |
+| `8c14b24` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
