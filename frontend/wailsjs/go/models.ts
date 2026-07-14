@@ -332,11 +332,11 @@ export namespace main {
 	}
 	export class SaveSimpleModeSettingsRequest {
 	    simpleMode: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SaveSimpleModeSettingsRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.simpleMode = source["simpleMode"];
@@ -1589,3 +1589,4 @@ export namespace structs {
 	}
 
 }
+
