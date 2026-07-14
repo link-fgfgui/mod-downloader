@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 21
-- **Last Active**: 2026-07-13
+- **Total Sessions**: 22
+- **Last Active**: 2026-07-14
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~724 | Active |
+| `journal-1.md` | ~759 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 22 | 2026-07-14 | Limit remote JAR metadata concurrency | `e80da5f`, `9eb6eef` | `master` |
 | 21 | 2026-07-13 | Implement download queue aggregate progress | `8e93113`, `e42e43f` | `master` |
 | 20 | 2026-07-13 | Refactor project structure for AI navigation | `74596b7`, `3b7e143` | `master` |
 | 19 | 2026-07-12 | Implement JIJ dependency safeguards | `93a8a23`, `79db5de`, `54ea084` | `master` |

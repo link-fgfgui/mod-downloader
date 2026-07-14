@@ -722,3 +722,38 @@ Added provider file-size metadata, byte-weighted queue-cycle progress, per-task 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 22: Limit remote JAR metadata concurrency
+
+**Date**: 2026-07-14
+**Task**: Limit remote JAR metadata concurrency
+**Package**: app
+**Branch**: `master`
+
+### Summary
+
+Raised remote JAR mod-ID parsing timeout to 45 seconds, parallelized search backfills behind a dynamic gate driven by concurrent_downloads, wired startup/runtime settings, added concurrency and integration tests, and updated network documentation.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e80da5f` | (see git log) |
+| `9eb6eef` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
