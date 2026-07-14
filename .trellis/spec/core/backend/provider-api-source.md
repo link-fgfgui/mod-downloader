@@ -32,6 +32,9 @@ The environment equivalent is `PREFERS_MCIM_ENABLED`.
 - Enabling MCIM uses `https://mod.mcimirror.top/modrinth/v2/` for Modrinth
   and rewrites CurseForge API requests under
   `https://mod.mcimirror.top/curseforge/`.
+- CurseForge URL rewriting must update both `request.URL.Host` and
+  `request.Host`. Go request cloning preserves the original explicit Host;
+  leaving it as `api.curseforge.com` makes the MCIM proxy reject the request.
 - MCIM CurseForge requests do not require an API key. The official CurseForge
   client remains disabled when its key is empty.
 - The source switch preserves the versioned User-Agent and the shared API rate
@@ -49,6 +52,8 @@ The environment equivalent is `PREFERS_MCIM_ENABLED`.
 - Missing preference -> official sources.
 - MCIM enabled with empty CurseForge key -> construct the mirror client.
 - MCIM disabled with empty CurseForge key -> set the CurseForge client to nil.
+- MCIM URL with `Request.Host=api.curseforge.com` -> proxy rejection (`418`);
+  synchronize the Host with `mod.mcimirror.top` before transport dispatch.
 - Any provider download URL -> pass it unchanged to file transfer validation.
 - Context canceled during API rate-limit wait -> do not invoke either source.
 
@@ -56,18 +61,21 @@ The environment equivalent is `PREFERS_MCIM_ENABLED`.
 
 - Good: the user enables MCIM, saves once, and the next metadata search uses
   MCIM while the selected file still downloads from the official CDN.
+- Good: the CurseForge transport rewrites the URL and explicit Host together.
 - Base: an existing config has no `mcim_enabled` field and continues using the
   official providers.
 - Bad: rewrite official CDN URLs to MCIM; platform download counts and creator
   revenue attribution can be lost.
 - Bad: require a CurseForge API key while MCIM is active; the mirror endpoint
   works without it.
+- Bad: rewrite only `request.URL.Host`; `request.Host` still overrides the HTTP
+  Host header with the official API hostname.
 
 ### 6. Tests Required
 
 - Config tests for default false, TOML true, and `PREFERS_MCIM_ENABLED`.
-- CurseForge transport test for URL/query rewriting, no key, caller request
-  immutability, and versioned UA.
+- CurseForge transport test for URL/query/Host rewriting, no key, caller
+  request immutability, and versioned UA.
 - Provider construction test for MCIM on/off and Modrinth `BaseURL`.
 - Downloader tests assert file-transfer requests retain provider URLs.
 - Service persistence test that toggles on and off without restart.
@@ -90,4 +98,17 @@ if useMCIM {
     curseForgeTransport.apiBaseURL = mcimCurseForgeBaseURL
 }
 request.URL = version.DownloadURL // official provider URL, unchanged
+```
+
+Wrong:
+
+```go
+clone.URL.Host = baseURL.Host // clone.Host still contains api.curseforge.com
+```
+
+Correct:
+
+```go
+clone.URL.Host = baseURL.Host
+clone.Host = baseURL.Host
 ```
