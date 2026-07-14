@@ -210,6 +210,10 @@ export function SaveNetworkSettings(arg1) {
   return window['go']['main']['App']['SaveNetworkSettings'](arg1);
 }
 
+export function SaveSimpleModeSettings(arg1) {
+  return window['go']['main']['App']['SaveSimpleModeSettings'](arg1);
+}
+
 export function SaveTheme(arg1) {
   return window['go']['main']['App']['SaveTheme'](arg1);
 }

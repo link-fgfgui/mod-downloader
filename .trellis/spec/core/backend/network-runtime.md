@@ -176,3 +176,113 @@ modbridge.ConfigureRemoteModIDConcurrency(cfg.Downloads.ConcurrentDownloadsValue
 request.Concurrency = configuredFileConcurrency()
 client.Transport = rateLimitedTransport{limiter: sharedLimiter}
 ```
+
+## Scenario: Simple Mode Remote Mod ID Gate
+
+### 1. Scope / Trigger
+
+Use this contract when a persisted user preference must disable remote JAR
+mod-ID resolution while leaving ordinary file downloads and local JAR parsing
+available.
+
+### 2. Signatures
+
+```go
+// configs.Preferences
+SimpleMode bool `toml:"simple_mode" json:"simple_mode" env:"SIMPLE_MODE"`
+
+func modbridge.ConfigureSimpleMode(enabled bool)
+func modbridge.SimpleModeEnabled() bool
+func downloader.ConfigureSimpleMode(enabled bool, events ...downloader.Events)
+```
+
+### 3. Contracts
+
+- `simple_mode` defaults to `false`; the settings view uses `simpleMode` and
+  the environment equivalent is `PREFERS_SIMPLE_MODE` through the preferences
+  prefix.
+- `appcore.Service.Startup` applies the persisted value before accepting queue
+  work; saving the setting applies it immediately and returns the canonical
+  settings view.
+- While enabled, `VersionModIDs` returns no IDs without reading memory/SQLite
+  caches, and search state returns ordinary `new` download buttons without
+  queuing backfills.
+- The remote parser checks the mode before creating cache ownership and again
+  after acquiring the concurrency gate. A waiter rejected after the second
+  check closes its cache-entry channel and releases the gate.
+- A parser already inside the HTTP function may finish; enabling the mode does
+  not cancel its context. New work and queued waiters must not start HTTP I/O.
+- Enabling the mode clears pending backfills and downloader optional reminders.
+  Required/optional/incompatible dependency preflight and stale optional
+  reminder actions are disabled.
+- Local parsing after a downloaded or hardlinked file remains enabled and may
+  persist primary IDs for later normal-mode use.
+
+### 4. Validation & Error Matrix
+
+- Missing `simple_mode` -> `false`; no config migration is required.
+- Simple mode with an in-memory or persisted Mod ID cache -> return no IDs and
+  do not consult the cache.
+- Simple mode with a queued remote parse -> return the mode-disabled result,
+  close waiters, and make zero parser calls.
+- Simple mode with an active remote parse -> allow that call to finish; all
+  subsequent calls remain disabled until the mode is turned off.
+- Simple mode optional reminder action -> return no install results and leave no
+  reminder snapshot available to the queue.
+- Normal mode -> retain cache reads, remote fallback, backfills, precise status,
+  and dependency behavior.
+
+### 5. Good/Base/Bad Cases
+
+- Good: check the mode immediately before and after remote gate acquisition,
+  then close an aborted cache entry before returning.
+- Base: a normal-mode download with no remote IDs downloads to a temporary path,
+  parses locally, and installs normally.
+- Bad: only disable the Settings button; a queued backfill or direct core caller
+  can still start a remote Range request.
+- Bad: keep cached IDs authoritative in simple mode; two users with different
+  cache history then see different reduced-mode behavior.
+- Bad: clear reminder UI without gating its stored install action.
+
+### 6. Tests Required
+
+- TOML/environment decode and appcore save/reload round trip for `simple_mode`.
+- Startup and runtime-save tests proving the core flag changes immediately.
+- Cached in-memory IDs, persisted IDs, and backfill queue are ignored in simple
+  mode.
+- A blocking parser test proving one in-flight call may finish while a queued
+  caller is released without starting a second parse.
+- Search-state test asserting an enabled ordinary download button in simple mode.
+- Dependency/reminder tests asserting no required queueing, optional reminders,
+  incompatible analysis, or stale optional action.
+- Local-parse download test and normal-mode cache restoration test.
+- Run `go test -race ./modbridge ./downloader` plus full core/app checks and
+  frontend lint/build after binding changes.
+
+### 7. Wrong vs Correct
+
+Wrong:
+
+```go
+if simpleMode {
+    return defaultButtonState(result) // UI only; queued backfills still run
+}
+```
+
+Correct:
+
+```go
+for {
+    if modbridge.SimpleModeEnabled() {
+        return nil, errSimpleMode
+    }
+    entry := ownRemoteCacheEntry(key)
+    release := remoteModIDGate.acquire()
+    if modbridge.SimpleModeEnabled() {
+        release()
+        closeAndDelete(entry)
+        return nil, errSimpleMode
+    }
+    return parseRemoteJar(entry, release)
+}
+```

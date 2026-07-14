@@ -309,6 +309,12 @@ func (a *App) SaveAnimationSettings(req SaveAnimationSettingsRequest) SettingsVi
 	return settingsViewFromCore(next)
 }
 
+func (a *App) SaveSimpleModeSettings(req SaveSimpleModeSettingsRequest) SettingsView {
+	next := a.service().SaveSimpleModeSettings(appcore.SaveSimpleModeSettingsRequest{SimpleMode: req.SimpleMode})
+	a.config = a.core.Config()
+	return settingsViewFromCore(next)
+}
+
 func (a *App) SaveUnusedDependencyCleanupSettings(req SaveUnusedDependencyCleanupSettingsRequest) SettingsView {
 	next := a.service().SaveUnusedDependencyCleanupSettings(appcore.SaveUnusedDependencyCleanupSettingsRequest{
 		AutoScanUnusedDependencies: req.AutoScanUnusedDependencies,
@@ -494,6 +500,7 @@ func settingsViewFromCore(sv appcore.SettingsView) SettingsView {
 	return SettingsView{
 		Theme:                       sv.Theme,
 		Language:                    sv.Language,
+		SimpleMode:                  sv.SimpleMode,
 		AnimationMode:               sv.AnimationMode,
 		AnimationEnabled:            sv.AnimationEnabled,
 		AnimationDurationMultiplier: sv.AnimationDurationMultiplier,

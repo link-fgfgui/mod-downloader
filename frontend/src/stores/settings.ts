@@ -4,6 +4,7 @@ import {
     SaveLanguage,
     SaveTheme,
     SaveAnimationSettings,
+    SaveSimpleModeSettings,
     SaveApiKeys,
     SaveUnusedDependencyCleanupSettings,
     SaveMCIMSettings,
@@ -40,6 +41,7 @@ export const useSettingsStore = defineStore("settings", {
         isSavingTheme: false,
         isSavingLanguage: false,
         isSavingAnimations: false,
+        isSavingSimpleMode: false,
         isSavingUnusedDependencyCleanup: false,
         isSavingMCIM: false,
         isSavingKeys: false,
@@ -49,6 +51,7 @@ export const useSettingsStore = defineStore("settings", {
         draftLanguage: languageSystem,
         draftAnimationMode: defaultAnimationMode,
         draftAnimationDurationMultiplier: defaultAnimationDurationMultiplier,
+        draftSimpleMode: false,
         draftAutoScanUnusedDependencies: false,
         draftMCIMEnabled: false,
         draftFileConcurrency: 4,
@@ -69,7 +72,7 @@ export const useSettingsStore = defineStore("settings", {
         hasModrinthKey: (s) => Boolean(s.view?.hasModrinthKey),
     },
     actions: {
-        scheduleAutoSave(kind: "animations" | "cleanup" | "mcim" | "network" | "keys", delay = 600) {
+        scheduleAutoSave(kind: "animations" | "simpleMode" | "cleanup" | "mcim" | "network" | "keys", delay = 600) {
             const previous = autoSaveTimers.get(kind);
             if (previous) window.clearTimeout(previous);
             autoSaveTimers.set(kind, window.setTimeout(async () => {
@@ -77,6 +80,7 @@ export const useSettingsStore = defineStore("settings", {
                 this.autoSaveError = "";
                 try {
                     if (kind === "animations") await this.saveAnimationSettings();
+                    else if (kind === "simpleMode") await this.saveSimpleModeSettings();
                     else if (kind === "cleanup") await this.saveUnusedDependencyCleanupSettings();
                     else if (kind === "mcim") await this.saveMCIMSettings();
                     else if (kind === "network") await this.saveNetworkSettings();
@@ -100,6 +104,7 @@ export const useSettingsStore = defineStore("settings", {
                 this.draftAnimationDurationMultiplier = normalizeAnimationDurationMultiplier(
                     this.view?.animationDurationMultiplier ?? defaultAnimationDurationMultiplier
                 );
+                this.draftSimpleMode = this.view?.simpleMode ?? false;
                 this.draftAutoScanUnusedDependencies = this.view?.autoScanUnusedDependencies ?? false;
                 this.draftMCIMEnabled = this.view?.mcimEnabled ?? false;
                 this.draftFileConcurrency = this.view?.fileConcurrency ?? 4;
@@ -166,6 +171,16 @@ export const useSettingsStore = defineStore("settings", {
                 };
             } finally {
                 this.isSavingAnimations = false;
+            }
+        },
+        async saveSimpleModeSettings() {
+            this.isSavingSimpleMode = true;
+            try {
+                this.view = await SaveSimpleModeSettings({ simpleMode: this.draftSimpleMode });
+                this.draftSimpleMode = this.view.simpleMode;
+                return this.view;
+            } finally {
+                this.isSavingSimpleMode = false;
             }
         },
         async saveUnusedDependencyCleanupSettings() {

@@ -41,6 +41,7 @@ modrinth_api_key = ""
 [preferences]
 theme = "dark"
 minecraft_dir = "/path/to/.minecraft"
+simple_mode = false
 mcim_enabled = false
 
 [downloads]
@@ -56,6 +57,7 @@ requests_per_second = 0
 Environment variables:
 
 - `KEYS_CF_API_KEY`
+- `PREFERS_SIMPLE_MODE` enables simple mode, which skips remote Mod ID parsing and automatic dependency/conflict handling.
 - `KEYS_MODRINTH_API_KEY`
 - `PREFERS_MINECRAFT_DIR`
 - `PREFERS_THEME`

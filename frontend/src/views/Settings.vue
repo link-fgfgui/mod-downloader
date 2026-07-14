@@ -112,6 +112,17 @@
                 </v-card>
 
                 <v-card class="mb-4">
+                    <v-card-title>{{ $t('settings.simpleMode.label') }}</v-card-title>
+                    <v-card-subtitle>{{ $t('settings.simpleMode.hint') }}</v-card-subtitle>
+                    <v-card-text>
+                        <v-switch v-model="settingsStore.draftSimpleMode" color="primary" density="comfortable"
+                            hide-details :loading="settingsStore.isSavingSimpleMode"
+                            :label="$t('settings.simpleMode.enabled')"
+                            @update:model-value="settingsStore.scheduleAutoSave('simpleMode')" />
+                    </v-card-text>
+                </v-card>
+
+                <v-card class="mb-4">
                     <v-card-title>{{ $t('settings.network.label') }}</v-card-title>
                     <v-card-text class="network-settings-grid">
                         <v-number-input v-model="settingsStore.draftFileConcurrency" :min="1" :max="32"
