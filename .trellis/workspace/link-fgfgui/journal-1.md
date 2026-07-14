@@ -792,3 +792,37 @@ Added a persisted simple mode that blocks new remote Mod ID parsing, disables de
 ### Next Steps
 
 - None - task complete
+
+
+## Session 24: Favorites as search results
+
+**Date**: 2026-07-15
+**Task**: Favorites as search results
+**Package**: app
+**Branch**: `master`
+
+### Summary
+
+Added a localized Favorites list context-menu action that imports the active scoped favorite Mods into the Download page as local ModProject search-result snapshots, refreshes install states, added frontend snapshot contract spec, and verified lint/build.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3f0d8dc` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
