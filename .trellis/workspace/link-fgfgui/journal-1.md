@@ -895,3 +895,38 @@ Added an immediate enabled-state selector to the local mod list, combined it wit
 ### Next Steps
 
 - None - task complete
+
+
+## Session 27: 下载队列删除失败和等待任务
+
+**Date**: 2026-07-15
+**Task**: 下载队列删除失败和等待任务
+**Package**: app
+**Branch**: `cancel`
+
+### Summary
+
+将队列删除扩展至失败和等待中任务；等待中任务右键取消按钮直接移除且不生成取消历史，并同步测试、Wails 绑定和跨层规范。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0d51a18` | (see git log) |
+| `fda148e` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

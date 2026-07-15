@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 26
+- **Total Sessions**: 27
 - **Last Active**: 2026-07-15
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~897 | Active |
+| `journal-1.md` | ~932 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 27 | 2026-07-15 | 下载队列删除失败和等待任务 | `0d51a18`, `fda148e` | `cancel` |
 | 26 | 2026-07-15 | 下载队列删除已取消任务 | `5c1f504`, `b9f074f` | `cancel` |
 | 25 | 2026-07-15 | Filter local mods by enabled state | `ca953a7` | `master` |
 | 24 | 2026-07-15 | Favorites as search results | `3f0d8dc` | `master` |
