@@ -23,6 +23,7 @@ workflow file.
 - [Provider API Source](./provider-api-source.md)
 - [System Proxy](./system-proxy.md)
 - [Local Mod Online Version Metadata](./local-mod-online-version.md)
+- [Connector Compatibility](./connector-compatibility.md)
 - [Language Preference](../../app/frontend/language-preference.md)
 
 ## Pre-Development Checklist
@@ -43,6 +44,9 @@ workflow file.
 - Route every outbound HTTP client through [System Proxy](./system-proxy.md).
 - Preserve parsed JAR versions when adding provider version metadata; see
   [Local Mod Online Version Metadata](./local-mod-online-version.md).
+- Keep local all-loader parsing, scoped JAR cache identity, and transient
+  physical-instance views aligned; see
+  [Connector Compatibility](./connector-compatibility.md).
 - Keep config parsing and appcore language fields aligned with the app/frontend
   contract; see [Language Preference](../../app/frontend/language-preference.md).
 

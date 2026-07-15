@@ -11,6 +11,7 @@ app adapter or `core/` specs.
 - [UI State Lifecycle](./ui-state-lifecycle.md)
 - [Animation Modes](./animation-modes.md)
 - [Local Mod Version Selection](./local-mod-version-selection.md)
+- [Connector Compatibility](../../core/backend/connector-compatibility.md)
 - [Download Completion Sound](./download-completion-sound.md)
 - [Download Result Snapshots](./download-result-snapshots.md)
 - [Language Preference](./language-preference.md)
@@ -31,6 +32,9 @@ app adapter or `core/` specs.
 - Reuse `ModVersionList` for provider version choices and keep local parsed
   versions separate from online metadata; see
   [Local Mod Version Selection](./local-mod-version-selection.md).
+- Keep the Connector switch on the selected-version snapshot and exclude the
+  incompatible-section control from virtual-list selection; see
+  [Connector Compatibility](../../core/backend/connector-compatibility.md).
 - Preserve the success-event plus queue-drain plus unfocused gate for audible
   download notifications; see [Download Completion Sound](./download-completion-sound.md).
 - Keep persisted language values, startup resolution, Settings behavior, and
