@@ -23,9 +23,14 @@
             </v-btn>
         </div>
 
-        <v-text-field v-if="hasSelectedInstance" v-model="searchInput" class="manage-search"
-            prepend-inner-icon="mdi-magnify" :label="$t('manage.search.label')" clearable
-            density="comfortable" hide-details />
+        <div v-if="hasSelectedInstance" class="manage-filters">
+            <v-text-field v-model="searchInput" class="manage-search"
+                prepend-inner-icon="mdi-magnify" :label="$t('manage.search.label')" clearable
+                density="comfortable" hide-details />
+            <v-select v-model="enabledFilter" class="manage-enabled-filter"
+                :items="enabledFilterOptions" item-title="title" item-value="value"
+                :label="$t('manage.filter.label')" density="comfortable" hide-details />
+        </div>
 
         <v-alert v-if="!hasSelectedInstance" type="info" variant="tonal">
             {{ $t("manage.noInstance") }}
@@ -34,7 +39,7 @@
         <div v-else-if="groupedMods.length === 0" class="empty-state md-animate-fade-up">
             <v-icon class="md-animate-float" icon="mdi-package-variant" size="48"></v-icon>
             <div class="text-body-1 mt-3">
-                {{ appliedSearch ? $t("manage.search.empty") : $t("manage.noMods") }}
+                {{ hasActiveFilter ? $t("manage.search.empty") : $t("manage.noMods") }}
             </div>
         </div>
 
@@ -353,6 +358,7 @@ const snackbar = ref({ show: false, key: "", color: "success", params: {} });
 const listTooltipsPaused = ref(false);
 const searchInput = ref("");
 const appliedSearch = ref("");
+const enabledFilter = ref("all");
 const versionDialog = ref(false);
 const selectedVersionGroup = ref(null);
 const matchingVersions = ref([]);
@@ -380,6 +386,12 @@ const onListScroll = () => {
 };
 
 const isBatchBusy = computed(() => batchOperation.value !== "");
+const enabledFilterOptions = computed(() => [
+    { title: t("manage.enabled"), value: "enabled" },
+    { title: t("manage.disabled"), value: "disabled" },
+    { title: t("manage.filter.all"), value: "all" },
+]);
+const hasActiveFilter = computed(() => appliedSearch.value !== "" || enabledFilter.value !== "all");
 
 const allGroupedMods = computed(() => {
     const raw = minecraftStore.mods;
@@ -400,10 +412,13 @@ const allGroupedMods = computed(() => {
 });
 
 const groupedMods = computed(() => {
-    if (!appliedSearch.value) {
-        return allGroupedMods.value;
-    }
-    return allGroupedMods.value.filter((group) => searchableGroupText(group).includes(appliedSearch.value));
+    return allGroupedMods.value.filter((group) => {
+        const matchesSearch = !appliedSearch.value
+            || searchableGroupText(group).includes(appliedSearch.value);
+        const matchesEnabledState = enabledFilter.value === "all"
+            || group.primary.enabled === (enabledFilter.value === "enabled");
+        return matchesSearch && matchesEnabledState;
+    });
 });
 
 const searchableGroupText = (group) => {
@@ -990,10 +1005,31 @@ onDeactivated(() => {
     min-width: 0;
 }
 
-.manage-search {
+.manage-filters {
+    display: flex;
     flex: 0 0 auto;
+    gap: 12px;
     margin-bottom: 16px;
-    width: 100%;
+}
+
+.manage-search {
+    flex: 1 1 320px;
+    min-width: 0;
+}
+
+.manage-enabled-filter {
+    flex: 0 0 180px;
+}
+
+@media (max-width: 600px) {
+    .manage-filters {
+        flex-wrap: wrap;
+    }
+
+    .manage-search,
+    .manage-enabled-filter {
+        flex: 1 1 100%;
+    }
 }
 
 .empty-state {
