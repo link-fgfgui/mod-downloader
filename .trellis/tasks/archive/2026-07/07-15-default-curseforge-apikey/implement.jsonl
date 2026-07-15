@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/app/backend/build-version.md", "reason": "ldflags -X injection pattern for build-time values; mirror for DefaultCurseforgeAPIKey"}
+{"file": ".trellis/spec/core/backend/provider-api-source.md", "reason": "official CF client empty-key behavior must use effective key after change"}
+{"file": ".trellis/spec/app/backend/index.md", "reason": "app vs core boundary; build version checklist"}
+{"file": ".trellis/spec/core/backend/index.md", "reason": "core appcore/provider construction conventions"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "shared backend quality bar for tests and packages"}
