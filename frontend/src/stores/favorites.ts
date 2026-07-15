@@ -3,7 +3,7 @@ import {
     AddFavoriteListReference,
     AddFavoriteMod,
     AddFavoriteModsToLists,
-    ApplyFavoriteListMigration,
+    ApplyFavoriteListCrossVersionCopy,
     CopyFavoriteListToList,
     CreateFavoriteList,
     DeleteFavoriteList,
@@ -11,7 +11,7 @@ import {
     ListFavoriteContents,
     ListFavoriteLists,
     LookupProjectBySlug,
-    PreviewFavoriteListMigration,
+    PreviewFavoriteListCrossVersionCopy,
     RemoveFavoriteMod,
     RenameFavoriteList,
     ReorderFavoriteLists,
@@ -35,9 +35,8 @@ export type FavoriteModDraft = {
 
 export type FavoriteIconMode = "mdi" | "project";
 
-export type FavoriteMigrationTarget = {
+export type FavoriteCrossVersionCopyTarget = {
     sourceListId: string;
-    targetListId: string;
     minecraftVersion: string;
     modLoader: string;
     ignoreConflicts?: boolean;
@@ -327,25 +326,23 @@ export const useFavoritesStore = defineStore("favorites", {
             }
             return ref;
         },
-        async previewMigration(target: FavoriteMigrationTarget) {
-            return PreviewFavoriteListMigration({
+        async previewCrossVersionCopy(target: FavoriteCrossVersionCopyTarget) {
+            return PreviewFavoriteListCrossVersionCopy({
                 sourceListId: target.sourceListId,
-                targetListId: target.targetListId,
                 minecraftVersion: target.minecraftVersion,
                 modLoader: target.modLoader,
                 ignoreConflicts: Boolean(target.ignoreConflicts),
-            } as appcore.FavoriteMigrationRequest);
+            } as appcore.FavoriteCrossVersionCopyRequest);
         },
-        async applyMigration(target: FavoriteMigrationTarget) {
-            const result = await ApplyFavoriteListMigration({
+        async applyCrossVersionCopy(target: FavoriteCrossVersionCopyTarget) {
+            const result = await ApplyFavoriteListCrossVersionCopy({
                 sourceListId: target.sourceListId,
-                targetListId: target.targetListId,
                 minecraftVersion: target.minecraftVersion,
                 modLoader: target.modLoader,
                 ignoreConflicts: Boolean(target.ignoreConflicts),
-            } as appcore.FavoriteMigrationRequest);
-            if (target.targetListId === this.selectedListId) {
-                await this.loadItems(target.targetListId);
+            } as appcore.FavoriteCrossVersionCopyRequest);
+            if (result?.applied) {
+                await this.loadLists();
             }
             return result;
         },

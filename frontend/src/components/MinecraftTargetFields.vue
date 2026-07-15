@@ -8,6 +8,7 @@
             hide-details
             variant="outlined"
             clearable
+            :disabled="disabled"
         ></v-combobox>
         <v-select
             v-model="modLoader"
@@ -16,6 +17,7 @@
             density="compact"
             hide-details
             variant="outlined"
+            :disabled="disabled"
         ></v-select>
     </div>
 </template>
@@ -31,10 +33,12 @@ withDefaults(defineProps<{
     minecraftVersionLabel?: string;
     modLoaderLabel?: string;
     stacked?: boolean;
+    disabled?: boolean;
 }>(), {
     minecraftVersionLabel: "",
     modLoaderLabel: "",
     stacked: false,
+    disabled: false,
 });
 
 const minecraftVersion = defineModel<string>("minecraftVersion", { required: true });

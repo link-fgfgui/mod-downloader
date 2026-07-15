@@ -94,7 +94,7 @@
                     <v-list-item prepend-icon="mdi-content-copy" :title="$t('favorites.actions.copyList')" @click="openListCopy(listMenu.list)"></v-list-item>
                     <v-list-item prepend-icon="mdi-view-list" :title="$t('favorites.actions.asSearchResults')" @click="openListAsSearchResults(listMenu.list)"></v-list-item>
                     <v-list-item prepend-icon="mdi-link-variant" :title="$t('favorites.actions.referenceList')" @click="openReference(listMenu.list)"></v-list-item>
-                    <v-list-item prepend-icon="mdi-swap-horizontal" :title="$t('favorites.actions.migrate')" @click="openMigration(listMenu.list)"></v-list-item>
+                    <v-list-item prepend-icon="mdi-swap-horizontal" :title="$t('favorites.actions.copyAcrossVersions')" @click="openCrossVersionCopy(listMenu.list)"></v-list-item>
                     <v-list-item prepend-icon="mdi-delete" :title="$t('favorites.actions.delete')" @click="openDelete(listMenu.list)"></v-list-item>
                 </v-list>
             </v-menu>
@@ -132,8 +132,8 @@
                     <v-btn prepend-icon="mdi-refresh" variant="tonal" :loading="favoritesStore.isLoadingItems" @click="favoritesStore.loadItems()">
                         {{ $t("favorites.actions.refresh") }}
                     </v-btn>
-                    <v-btn prepend-icon="mdi-swap-horizontal" variant="tonal" @click="openMigration(selectedList)">
-                        {{ $t("favorites.actions.migrate") }}
+                    <v-btn prepend-icon="mdi-swap-horizontal" variant="tonal" @click="openCrossVersionCopy(selectedList)">
+                        {{ $t("favorites.actions.copyAcrossVersions") }}
                     </v-btn>
                 </div>
             </div>
@@ -274,36 +274,77 @@
             </v-card>
         </v-dialog>
 
-        <v-dialog v-model="migrationDialog.show" max-width="760">
+        <v-dialog
+            v-model="crossVersionCopyDialog.show"
+            max-width="760"
+            :persistent="crossVersionCopyDialog.isApplying"
+            @after-leave="clearClosedCrossVersionCopyDialog"
+        >
             <v-card>
-                <v-card-title>{{ $t("favorites.dialog.migrationTitle") }}</v-card-title>
+                <v-card-title>{{ $t("favorites.dialog.crossVersionCopyTitle") }}</v-card-title>
                 <v-card-text>
-                    <div class="migration-grid">
+                    <div class="cross-version-copy-grid">
                         <MinecraftTargetFields
-                            v-model:minecraft-version="migrationDialog.minecraftVersion"
-                            v-model:mod-loader="migrationDialog.modLoader"
+                            v-model:minecraft-version="crossVersionCopyDialog.minecraftVersion"
+                            v-model:mod-loader="crossVersionCopyDialog.modLoader"
                             :versions="minecraftStore.releaseVersions"
                             :mod-loaders="minecraftStore.modLoaderList"
                             :minecraft-version-label="$t('favorites.dialog.minecraftVersion')"
                             :mod-loader-label="$t('favorites.dialog.modLoader')"
+                            :disabled="crossVersionCopyDialog.isApplying"
                         ></MinecraftTargetFields>
                     </div>
-                    <v-checkbox v-model="migrationDialog.ignoreConflicts" :label="$t('favorites.dialog.ignoreConflicts')"></v-checkbox>
-                    <v-btn variant="tonal" prepend-icon="mdi-eye" :disabled="!migrationReady" @click="previewMigration">{{ $t("favorites.actions.preview") }}</v-btn>
+                    <v-alert class="mt-3" type="info" variant="tonal" density="compact">
+                        {{ $t("favorites.crossVersionCopy.target", {
+                            name: crossVersionCopyDialog.sourceListName,
+                            minecraftVersion: crossVersionCopyDialog.minecraftVersion,
+                            modLoader: crossVersionCopyDialog.modLoader,
+                        }) }}
+                    </v-alert>
+                    <v-checkbox
+                        v-model="crossVersionCopyDialog.ignoreConflicts"
+                        :label="$t('favorites.dialog.ignoreConflicts')"
+                        :disabled="crossVersionCopyDialog.isApplying"
+                    ></v-checkbox>
+                    <v-btn
+                        variant="tonal"
+                        prepend-icon="mdi-eye"
+                        :disabled="!crossVersionCopyReady || crossVersionCopyDialog.isApplying"
+                        :loading="crossVersionCopyDialog.isPreviewing"
+                        @click="previewCrossVersionCopy"
+                    >{{ $t("favorites.actions.preview") }}</v-btn>
 
-                    <div v-if="migrationDialog.preview" class="migration-preview mt-4">
-                        <v-chip size="small" color="success" variant="tonal">{{ $t("favorites.migration.matched", { n: migrationDialog.preview.matched?.length || 0 }) }}</v-chip>
-                        <v-chip size="small" color="warning" variant="tonal">{{ $t("favorites.migration.conflicts", { n: migrationDialog.preview.conflicts?.length || 0 }) }}</v-chip>
+                    <div v-if="crossVersionCopyDialog.preview" class="cross-version-copy-preview mt-4">
+                        <v-alert v-if="crossVersionCopyDialog.preview.nameConflict" class="mb-3" type="error" variant="tonal" density="compact">
+                            {{ $t("favorites.crossVersionCopy.nameConflict") }}
+                        </v-alert>
+                        <v-alert
+                            v-else-if="crossVersionCopyDialog.preview.errors?.length"
+                            class="mb-3"
+                            type="error"
+                            variant="tonal"
+                            density="compact"
+                        >
+                            <div v-for="message in crossVersionCopyDialog.preview.errors" :key="message">{{ message }}</div>
+                        </v-alert>
+                        <v-chip size="small" color="success" variant="tonal">{{ $t("favorites.crossVersionCopy.matched", { n: crossVersionCopyDialog.preview.matched?.length || 0 }) }}</v-chip>
+                        <v-chip size="small" color="warning" variant="tonal">{{ $t("favorites.crossVersionCopy.conflicts", { n: crossVersionCopyDialog.preview.conflicts?.length || 0 }) }}</v-chip>
                         <v-list density="compact" class="mt-2">
-                            <v-list-item v-for="match in migrationDialog.preview.matched || []" :key="`m-${match.source.id}`" prepend-icon="mdi-check" :title="displayName(match.source)" :subtitle="match.version.versionId || match.version.id"></v-list-item>
-                            <v-list-item v-for="conflict in migrationDialog.preview.conflicts || []" :key="`c-${conflict.source.id}`" prepend-icon="mdi-alert" :title="displayName(conflict.source)" :subtitle="conflict.reason"></v-list-item>
+                            <v-list-item v-for="match in crossVersionCopyDialog.preview.matched || []" :key="`m-${match.source.id}`" prepend-icon="mdi-check" :title="displayName(match.source)" :subtitle="match.version.versionId || match.version.id"></v-list-item>
+                            <v-list-item v-for="conflict in crossVersionCopyDialog.preview.conflicts || []" :key="`c-${conflict.source.id}`" prepend-icon="mdi-alert" :title="displayName(conflict.source)" :subtitle="conflict.reason"></v-list-item>
                         </v-list>
                     </div>
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer></v-spacer>
-                    <v-btn variant="text" @click="migrationDialog.show = false">{{ $t("favorites.actions.cancel") }}</v-btn>
-                    <v-btn color="primary" variant="flat" :disabled="!migrationApplyReady" @click="applyMigration">{{ $t("favorites.actions.apply") }}</v-btn>
+                    <v-btn variant="text" :disabled="crossVersionCopyDialog.isApplying" @click="crossVersionCopyDialog.show = false">{{ $t("favorites.actions.cancel") }}</v-btn>
+                    <v-btn
+                        color="primary"
+                        variant="flat"
+                        :disabled="!crossVersionCopyApplyReady"
+                        :loading="crossVersionCopyDialog.isApplying"
+                        @click="applyCrossVersionCopy"
+                    >{{ $t("favorites.actions.apply") }}</v-btn>
                 </v-card-actions>
             </v-card>
         </v-dialog>
@@ -360,13 +401,26 @@ const selectedList = computed(() => favoritesStore.selectedList);
 const draggedListId = ref("");
 const dropTargetId = ref("");
 const pendingClearSelection = ref(null);
+const crossVersionCopyOperation = ref(0);
 
 const listEdit = reactive({ show: false, id: "", name: "" });
 const listMenu = reactive({ show: false, list: null, target: null });
 const deleteDialog = reactive({ show: false, list: null });
 const metadataDialog = reactive({ show: false, list: null, pinned: false, iconKind: "mdi", iconValue: "", iconPlatform: "modrinth" });
 const copyDialog = reactive({ show: false, mode: "selected", sourceListId: "", targetListId: "", targetListIds: [], mods: [] });
-const migrationDialog = reactive({ show: false, sourceListId: "", targetListId: "", minecraftVersion: "", modLoader: "", ignoreConflicts: false, preview: null });
+const crossVersionCopyDialog = reactive({
+    show: false,
+    sourceListId: "",
+    sourceListName: "",
+    sourceMinecraftVersion: "",
+    sourceModLoader: "",
+    minecraftVersion: "",
+    modLoader: "",
+    ignoreConflicts: false,
+    preview: null,
+    isPreviewing: false,
+    isApplying: false,
+});
 const pinDialog = reactive({ show: false, item: null, versions: [], loading: false, pinnedVersionId: "", busyVersionId: "" });
 
 const targetListOptions = computed(() => favoritesStore.lists.map((list) => ({ title: list.name, value: list.id })));
@@ -381,23 +435,31 @@ const copyDialogTitle = computed(() => {
     return t("favorites.dialog.copySelectedTitle");
 });
 const copyDialogReady = computed(() => copyDialog.mode === "selected" ? copyDialog.targetListIds.length > 0 : Boolean(copyDialog.targetListId));
-const migrationReady = computed(() => {
-    const minecraftVersion = migrationDialog.minecraftVersion.trim();
-    const modLoader = migrationDialog.modLoader.trim().toLocaleLowerCase();
-    const currentMinecraftVersion = minecraftStore.selectedMinecraftVersion.trim();
-    const currentModLoader = minecraftStore.selectedModLoader.trim().toLocaleLowerCase();
+const crossVersionCopyReady = computed(() => {
+    const minecraftVersion = crossVersionCopyDialog.minecraftVersion.trim();
+    const modLoader = crossVersionCopyDialog.modLoader.trim().toLocaleLowerCase();
+    const sourceMinecraftVersion = crossVersionCopyDialog.sourceMinecraftVersion.trim();
+    const sourceModLoader = crossVersionCopyDialog.sourceModLoader.trim().toLocaleLowerCase();
     return Boolean(
-        migrationDialog.sourceListId &&
-        migrationDialog.targetListId &&
+        crossVersionCopyDialog.sourceListId &&
         minecraftVersion &&
         modLoader &&
-        (minecraftVersion !== currentMinecraftVersion || modLoader !== currentModLoader)
+        (minecraftVersion !== sourceMinecraftVersion || modLoader !== sourceModLoader)
     );
 });
-const migrationApplyReady = computed(() => {
-    const preview = migrationDialog.preview;
-    if (!migrationReady.value || !preview) return false;
-    return migrationDialog.ignoreConflicts || (preview.conflicts || []).length === 0;
+const crossVersionCopyPreviewIsCurrent = computed(() => {
+    const preview = crossVersionCopyDialog.preview;
+    if (!preview) return false;
+    return preview.sourceListId === crossVersionCopyDialog.sourceListId &&
+        preview.minecraftVersion === crossVersionCopyDialog.minecraftVersion.trim() &&
+        preview.modLoader === crossVersionCopyDialog.modLoader.trim().toLocaleLowerCase();
+});
+const crossVersionCopyApplyReady = computed(() => {
+    const preview = crossVersionCopyDialog.preview;
+    if (!crossVersionCopyReady.value || !crossVersionCopyPreviewIsCurrent.value || !preview) return false;
+    if (crossVersionCopyDialog.isPreviewing || crossVersionCopyDialog.isApplying) return false;
+    if (preview.nameConflict || (preview.errors || []).length > 0 || (preview.matched || []).length === 0) return false;
+    return crossVersionCopyDialog.ignoreConflicts || (preview.conflicts || []).length === 0;
 });
 const snackbar = ref({ show: false, message: "", color: "success" });
 
@@ -569,23 +631,90 @@ const applyCopyDialog = async () => {
     }
     copyDialog.show = false;
 };
-const openMigration = (list) => {
-    migrationDialog.show = true;
-    migrationDialog.sourceListId = list.id;
-    migrationDialog.targetListId = list.id;
-    migrationDialog.minecraftVersion = minecraftStore.selectedMinecraftVersion;
-    migrationDialog.modLoader = minecraftStore.selectedModLoader;
-    migrationDialog.ignoreConflicts = false;
-    migrationDialog.preview = null;
+const openCrossVersionCopy = (list) => {
+    crossVersionCopyOperation.value += 1;
+    crossVersionCopyDialog.show = true;
+    crossVersionCopyDialog.sourceListId = list.id;
+    crossVersionCopyDialog.sourceListName = list.name;
+    crossVersionCopyDialog.sourceMinecraftVersion = list.minecraftVersion || "";
+    crossVersionCopyDialog.sourceModLoader = list.modLoader || "";
+    crossVersionCopyDialog.minecraftVersion = minecraftStore.selectedMinecraftVersion;
+    crossVersionCopyDialog.modLoader = minecraftStore.selectedModLoader;
+    crossVersionCopyDialog.ignoreConflicts = false;
+    crossVersionCopyDialog.preview = null;
+    crossVersionCopyDialog.isPreviewing = false;
+    crossVersionCopyDialog.isApplying = false;
 };
-const previewMigration = async () => {
-    migrationDialog.preview = await favoritesStore.previewMigration(migrationDialog);
+const crossVersionCopyRequest = () => ({
+    sourceListId: crossVersionCopyDialog.sourceListId,
+    minecraftVersion: crossVersionCopyDialog.minecraftVersion.trim(),
+    modLoader: crossVersionCopyDialog.modLoader.trim().toLocaleLowerCase(),
+    ignoreConflicts: crossVersionCopyDialog.ignoreConflicts,
+});
+const crossVersionCopyRequestIsCurrent = (request) =>
+    crossVersionCopyDialog.show &&
+    request.sourceListId === crossVersionCopyDialog.sourceListId &&
+    request.minecraftVersion === crossVersionCopyDialog.minecraftVersion.trim() &&
+    request.modLoader === crossVersionCopyDialog.modLoader.trim().toLocaleLowerCase();
+const previewCrossVersionCopy = async () => {
+    if (!crossVersionCopyReady.value || crossVersionCopyDialog.isPreviewing) return;
+    const request = crossVersionCopyRequest();
+    const operation = crossVersionCopyOperation.value;
+    crossVersionCopyDialog.isPreviewing = true;
+    try {
+        const preview = await favoritesStore.previewCrossVersionCopy(request);
+        if (operation === crossVersionCopyOperation.value && crossVersionCopyRequestIsCurrent(request)) {
+            crossVersionCopyDialog.preview = preview;
+        }
+    } catch (error) {
+        if (operation === crossVersionCopyOperation.value && crossVersionCopyRequestIsCurrent(request)) {
+            showMessage(t("favorites.crossVersionCopy.notApplied", { reason: errorMessage(error) }), "error");
+        }
+    } finally {
+        if (operation === crossVersionCopyOperation.value) {
+            crossVersionCopyDialog.isPreviewing = false;
+        }
+    }
 };
-const applyMigration = async () => {
-    const result = await favoritesStore.applyMigration(migrationDialog);
-    migrationDialog.preview = result?.preview || migrationDialog.preview;
-    if (result?.applied) migrationDialog.show = false;
-    showMessage(result?.applied ? t("favorites.migration.applied") : t("favorites.migration.notApplied"));
+const applyCrossVersionCopy = async () => {
+    if (!crossVersionCopyApplyReady.value) return;
+    const request = crossVersionCopyRequest();
+    crossVersionCopyDialog.isApplying = true;
+    try {
+        const result = await favoritesStore.applyCrossVersionCopy(request);
+        crossVersionCopyDialog.preview = result?.preview || crossVersionCopyDialog.preview;
+        if (result?.applied && result.targetList?.id) {
+            crossVersionCopyDialog.show = false;
+            showMessage(t("favorites.crossVersionCopy.success", {
+                name: result.targetList.name,
+                added: result.result?.added || 0,
+                skipped: result.result?.skipped || 0,
+            }));
+            return;
+        }
+        const reason = result?.result?.errors?.[0] ||
+            result?.preview?.errors?.[0] ||
+            t("favorites.crossVersionCopy.unknownError");
+        showMessage(t("favorites.crossVersionCopy.notApplied", { reason }), "error");
+    } catch (error) {
+        showMessage(t("favorites.crossVersionCopy.notApplied", { reason: errorMessage(error) }), "error");
+    } finally {
+        crossVersionCopyDialog.isApplying = false;
+    }
+};
+const clearClosedCrossVersionCopyDialog = () => {
+    if (crossVersionCopyDialog.show) return;
+    crossVersionCopyOperation.value += 1;
+    crossVersionCopyDialog.sourceListId = "";
+    crossVersionCopyDialog.sourceListName = "";
+    crossVersionCopyDialog.sourceMinecraftVersion = "";
+    crossVersionCopyDialog.sourceModLoader = "";
+    crossVersionCopyDialog.minecraftVersion = "";
+    crossVersionCopyDialog.modLoader = "";
+    crossVersionCopyDialog.ignoreConflicts = false;
+    crossVersionCopyDialog.preview = null;
+    crossVersionCopyDialog.isPreviewing = false;
+    crossVersionCopyDialog.isApplying = false;
 };
 const removeSelected = async (items, clearSelection) => {
     await favoritesStore.removeMany(items.filter((item) => !item.referenced));
@@ -669,9 +798,9 @@ const errorMessage = (error) => {
 };
 
 watch(
-    () => [migrationDialog.minecraftVersion, migrationDialog.modLoader],
+    () => [crossVersionCopyDialog.minecraftVersion, crossVersionCopyDialog.modLoader],
     () => {
-        migrationDialog.preview = null;
+        crossVersionCopyDialog.preview = null;
     },
 );
 
@@ -848,7 +977,7 @@ onActivated(() => {
     cursor: pointer;
 }
 
-.migration-grid {
+.cross-version-copy-grid {
     min-width: 0;
 }
 
@@ -873,7 +1002,7 @@ onActivated(() => {
     }
 
     .header-actions,
-    .migration-grid {
+    .cross-version-copy-grid {
         width: 100%;
     }
 
@@ -881,7 +1010,7 @@ onActivated(() => {
         flex-wrap: wrap;
     }
 
-    .migration-grid {
+    .cross-version-copy-grid {
         grid-template-columns: 1fr;
     }
 

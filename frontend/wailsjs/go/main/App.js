@@ -22,8 +22,8 @@ export function AnalyzeLocalModDisableImpact(arg1) {
   return window['go']['main']['App']['AnalyzeLocalModDisableImpact'](arg1);
 }
 
-export function ApplyFavoriteListMigration(arg1) {
-  return window['go']['main']['App']['ApplyFavoriteListMigration'](arg1);
+export function ApplyFavoriteListCrossVersionCopy(arg1) {
+  return window['go']['main']['App']['ApplyFavoriteListCrossVersionCopy'](arg1);
 }
 
 export function ApplyLocalModBatchOperation(arg1) {
@@ -146,8 +146,8 @@ export function PinModVersion(arg1) {
   return window['go']['main']['App']['PinModVersion'](arg1);
 }
 
-export function PreviewFavoriteListMigration(arg1) {
-  return window['go']['main']['App']['PreviewFavoriteListMigration'](arg1);
+export function PreviewFavoriteListCrossVersionCopy(arg1) {
+  return window['go']['main']['App']['PreviewFavoriteListCrossVersionCopy'](arg1);
 }
 
 export function QueueModDownload(arg1) {

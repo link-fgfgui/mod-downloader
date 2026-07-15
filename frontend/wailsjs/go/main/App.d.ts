@@ -16,7 +16,7 @@ export function AnalyzeBatchIncompatibleConflicts(arg1:structs.BatchDownloadRequ
 
 export function AnalyzeLocalModDisableImpact(arg1:structs.LocalModDisableImpactRequest):Promise<structs.LocalModDisableImpactResult>;
 
-export function ApplyFavoriteListMigration(arg1:appcore.FavoriteMigrationRequest):Promise<appcore.FavoriteMigrationApplyResult>;
+export function ApplyFavoriteListCrossVersionCopy(arg1:appcore.FavoriteCrossVersionCopyRequest):Promise<appcore.FavoriteCrossVersionCopyApplyResult>;
 
 export function ApplyLocalModBatchOperation(arg1:structs.LocalModBatchOperationRequest):Promise<structs.VersionInfo>;
 
@@ -78,7 +78,7 @@ export function LookupProjectBySlug(arg1:string,arg2:string,arg3:string,arg4:str
 
 export function PinModVersion(arg1:structs.ModVersionPinRequest):Promise<storage.PinnedMod>;
 
-export function PreviewFavoriteListMigration(arg1:appcore.FavoriteMigrationRequest):Promise<appcore.FavoriteMigrationPreview>;
+export function PreviewFavoriteListCrossVersionCopy(arg1:appcore.FavoriteCrossVersionCopyRequest):Promise<appcore.FavoriteCrossVersionCopyPreview>;
 
 export function QueueModDownload(arg1:structs.ModDownloadRequest):Promise<structs.ModDownloadResult>;
 

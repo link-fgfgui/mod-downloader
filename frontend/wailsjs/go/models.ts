@@ -1,9 +1,9 @@
 export namespace appcore {
-	
+
 	export class FavoriteBulkAddRequest {
 	    targetListIds: string[];
 	    mods: storage.FavoriteMod[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new FavoriteBulkAddRequest(source);
 	    }
@@ -50,26 +50,12 @@ export namespace appcore {
 	        this.errors = source["errors"];
 	    }
 	}
-	export class FavoriteListCopyRequest {
-	    sourceListId: string;
-	    targetListId: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new FavoriteListCopyRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.sourceListId = source["sourceListId"];
-	        this.targetListId = source["targetListId"];
-	    }
-	}
-	export class FavoriteMigrationConflict {
+	export class FavoriteCrossVersionCopyConflict {
 	    source: storage.FavoriteModEntry;
 	    reason: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new FavoriteMigrationConflict(source);
+	        return new FavoriteCrossVersionCopyConflict(source);
 	    }
 	
 	    constructor(source: any = {}) {
@@ -96,14 +82,14 @@ export namespace appcore {
 		    return a;
 		}
 	}
-	export class FavoriteMigrationMatch {
+	export class FavoriteCrossVersionCopyMatch {
 	    source: storage.FavoriteModEntry;
 	    target: storage.FavoriteMod;
 	    project: models.ModProject;
 	    version: models.ModVersion;
 	
 	    static createFrom(source: any = {}) {
-	        return new FavoriteMigrationMatch(source);
+	        return new FavoriteCrossVersionCopyMatch(source);
 	    }
 	
 	    constructor(source: any = {}) {
@@ -132,23 +118,29 @@ export namespace appcore {
 		    return a;
 		}
 	}
-	export class FavoriteMigrationPreview {
+	export class FavoriteCrossVersionCopyPreview {
 	    sourceListId: string;
-	    targetListId: string;
-	    matched: FavoriteMigrationMatch[];
-	    conflicts: FavoriteMigrationConflict[];
+	    targetListName: string;
+	    minecraftVersion: string;
+	    modLoader: string;
+	    nameConflict: boolean;
+	    matched: FavoriteCrossVersionCopyMatch[];
+	    conflicts: FavoriteCrossVersionCopyConflict[];
 	    errors?: string[];
 	
 	    static createFrom(source: any = {}) {
-	        return new FavoriteMigrationPreview(source);
+	        return new FavoriteCrossVersionCopyPreview(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.sourceListId = source["sourceListId"];
-	        this.targetListId = source["targetListId"];
-	        this.matched = this.convertValues(source["matched"], FavoriteMigrationMatch);
-	        this.conflicts = this.convertValues(source["conflicts"], FavoriteMigrationConflict);
+	        this.targetListName = source["targetListName"];
+	        this.minecraftVersion = source["minecraftVersion"];
+	        this.modLoader = source["modLoader"];
+	        this.nameConflict = source["nameConflict"];
+	        this.matched = this.convertValues(source["matched"], FavoriteCrossVersionCopyMatch);
+	        this.conflicts = this.convertValues(source["conflicts"], FavoriteCrossVersionCopyConflict);
 	        this.errors = source["errors"];
 	    }
 	
@@ -170,19 +162,21 @@ export namespace appcore {
 		    return a;
 		}
 	}
-	export class FavoriteMigrationApplyResult {
+	export class FavoriteCrossVersionCopyApplyResult {
 	    applied: boolean;
-	    preview: FavoriteMigrationPreview;
+	    targetList: storage.FavoriteList;
+	    preview: FavoriteCrossVersionCopyPreview;
 	    result: FavoriteBulkOperationResult;
 	
 	    static createFrom(source: any = {}) {
-	        return new FavoriteMigrationApplyResult(source);
+	        return new FavoriteCrossVersionCopyApplyResult(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.applied = source["applied"];
-	        this.preview = this.convertValues(source["preview"], FavoriteMigrationPreview);
+	        this.targetList = this.convertValues(source["targetList"], storage.FavoriteList);
+	        this.preview = this.convertValues(source["preview"], FavoriteCrossVersionCopyPreview);
 	        this.result = this.convertValues(source["result"], FavoriteBulkOperationResult);
 	    }
 	
@@ -207,24 +201,36 @@ export namespace appcore {
 	
 	
 	
-	export class FavoriteMigrationRequest {
+	export class FavoriteCrossVersionCopyRequest {
 	    sourceListId: string;
-	    targetListId: string;
 	    minecraftVersion: string;
 	    modLoader: string;
 	    ignoreConflicts?: boolean;
 	
 	    static createFrom(source: any = {}) {
-	        return new FavoriteMigrationRequest(source);
+	        return new FavoriteCrossVersionCopyRequest(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.sourceListId = source["sourceListId"];
-	        this.targetListId = source["targetListId"];
 	        this.minecraftVersion = source["minecraftVersion"];
 	        this.modLoader = source["modLoader"];
 	        this.ignoreConflicts = source["ignoreConflicts"];
+	    }
+	}
+	export class FavoriteListCopyRequest {
+	    sourceListId: string;
+	    targetListId: string;
+
+	    static createFrom(source: any = {}) {
+	        return new FavoriteListCopyRequest(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sourceListId = source["sourceListId"];
+	        this.targetListId = source["targetListId"];
 	    }
 	}
 
@@ -1589,4 +1595,3 @@ export namespace structs {
 	}
 
 }
-
