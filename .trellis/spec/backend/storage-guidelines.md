@@ -513,6 +513,112 @@ copied.UpdatedAt = 0
 storage.UpsertFavoriteMod(copied)
 ```
 
+### Scenario: Favorite Cross-Version Copy And Scoped Lists
+
+#### 1. Scope / Trigger
+
+Use this contract when copying a favorite list to another Minecraft version or
+Mod Loader. A favorite list owns one canonical scope; writing target-scope mods
+into the source list makes those rows unreachable through the scoped UI.
+
+#### 2. Signatures
+
+```go
+var ErrFavoriteListNameConflict error
+
+func GetFavoriteListByNameAndScope(name, minecraftVersion, modLoader string) (FavoriteList, bool)
+func CreateFavoriteListWithModsForScope(name, minecraftVersion, modLoader string, mods []FavoriteMod) (FavoriteList, []FavoriteMod, error)
+
+type FavoriteCrossVersionCopyRequest struct {
+    SourceListID     string `json:"sourceListId"`
+    MinecraftVersion string `json:"minecraftVersion"`
+    ModLoader        string `json:"modLoader"`
+    IgnoreConflicts  bool   `json:"ignoreConflicts,omitempty"`
+}
+
+func (s *Service) PreviewFavoriteListCrossVersionCopy(req FavoriteCrossVersionCopyRequest) FavoriteCrossVersionCopyPreview
+func (s *Service) ApplyFavoriteListCrossVersionCopy(req FavoriteCrossVersionCopyRequest) FavoriteCrossVersionCopyApplyResult
+```
+
+The Wails adapter exposes methods with the same names and payloads. The request
+does not accept a target list ID or target name.
+
+#### 3. Contracts
+
+- The source list remains unchanged. Its normalized name becomes the target
+  name, and the requested Minecraft version/loader become the target scope.
+- `favorite_lists` has case-insensitive uniqueness on
+  `(name, minecraft_version, mod_loader)`. Direct favorite rows always derive
+  their scope from the parent list; database triggers reject mismatched rows.
+- Preview checks target-name availability and returns `nameConflict`; apply
+  repeats preview and relies on the unique constraint for the final race check.
+- Apply creates the target list and all matched rows in one SQLite transaction.
+  Provider resolution completes before the transaction starts.
+- Zero matches, unignored conflicts, name conflicts, or write failures create no
+  empty or partial target list.
+- After success the frontend refreshes its list cache and shows a success
+  notification. It does not change the global Minecraft version, Mod Loader,
+  selected instance, display scope, or selected favorite list.
+- Schema v3 intentionally drops and recreates `favorite_list_refs`,
+  `favorite_mods`, `favorite_lists`, and `favorite_groups`. It preserves
+  unrelated `pinned_mods` and `usage_stats` data.
+
+#### 4. Validation & Error Matrix
+
+- Missing source or target scope -> preview error; apply performs no write.
+- Target scope equals source scope -> preview error; apply performs no write.
+- Same target-scope name, including case-only differences -> `nameConflict`;
+  Apply is disabled and direct backend apply performs no write.
+- Conflicts with `ignoreConflicts=false` -> no target list; all items skipped.
+- Conflicts with `ignoreConflicts=true` and at least one match -> create the
+  target with matches only and report conflicts as skipped.
+- No matches -> no target list and `applied=false`.
+- Concurrent same-name creation after preview ->
+  `ErrFavoriteListNameConflict`; transaction leaves no partial rows.
+- Any target-list or favorite-row insert failure -> rollback the whole target.
+
+#### 5. Good/Base/Bad Cases
+
+- Good: copy `Performance` from `1.20.1/fabric` to `1.21.1/fabric`; both lists
+  remain, and each list contains only rows matching its own scope.
+- Good: ignore one unresolved mod while copying two matched mods; the target is
+  created with two rows and the result reports one skipped item.
+- Base: preview performs provider resolution but does not create any list.
+- Bad: pass the source list ID as a target and upsert target-scope rows into it.
+- Bad: reuse an existing same-name target list or create a list before provider
+  resolution, because failure can overwrite user state or leave an empty list.
+
+#### 6. Tests Required
+
+- Storage upgrade test starts with schema v2 data, opens schema v3, asserts all
+  favorite-domain rows are gone, pins/stats remain, and migration 3 is recorded.
+- Storage tests cover scoped case-insensitive uniqueness, parent-scope authority,
+  trigger rejection, atomic success, duplicate rejection, and rollback.
+- Appcore tests cover all-match, partial/all conflict, same-scope rejection,
+  target-name conflict, preview/apply race, source preservation, live references,
+  and target rows reachable through the created target list.
+- Regenerate Wails bindings and run frontend lint/type-check/build whenever the
+  request, preview, or apply-result contract changes.
+
+#### 7. Wrong vs Correct
+
+Wrong:
+
+```go
+target := sourceMod
+target.ListID = sourceList.ID
+target.MinecraftVersion = requestedVersion
+storage.UpsertFavoriteMod(target)
+```
+
+Correct:
+
+```go
+targetList, saved, err := storage.CreateFavoriteListWithModsForScope(
+    sourceList.Name, requestedVersion, requestedLoader, matchedMods,
+)
+```
+
 ### Scenario: Favorite List Organization APIs
 
 #### 1. Scope / Trigger
