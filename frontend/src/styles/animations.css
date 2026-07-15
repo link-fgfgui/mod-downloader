@@ -232,14 +232,12 @@
 .md-stagger > *:nth-child(11) { animation-delay: calc(var(--md-stagger-delay) * 11); }
 .md-stagger > *:nth-child(12) { animation-delay: calc(var(--md-stagger-delay) * 12); }
 
-/* Interactive hover lifts */
+/* Interactive hover elevation */
 .md-hover-lift {
-  transition: transform var(--md-transition-fast) var(--md-ease-out),
-    box-shadow var(--md-transition-fast) var(--md-ease-out);
+  transition: box-shadow var(--md-transition-fast) var(--md-ease-out);
 }
 
 .md-hover-lift:hover {
-  transform: translateY(-3px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
 }
 

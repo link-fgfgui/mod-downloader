@@ -59,6 +59,26 @@ Only `off` mode applies the global stop (`transition/animation: 0s`, plus
 `scroll-behavior: auto`). `prefers-reduced-motion` is independent of all three
 modes and overrides them.
 
+## Stable Hover Hit Areas
+
+**Rule**: Hover feedback on list rows must not move the hovered element itself.
+Use a shadow or another effect that keeps its pointer hit area fixed. Translating
+a row upward moves its bottom edge away from a pointer resting there, repeatedly
+toggling `:hover`. Button-scale feedback remains separate and may continue to
+use `transform`.
+
+```css
+/* Wrong: the hover state moves the boundary that activates it. */
+.md-hover-lift:hover {
+  transform: translateY(-3px);
+}
+
+/* Correct: elevation changes without moving the row's hit area. */
+.md-hover-lift:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+```
+
 ## Hidden State Comes Only From `animation ... both`
 
 **Rule**: An entrance utility's hidden initial state must come solely from the
@@ -140,4 +160,3 @@ Cover all three modes (`off`, `vuetify`, `gsap`) for every change:
 - FAB show/hide in each mode, and the leave-time snapshot cleanup.
 
 Always run `npm run build` and `npm run lint` from `frontend/`.
-
