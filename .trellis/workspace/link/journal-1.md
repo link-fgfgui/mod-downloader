@@ -75,3 +75,38 @@ Added retry for running downloads, automatic stalled-transfer retry using grab b
 ### Next Steps
 
 - None - task complete
+
+
+## Session 3: Default CurseForge API key at build time
+
+**Date**: 2026-07-15
+**Task**: Default CurseForge API key at build time
+**Package**: app
+**Branch**: `api-key`
+
+### Summary
+
+Added configs.DefaultCurseforgeAPIKey with EffectiveCurseforgeAPIKey fallback (user config wins; clear does not persist default). Wired appcore providers/downloads/settings to the effective key. Added root build.sh to inject DEFAULT_CF_API_KEY and APP_VERSION via ldflags. Documented contracts under .trellis/spec/core/backend/default-curseforge-api-key.md. CI/gitignore left to maintainer.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b2d5355` | (see git log) |
+| `c233a88` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
