@@ -170,9 +170,6 @@
                                         <div class="optional-reminder-header">
                                             <div class="download-queue-item-main">
                                                 <div class="download-queue-item-title">{{ reminder.mainTitle || reminder.mainProjectKey }}</div>
-                                                <div class="download-queue-item-meta">
-                                                    {{ [reminder.minecraftVersion, reminder.modLoader].filter(Boolean).join(" · ") }}
-                                                </div>
                                             </div>
                                             <div class="download-queue-actions">
                                                 <v-tooltip :text="$t('download.queue.installOptional')" location="top">
@@ -378,7 +375,7 @@ const queueStatusIcon = (status: string) => {
 };
 
 const queueItemMeta = (item: structs.DownloadQueueItem) =>
-    [item.platform, item.minecraftVersion, item.modLoader, item.fileName].filter(Boolean).join(" · ");
+    [item.platform, item.fileName].filter(Boolean).join(" · ");
 
 const progressPercent = (complete: number, total: number) => {
     if (!Number.isFinite(complete) || !Number.isFinite(total) || total <= 0) return 0;
