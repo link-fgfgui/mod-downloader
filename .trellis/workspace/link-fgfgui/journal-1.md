@@ -860,3 +860,38 @@ Added an immediate enabled-state selector to the local mod list, combined it wit
 ### Next Steps
 
 - None - task complete
+
+
+## Session 26: 下载队列删除已取消任务
+
+**Date**: 2026-07-15
+**Task**: 下载队列删除已取消任务
+**Package**: app
+**Branch**: `cancel`
+
+### Summary
+
+新增已取消下载任务的右键立即删除操作，贯通 downloader、appcore、Wails 与 Vue，并补充状态校验测试和跨层规范。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5c1f504` | (see git log) |
+| `b9f074f` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
