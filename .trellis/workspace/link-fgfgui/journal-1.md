@@ -930,3 +930,39 @@ Renamed favorite migration to Copy Across Versions, added schema v3 scoped favor
 ### Next Steps
 
 - None - task complete
+
+
+## Session 28: Connector compatibility
+
+**Date**: 2026-07-16
+**Task**: Connector compatibility
+**Package**: app
+**Branch**: `master`
+
+### Summary
+
+Added transient Connector loader switching, multi-loader local mod detection, and a collapsed incompatible-mod section; updated Wails bindings, tests, and Trellis contracts.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `582c896` | (see git log) |
+| `e706a43` | (see git log) |
+| `397a683` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
