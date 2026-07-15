@@ -1378,6 +1378,7 @@ export namespace structs {
 	    onlineMetadataLoading?: boolean;
 	    iconUrl?: string;
 	    categories?: string[];
+	    loaders?: string[];
 	    enabled: boolean;
 	    jijMods?: JijModInfo[];
 	    dependencies?: LocalModDependency[];
@@ -1406,6 +1407,7 @@ export namespace structs {
 	        this.onlineMetadataLoading = source["onlineMetadataLoading"];
 	        this.iconUrl = source["iconUrl"];
 	        this.categories = source["categories"];
+	        this.loaders = source["loaders"];
 	        this.enabled = source["enabled"];
 	        this.jijMods = this.convertValues(source["jijMods"], JijModInfo);
 	        this.dependencies = this.convertValues(source["dependencies"], LocalModDependency);
@@ -1560,6 +1562,9 @@ export namespace structs {
 	    id: string;
 	    minecraftVersion: string;
 	    modLoader: string;
+	    actualModLoader?: string;
+	    connectorAvailable?: boolean;
+	    connectorVirtual?: boolean;
 	    mods?: ModInfo[];
 	
 	    static createFrom(source: any = {}) {
@@ -1572,6 +1577,9 @@ export namespace structs {
 	        this.id = source["id"];
 	        this.minecraftVersion = source["minecraftVersion"];
 	        this.modLoader = source["modLoader"];
+	        this.actualModLoader = source["actualModLoader"];
+	        this.connectorAvailable = source["connectorAvailable"];
+	        this.connectorVirtual = source["connectorVirtual"];
 	        this.mods = this.convertValues(source["mods"], ModInfo);
 	    }
 	

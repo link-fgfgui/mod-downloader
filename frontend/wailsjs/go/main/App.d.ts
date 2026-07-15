@@ -122,6 +122,8 @@ export function SearchMods(arg1:structs.SearchModsRequest):Promise<void>;
 
 export function SelectVersion(arg1:string):Promise<structs.VersionInfo>;
 
+export function ToggleConnectorLoader():Promise<structs.VersionInfo>;
+
 export function UnpinMod(arg1:string,arg2:string,arg3:string,arg4:string):Promise<boolean>;
 
 export function UpdateFavoriteListMetadata(arg1:storage.FavoriteList):Promise<storage.FavoriteList>;

@@ -234,6 +234,10 @@ export function SelectVersion(arg1) {
   return window['go']['main']['App']['SelectVersion'](arg1);
 }
 
+export function ToggleConnectorLoader() {
+  return window['go']['main']['App']['ToggleConnectorLoader']();
+}
+
 export function UnpinMod(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['UnpinMod'](arg1, arg2, arg3, arg4);
 }

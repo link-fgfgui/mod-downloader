@@ -468,6 +468,10 @@ func (a *App) RefreshSelectedVersionMods() structs.VersionInfo {
 	return a.service().RefreshSelectedVersionMods()
 }
 
+func (a *App) ToggleConnectorLoader() (structs.VersionInfo, error) {
+	return a.service().ToggleConnectorLoader()
+}
+
 func (a *App) ApplyLocalModBatchOperation(req appstructs.LocalModBatchOperationRequest) (structs.VersionInfo, error) {
 	version, err := a.service().ApplyLocalModBatchOperation(req)
 	if err != nil {

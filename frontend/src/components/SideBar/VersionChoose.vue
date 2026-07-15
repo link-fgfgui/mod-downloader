@@ -34,6 +34,18 @@
                     class="mt-2"
                     stacked
                 ></MinecraftTargetFields>
+                <v-btn
+                    v-if="connectorAvailable"
+                    class="mt-2 md-btn-press"
+                    block
+                    color="secondary"
+                    prepend-icon="mdi-swap-horizontal"
+                    variant="tonal"
+                    :disabled="isRefreshing || isLoading"
+                    @click="toggleConnectorLoader"
+                >
+                    {{ $t("sidebar.connector.switchTo", { loader: connectorDestination }) }}
+                </v-btn>
                 <v-text-field
                     v-model="downloadFolder"
                     :label="$t('sidebar.minecraftDir')"
@@ -99,6 +111,12 @@ const versionList = computed(() =>
 
 const releaseVersionList = computed(() => minecraftStore.releaseVersions);
 const modLoaderList = computed(() => minecraftStore.modLoaderList);
+const connectorAvailable = computed(() => Boolean(minecraftStore.selectedVersion?.connectorAvailable));
+const connectorDestination = computed(() => {
+    const selected = minecraftStore.selectedVersion;
+    const loader = selected?.connectorVirtual ? selected.actualModLoader : "fabric";
+    return minecraftStore.modLoaderList.find((item) => item.toLowerCase() === (loader || "").toLowerCase()) || loader || "";
+});
 
 const selectedVersionName = computed({
     get: () => {
@@ -126,6 +144,10 @@ const selectedModLoader = computed({
 
 const refreshSelectedMods = async () => {
     await minecraftStore.refreshSelectedMods();
+};
+
+const toggleConnectorLoader = async () => {
+    await minecraftStore.toggleConnectorLoader();
 };
 
 const selectVersion = async (version: string) => {

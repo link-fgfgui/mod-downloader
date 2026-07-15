@@ -133,6 +133,11 @@ const messages = {
       invertSelected: "反转",
       deleteSelected: "删除",
       operationFailed: "操作失败",
+      incompatible: {
+        title: "与当前加载器不兼容（{n}）",
+        collapsed: "点击展开",
+        expanded: "点击折叠",
+      },
       version: {
         title: "{name} 的可用版本",
         online: "在线元数据版本：{version}",
@@ -342,6 +347,7 @@ const messages = {
       minecraftDir: ".minecraft 目录",
       minecraftVersion: "Minecraft 版本",
       modLoader: "加载器",
+      connector: { switchTo: "切换到 {loader} 视角" },
     },
     aboutDescription:
       "这是一个基于 Wails + Vue3 + Vuetify + Router + i18n 的高配置桌面端模板。",
@@ -477,6 +483,11 @@ const messages = {
       invertSelected: "Invert",
       deleteSelected: "Delete",
       operationFailed: "Operation failed",
+      incompatible: {
+        title: "Incompatible with current loader ({n})",
+        collapsed: "Click to expand",
+        expanded: "Click to collapse",
+      },
       version: {
         title: "Available versions for {name}",
         online: "Online metadata version: {version}",
@@ -688,6 +699,7 @@ const messages = {
       minecraftDir: ".minecraft Directory",
       minecraftVersion: "Minecraft Version",
       modLoader: "Mod Loader",
+      connector: { switchTo: "Switch to {loader} view" },
     },
     aboutDescription:
       "A feature-rich desktop template based on Wails + Vue3 + Vuetify + Router + i18n.",

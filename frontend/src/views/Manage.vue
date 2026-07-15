@@ -43,10 +43,31 @@
             </div>
         </div>
 
-        <VirtualList v-else :items="groupedMods" :item-height="72" :item-key="modRowKey"
+        <VirtualList v-else :items="managedRows" :item-height="72" :item-key="modRowKey"
+            :item-selectable="isManagedRowSelectable"
             class="manage-list" @scroll="onListScroll" @pointer-move="restoreListTooltips">
             <template #item="{ item: group, selected, onClick }">
-                <v-list-item class="mb-2 border-b md-hover-lift"
+                <v-list-item
+                    v-if="group.kind === 'incompatible-toggle'"
+                    class="incompatible-toggle mb-2 border-b"
+                    rounded="lg"
+                    lines="two"
+                    @click="incompatibleExpanded = !incompatibleExpanded"
+                >
+                    <template #prepend>
+                        <v-icon icon="mdi-package-variant-remove" color="warning"></v-icon>
+                    </template>
+                    <v-list-item-title>
+                        {{ $t("manage.incompatible.title", { n: incompatibleGroupedMods.length }) }}
+                    </v-list-item-title>
+                    <v-list-item-subtitle>
+                        {{ $t(incompatibleExpanded ? "manage.incompatible.expanded" : "manage.incompatible.collapsed") }}
+                    </v-list-item-subtitle>
+                    <template #append>
+                        <v-icon :icon="incompatibleExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down'"></v-icon>
+                    </template>
+                </v-list-item>
+                <v-list-item v-else class="mb-2 border-b md-hover-lift"
                     :class="{ 'manage-item-selected': selected }"
                     :bg-color="selected ? undefined : 'surface'"
                     rounded="xl" elevation="1" lines="two"
@@ -359,6 +380,7 @@ const listTooltipsPaused = ref(false);
 const searchInput = ref("");
 const appliedSearch = ref("");
 const enabledFilter = ref("all");
+const incompatibleExpanded = ref(false);
 const versionDialog = ref(false);
 const selectedVersionGroup = ref(null);
 const matchingVersions = ref([]);
@@ -421,6 +443,46 @@ const groupedMods = computed(() => {
     });
 });
 
+const groupLoaders = (group) => {
+    const loaders = new Set();
+    for (const mod of group.strong || []) {
+        for (const loader of mod.loaders || []) {
+            const normalized = (loader || "").trim().toLowerCase();
+            if (normalized) loaders.add(normalized);
+        }
+    }
+    return loaders;
+};
+
+const isGroupIncompatible = (group) => {
+    const loaders = groupLoaders(group);
+    const selectedLoader = (minecraftStore.selectedModLoader || "").trim().toLowerCase();
+    return loaders.size > 0 && Boolean(selectedLoader) && !loaders.has(selectedLoader);
+};
+
+const compatibleGroupedMods = computed(() => groupedMods.value.filter((group) => !isGroupIncompatible(group)));
+const incompatibleGroupedMods = computed(() => groupedMods.value.filter(isGroupIncompatible));
+const managedRows = computed(() => {
+    if (!incompatibleGroupedMods.value.length) {
+        return compatibleGroupedMods.value;
+    }
+    const rows = [...compatibleGroupedMods.value, { kind: "incompatible-toggle" }];
+    if (incompatibleExpanded.value) {
+        rows.push(...incompatibleGroupedMods.value);
+    }
+    return rows;
+});
+
+const selectedCompatibilityKey = computed(() => {
+    const selected = minecraftStore.selectedVersion;
+    const instance = selected?.id || selected?.name || "";
+    return `${instance}\u0000${minecraftStore.selectedModLoader || ""}`;
+});
+
+watch(selectedCompatibilityKey, () => {
+    incompatibleExpanded.value = false;
+});
+
 const searchableGroupText = (group) => {
     const values = [];
     const seen = new Set();
@@ -458,9 +520,12 @@ const selectedInstanceLabel = computed(() => {
 });
 
 const modRowKey = (group) => {
+    if (group.kind === "incompatible-toggle") return "incompatible-toggle";
     const mod = group.primary;
     return [mod.id, mod.sha1, mod.path, mod.fileName].filter(Boolean).join("|");
 };
+
+const isManagedRowSelectable = (group) => group?.kind !== "incompatible-toggle";
 
 const displayModName = (group) => {
     const mod = group.primary || {};
@@ -1044,6 +1109,11 @@ onDeactivated(() => {
 .manage-list {
     flex: 1 1 auto;
     min-height: 0;
+}
+
+.incompatible-toggle {
+    background: rgba(var(--v-theme-warning), 0.08);
+    cursor: pointer;
 }
 
 .cleanup-candidate-list {

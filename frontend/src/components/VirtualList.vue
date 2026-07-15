@@ -6,7 +6,7 @@
             @scroll.passive="onScroll">
             <template #default="{ item }">
                 <template v-if="item.type === 'item'">
-                    <slot name="item" :item="item.raw" :index="item.index" :selected="selectedIndices.has(item.index)"
+                    <slot name="item" :item="item.raw" :index="item.index" :selected="isItemSelectable(item.index) && selectedIndices.has(item.index)"
                         :on-click="(event) => onItemClick(item.index, event)">
                     </slot>
                 </template>
@@ -71,6 +71,10 @@ const props = defineProps({
         type: Function,
         default: (item, index) => index,
     },
+    itemSelectable: {
+        type: Function,
+        default: () => true,
+    },
     hasMore: {
         type: Boolean,
         default: false,
@@ -120,8 +124,10 @@ const virtualItems = computed(() => {
 });
 
 const selectedItemsList = computed(() => {
-    return [...selectedIndices].sort((a, b) => a - b).map((i) => props.items[i]).filter(Boolean);
+    return [...selectedIndices].sort((a, b) => a - b).filter(isItemSelectable).map((i) => props.items[i]).filter(Boolean);
 });
+
+const isItemSelectable = (index) => Boolean(props.itemSelectable(props.items[index], index));
 
 const refreshLatestSelectedItems = () => {
     latestSelectedItems.value = selectedItemsList.value;
@@ -144,13 +150,15 @@ const clearSelection = () => {
 const selectAll = () => {
     actionBarSnapshot.value = null;
     for (let i = 0; i < props.items.length; i++) {
-        selectedIndices.add(i);
+        if (isItemSelectable(i)) {
+            selectedIndices.add(i);
+        }
     }
     refreshLatestSelectedItems();
 };
 
 const onItemClick = (index, event) => {
-    if (!props.selectable) return;
+    if (!props.selectable || !isItemSelectable(index)) return;
 
     if (event.shiftKey && lastClickedIndex !== null) {
         event.preventDefault();
@@ -161,7 +169,9 @@ const onItemClick = (index, event) => {
             selectedIndices.clear();
         }
         for (let i = from; i <= to; i++) {
-            selectedIndices.add(i);
+            if (isItemSelectable(i)) {
+                selectedIndices.add(i);
+            }
         }
         refreshLatestSelectedItems();
     } else if (event.ctrlKey || event.metaKey) {

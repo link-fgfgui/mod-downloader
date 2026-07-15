@@ -9,6 +9,7 @@ import {
     RefreshSelectedVersionMods,
     RefreshVersions,
     SelectVersion,
+    ToggleConnectorLoader,
 } from "../../wailsjs/go/main/App";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
 import type { structs } from "../../wailsjs/go/models";
@@ -67,6 +68,9 @@ export const useMinecraftStore = defineStore("minecraft", {
         async refreshVersions(force = false) {
             this.isRefreshing = true;
             try {
+                if (force) {
+                    this.initializedSelectedModsKey = "";
+                }
                 const versions = (force ? await RefreshVersions() : await GetVersions()) || [];
                 this.versions = versions;
                 this.releaseVersions = await GetMinecraftReleaseVersions();
@@ -100,6 +104,17 @@ export const useMinecraftStore = defineStore("minecraft", {
                 const selected = await SelectVersion(version);
                 this.applySelectedVersion(selected);
                 this.initializedSelectedModsKey = selectedModsKey(this.minecraftDir, selected);
+            } finally {
+                this.isLoading = false;
+            }
+        },
+        async toggleConnectorLoader() {
+            if (!this.selectedVersion?.connectorAvailable || this.isLoading) return this.selectedVersion;
+            this.isLoading = true;
+            try {
+                const selected = await ToggleConnectorLoader();
+                this.applySelectedVersion(selected);
+                return selected;
             } finally {
                 this.isLoading = false;
             }
@@ -153,6 +168,7 @@ export const useMinecraftStore = defineStore("minecraft", {
             await this.refreshMinecraftDir();
             await this.refreshVersions();
             this.applySelectedVersion(await GetSelectedVersion());
+            await this.ensureSelectedModsLoaded();
         },
         stop() {
             this.stopListeningMinecraftDirChanged?.();
