@@ -860,3 +860,37 @@ Added an immediate enabled-state selector to the local mod list, combined it wit
 ### Next Steps
 
 - None - task complete
+
+
+## Session 26: Fix list item hover jitter
+
+**Date**: 2026-07-15
+**Task**: Fix list item hover jitter
+**Package**: app
+**Branch**: `master`
+
+### Summary
+
+Removed vertical translation from the shared list-row hover utility, preserved shadow feedback, documented stable hover hit areas, and verified frontend build and lint.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2ce1183` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
