@@ -14,6 +14,7 @@ app adapter or `core/` specs.
 - [Connector Compatibility](../../core/backend/connector-compatibility.md)
 - [Download Completion Sound](./download-completion-sound.md)
 - [Download Result Snapshots](./download-result-snapshots.md)
+- [Download Queue Actions](./download-queue-actions.md)
 - [Language Preference](./language-preference.md)
 - [Shared Thinking Guides](../../guides/index.md)
 
@@ -39,6 +40,8 @@ app adapter or `core/` specs.
   [Connector Compatibility](../../core/backend/connector-compatibility.md).
 - Preserve the success-event plus queue-drain plus unfocused gate for audible
   download notifications; see [Download Completion Sound](./download-completion-sound.md).
+- Keep cancel, retry, and queue-item removal semantics aligned across
+  Vue, Wails, appcore, and downloader; see [Download Queue Actions](./download-queue-actions.md).
 - Keep persisted language values, startup resolution, Settings behavior, and
   localized native-dialog locale arguments aligned; see
   [Language Preference](./language-preference.md).

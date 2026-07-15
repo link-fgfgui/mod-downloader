@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 28
+- **Total Sessions**: 30
 - **Last Active**: 2026-07-16
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~968 | Active |
+| `journal-1.md` | ~1038 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,8 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 30 | 2026-07-15 | 下载队列删除失败和等待任务 | `0d51a18`, `fda148e` | `cancel` |
+| 29 | 2026-07-15 | 下载队列删除已取消任务 | `5c1f504`, `b9f074f` | `cancel` |
 | 28 | 2026-07-16 | Connector compatibility | `582c896`, `e706a43`, `397a683` | `master` |
 | 27 | 2026-07-15 | Fix favorite cross-version copy | `d7b1f62`, `05ff6b2`, `69cb164` | `master` |
 | 26 | 2026-07-15 | Fix list item hover jitter | `2ce1183` | `master` |

@@ -32,7 +32,7 @@ logic and may be reused by the sibling CLI project. Generated files under
 | Workflow | Frontend entry | Wails adapter | Core boundary | Main lower layers |
 | --- | --- | --- | --- | --- |
 | Search | `views/Download.vue`, `stores/downloadSearch.ts` | `App.SearchMods` | `Service.SearchMods` | `providers`, `storage` |
-| Download/install | `views/Download.vue`, `stores/downloadQueue.ts` | `App.QueueModDownload` | `Service.QueueModDownload` | `downloader`, `modbridge`, `storage` |
+| Download/install and queue actions | `views/Download.vue`, `App.vue`, `stores/downloadQueue.ts` | `App.QueueModDownload`, `CancelDownload`, `RetryDownload`, `RemoveDownload` | matching `Service` methods | `downloader`, `modbridge`, `storage` |
 | Local mods | `views/Manage.vue`, `stores/minecraft.ts` | `App.RefreshSelectedVersionMods` / `ApplyLocalModBatchOperation` | `Service.RefreshSelectedVersionMods` / local-mod methods | `minecraft`, `global`, `storage` |
 | Settings | `views/Settings.vue`, `stores/settings.ts` | `App.GetSettings` and `Save*` methods | `Service.GetSettings` and `Save*` methods | `configs`, `downloader`, `providers` |
 | Favorites/pins | `views/Favorites.vue`, `views/Unpin.vue` | corresponding `App` methods | `Service` favorite/pin methods | `storage`, `providers` |

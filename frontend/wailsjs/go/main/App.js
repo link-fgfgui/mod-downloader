@@ -162,6 +162,10 @@ export function RefreshVersions() {
   return window['go']['main']['App']['RefreshVersions']();
 }
 
+export function RemoveDownload(arg1) {
+  return window['go']['main']['App']['RemoveDownload'](arg1);
+}
+
 export function RemoveFavoriteListReference(arg1, arg2) {
   return window['go']['main']['App']['RemoveFavoriteListReference'](arg1, arg2);
 }

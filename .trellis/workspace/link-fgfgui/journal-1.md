@@ -966,3 +966,73 @@ Added transient Connector loader switching, multi-loader local mod detection, an
 ### Next Steps
 
 - None - task complete
+
+
+## Session 29: 下载队列删除已取消任务
+
+**Date**: 2026-07-15
+**Task**: 下载队列删除已取消任务
+**Package**: app
+**Branch**: `cancel`
+
+### Summary
+
+新增已取消下载任务的右键立即删除操作，贯通 downloader、appcore、Wails 与 Vue，并补充状态校验测试和跨层规范。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5c1f504` | (see git log) |
+| `b9f074f` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 30: 下载队列删除失败和等待任务
+
+**Date**: 2026-07-15
+**Task**: 下载队列删除失败和等待任务
+**Package**: app
+**Branch**: `cancel`
+
+### Summary
+
+将队列删除扩展至失败和等待中任务；等待中任务右键取消按钮直接移除且不生成取消历史，并同步测试、Wails 绑定和跨层规范。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0d51a18` | (see git log) |
+| `fda148e` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
