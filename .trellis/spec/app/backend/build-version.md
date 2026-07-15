@@ -20,6 +20,8 @@ Build command:
 ```bash
 export APP_VERSION=v1.2.3
 wails build -ldflags "-X main.appVersion=${APP_VERSION}"
+# or use ./build.sh which also injects the default CurseForge API key
+# (see ../../core/backend/default-curseforge-api-key.md)
 ```
 
 ### 3. Contracts
