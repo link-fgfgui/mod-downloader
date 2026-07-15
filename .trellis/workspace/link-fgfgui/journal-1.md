@@ -894,3 +894,39 @@ Removed vertical translation from the shared list-row hover utility, preserved s
 ### Next Steps
 
 - None - task complete
+
+
+## Session 27: Fix favorite cross-version copy
+
+**Date**: 2026-07-15
+**Task**: Fix favorite cross-version copy
+**Package**: app
+**Branch**: `master`
+
+### Summary
+
+Renamed favorite migration to Copy Across Versions, added schema v3 scoped favorite invariants and atomic target creation, blocked target name conflicts, regenerated Wails bindings, and added accurate success-only UI feedback without switching the active Minecraft scope.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d7b1f62` | (see git log) |
+| `05ff6b2` | (see git log) |
+| `69cb164` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
