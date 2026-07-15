@@ -291,7 +291,7 @@ const messages = {
         close: "关闭",
         cancel: "取消下载",
         retry: "重试下载",
-        removeCanceled: "删除已取消任务",
+        removeItem: "删除队列任务",
         installOptional: "安装可选依赖",
         dismissOptional: "删除提醒",
         status: {
@@ -635,7 +635,7 @@ const messages = {
         close: "Close",
         cancel: "Cancel download",
         retry: "Retry download",
-        removeCanceled: "Remove canceled task",
+        removeItem: "Remove queue task",
         installOptional: "Install optional dependencies",
         dismissOptional: "Dismiss reminder",
         status: {

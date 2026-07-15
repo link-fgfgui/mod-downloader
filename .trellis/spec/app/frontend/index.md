@@ -34,7 +34,7 @@ app adapter or `core/` specs.
   [Local Mod Version Selection](./local-mod-version-selection.md).
 - Preserve the success-event plus queue-drain plus unfocused gate for audible
   download notifications; see [Download Completion Sound](./download-completion-sound.md).
-- Keep cancel, retry, and canceled-history removal semantics aligned across
+- Keep cancel, retry, and queue-item removal semantics aligned across
   Vue, Wails, appcore, and downloader; see [Download Queue Actions](./download-queue-actions.md).
 - Keep persisted language values, startup resolution, Settings behavior, and
   localized native-dialog locale arguments aligned; see

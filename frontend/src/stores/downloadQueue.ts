@@ -6,7 +6,7 @@ import {
     DismissOptionalDependencyReminder,
     GetDownloadQueueState,
     InstallOptionalDependencies,
-    RemoveCanceledDownload,
+    RemoveDownload,
     RetryDownload,
 } from "../../wailsjs/go/main/App";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
@@ -80,11 +80,11 @@ export const useDownloadQueueStore = defineStore("downloadQueue", {
             }
             return retried;
         },
-        async removeCanceled(id: string) {
+        async remove(id: string) {
             if (!id) {
                 return false;
             }
-            const removed = await RemoveCanceledDownload(id);
+            const removed = await RemoveDownload(id);
             if (removed) {
                 await this.refresh();
             }

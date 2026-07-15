@@ -140,7 +140,9 @@
                                                         color="error"
                                                         size="small"
                                                         :aria-label="$t('download.queue.cancel')"
+                                                        :aria-description="isRemovableQueueItem(item) ? $t('download.queue.removeItem') : undefined"
                                                         @click.stop="cancelQueueItem(item.id)"
+                                                        @contextmenu="removeQueueItem($event, item)"
                                                     />
                                                 </template>
                                             </v-tooltip>
@@ -153,9 +155,9 @@
                                                         color="primary"
                                                         size="small"
                                                         :aria-label="$t('download.queue.retry')"
-                                                        :aria-description="item.status === 'canceled' ? $t('download.queue.removeCanceled') : undefined"
+                                                        :aria-description="isRemovableQueueItem(item) ? $t('download.queue.removeItem') : undefined"
                                                         @click.stop="retryQueueItem(item.id)"
-                                                        @contextmenu="removeCanceledQueueItem($event, item)"
+                                                        @contextmenu="removeQueueItem($event, item)"
                                                     />
                                                 </template>
                                             </v-tooltip>
@@ -433,11 +435,14 @@ const retryQueueItem = (id: string) => {
     void downloadQueueStore.retry(id);
 };
 
-const removeCanceledQueueItem = (event: MouseEvent, item: structs.DownloadQueueItem) => {
-    if (item.status !== "canceled") return;
+const isRemovableQueueItem = (item: structs.DownloadQueueItem) =>
+    item.status === "pending" || item.status === "failed" || item.status === "canceled";
+
+const removeQueueItem = (event: MouseEvent, item: structs.DownloadQueueItem) => {
+    if (!isRemovableQueueItem(item)) return;
     event.preventDefault();
     event.stopPropagation();
-    void downloadQueueStore.removeCanceled(item.id);
+    void downloadQueueStore.remove(item.id);
 };
 
 const dismissOptionalReminder = (id: string) => {
