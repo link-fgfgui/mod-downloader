@@ -121,7 +121,7 @@ Added retry for running downloads, automatic stalled-transfer retry using grab b
 
 ### Summary
 
-Added configs.DefaultCurseforgeAPIKey with EffectiveCurseforgeAPIKey fallback (user config wins; clear does not persist default). Wired appcore providers/downloads/settings to the effective key. Added root build.sh to inject DEFAULT_CF_API_KEY and APP_VERSION via ldflags. Documented contracts under .trellis/spec/core/backend/default-curseforge-api-key.md. CI/gitignore left to maintainer.
+Added configs.DefaultCurseforgeAPIKey with EffectiveCurseforgeAPIKey fallback (user config wins; clear does not persist default). Wired appcore providers/downloads/settings to the effective key. Updated the GitHub Actions build to inject APP_VERSION and the DEFAULT_CF_API_KEY secret via ldflags. Documented contracts under .trellis/spec/core/backend/default-curseforge-api-key.md.
 
 ### Main Changes
 

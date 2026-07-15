@@ -19,13 +19,13 @@ func EffectiveCurseforgeAPIKey(configured string) string
 func (s *Service) effectiveCurseforgeAPIKey() string
 ```
 
-Build injection:
+Production build injection is owned by `.github/workflows/build.yml`. It reads
+`secrets.DEFAULT_CF_API_KEY` and passes it to the linker together with
+`APP_VERSION`. A local equivalent for smoke testing is:
 
 ```bash
 export DEFAULT_CF_API_KEY='...'
 export APP_VERSION=v1.2.3
-./build.sh
-# equivalent:
 wails build -ldflags "-X main.appVersion=${APP_VERSION} -X github.com/link-fgfgui/mod-downloader-core/configs.DefaultCurseforgeAPIKey=${DEFAULT_CF_API_KEY}"
 ```
 
@@ -45,9 +45,11 @@ wails build -ldflags "-X main.appVersion=${APP_VERSION} -X github.com/link-fgfgu
 - UI clear sets the configured field to empty and **must not** write the
   compile-time default into `mod-downloader.toml`. After clear, effective key
   falls back to the compile-time default when present.
-- `build.sh` may embed a fallback key and accepts `DEFAULT_CF_API_KEY` override.
-  Keys containing `$` must be assigned with single quotes. The script must not
-  print the key.
+- Release builds obtain the key from the `DEFAULT_CF_API_KEY` GitHub Actions
+  secret. The tracked workflow must contain only the secret reference and must
+  not print the resolved value.
+- Local smoke builds may export `DEFAULT_CF_API_KEY`; values containing `$`
+  must be assigned with single quotes before being expanded into `-ldflags`.
 
 ### 4. Validation & Error Matrix
 
@@ -71,7 +73,8 @@ wails build -ldflags "-X main.appVersion=${APP_VERSION} -X github.com/link-fgfgu
   startup and later `Save` — leaks the default into the user's TOML.
 - Bad: read `os.Getenv("DEFAULT_CF_API_KEY")` at runtime for the default —
   release binaries would lose the key outside the build shell.
-- Bad: `echo` the key in `build.sh` or CI logs.
+- Bad: hard-code the key in the workflow or print the resolved secret in CI
+  logs.
 
 ### 6. Tests Required
 
@@ -80,6 +83,8 @@ wails build -ldflags "-X main.appVersion=${APP_VERSION} -X github.com/link-fgfgu
   config field remains empty.
 - Service: user key wins over default for mask.
 - Service: clear persists empty TOML and still reports has-key when default set.
+- Workflow: production `wails build` injects both version and
+  `secrets.DEFAULT_CF_API_KEY` through one `-ldflags` argument.
 - Optional: `go build -ldflags '-X ...DefaultCurseforgeAPIKey=...'` smoke.
 
 ### 7. Wrong vs Correct

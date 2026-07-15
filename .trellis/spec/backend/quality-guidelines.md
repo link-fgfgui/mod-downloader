@@ -101,6 +101,20 @@ Do not point this replace directive at `../mod-downloader-core`; the core repo i
 - When changing core code, run tests from `core/` as well as from the consuming app or CLI.
 - When deleting a duplicate test file (e.g. `providers/model_test.go` was a verbatim copy of `models/models_test.go`), confirm the canonical test file covers the same cases — no coverage loss.
 
+### Convention: Derive Boundary Test Inputs From Limits
+
+Tests for clamping and rejection boundaries must derive out-of-range inputs
+from the production limit constants. A fixed value can silently become valid
+when the limit changes, invalidating the premise of the test.
+
+```go
+// Bad: this stopped being above the limit when MaxConcurrentDownloads became 256.
+ConcurrentDownloads: 100
+
+// Correct: remains one step beyond the current production limit.
+ConcurrentDownloads: MaxConcurrentDownloads + 1
+```
+
 ---
 
 ## Code Review Checklist

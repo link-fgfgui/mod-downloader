@@ -3,7 +3,7 @@
 ## Architecture
 
 ```
-build.sh / wails -ldflags
+.github/workflows/build.yml / wails -ldflags
         │
         ▼
 configs.DefaultCurseforgeAPIKey  (linker-injected)
@@ -28,9 +28,9 @@ configs.EffectiveCurseforgeAPIKey(configured)
 |----|------|
 | `core/configs` | 持有默认变量 + `EffectiveCurseforgeAPIKey`；**不**在 Load/Save 时改写配置字段 |
 | `core/appcore` | 所有出站与 settings 视图改用 effective key |
-| 根 `build.sh` | 注入 ldflags；可含 fallback 字面量 key |
+| GitHub Actions workflow | 从 `secrets.DEFAULT_CF_API_KEY` 取值并注入 ldflags |
 | app `main` / `version.go` | 不新增 key 变量（与 version 分离，避免 shell 多包混乱） |
-| CI / gitignore | 本任务不改 |
+| Git / workflow | 只跟踪 secret 引用，不保存真实 key |
 
 ## Contracts
 
@@ -58,29 +58,23 @@ func EffectiveCurseforgeAPIKey(configured string) string {
 | `GetSettings` mask / has | 基于 effective；**不**修改 `s.config.Keys` |
 | `SaveApiKeys` | 逻辑不变：写用户字段 + Save；清除后配置为空；随后 `configureProviderClients` 自动用默认 |
 
-### build.sh
+### GitHub Actions build
 
-- Env：`DEFAULT_CF_API_KEY`（可选覆盖）、`APP_VERSION`（可选）
-- 脚本内可设单引号 fallback 默认 key（用户指定可写在脚本中）
+- Secret：`secrets.DEFAULT_CF_API_KEY`
+- `APP_VERSION`：tag 构建使用 tag 名，其它构建使用短 commit SHA
 - ldflags 两段：`main.appVersion` + `.../configs.DefaultCurseforgeAPIKey`
-- 透传 `"$@"` 给 `wails build`
-- 不 echo key
+- workflow 不硬编码或输出真实 key
 
-示例形状：
+等价的本地 smoke 命令：
 
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
-if [[ -z "${DEFAULT_CF_API_KEY:-}" ]]; then
-  DEFAULT_CF_API_KEY='$2a$10$...'  # single-quoted literal; user-supplied
-fi
-APP_VERSION="${APP_VERSION:-}"
-LDFLAGS=(-X "main.appVersion=${APP_VERSION}" -X "github.com/link-fgfgui/mod-downloader-core/configs.DefaultCurseforgeAPIKey=${DEFAULT_CF_API_KEY}")
-# join for wails -ldflags
-wails build -ldflags "${ldflags_str}" "$@"
+export APP_VERSION=dev
+export DEFAULT_CF_API_KEY='...'
+wails build -ldflags "-X main.appVersion=${APP_VERSION} -X github.com/link-fgfgui/mod-downloader-core/configs.DefaultCurseforgeAPIKey=${DEFAULT_CF_API_KEY}"
 ```
 
-注意：key 含 `$`，赋值必须用单引号；传给 `-X` 时用双引号包裹整个 `-X path=value`，并避免未引用展开。
+注意：本地 key 含 `$` 时赋值必须用单引号；CI 值必须通过 Secret
+注入并在 linker 参数中正确引用。
 
 ## Compatibility
 
@@ -96,11 +90,11 @@ wails build -ldflags "${ldflags_str}" "$@"
 | 变量放 main vs configs | **configs** | downloader/appcore 直接读，无需 Options 透传 |
 | 启动时把默认写入 config 字段 | **否** | 避免 Save 把默认持久化进 TOML；清除语义清晰 |
 | UI 显示 effective | **是** | 用户知悉 CF 已可用 |
-| 默认写在 build.sh | **是（用户要求）** | 简单；用户自理 gitignore/CI |
+| 默认 key 存放 | **GitHub Actions Secret** | workflow 可构建发布包且仓库不保存真实值 |
 
 ## Rollback
 
-- 删除 `build.sh`、还原 `configs` / `appcore` 改动即可；无数据迁移。
+- 移除 workflow 的默认 key ldflag、还原 `configs` / `appcore` 改动即可；无数据迁移。
 - 已分发二进制仍含注入 key，无法从代码侧撤回（预期）。
 
 ## Risks

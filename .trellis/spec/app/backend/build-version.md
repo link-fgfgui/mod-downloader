@@ -20,9 +20,12 @@ Build command:
 ```bash
 export APP_VERSION=v1.2.3
 wails build -ldflags "-X main.appVersion=${APP_VERSION}"
-# or use ./build.sh which also injects the default CurseForge API key
-# (see ../../core/backend/default-curseforge-api-key.md)
 ```
+
+Production builds run from `.github/workflows/build.yml`. The workflow derives
+`APP_VERSION` from the tag or commit and uses one `-ldflags` argument for
+both `main.appVersion` and the default CurseForge key stored in the
+`DEFAULT_CF_API_KEY` GitHub Actions secret.
 
 ### 3. Contracts
 
@@ -30,6 +33,8 @@ wails build -ldflags "-X main.appVersion=${APP_VERSION}"
 - An empty or whitespace-only injected value normalizes to `dev`.
 - CI uses a tag name for tag builds and a short commit SHA otherwise, unless
   `APP_VERSION` is explicitly set.
+- CI reads the default CurseForge key from `secrets.DEFAULT_CF_API_KEY`; the
+  workflow contains only the secret reference, not the key value.
 - `GetAppVersion` returns the normalized embedded value and has generated Wails
   bindings.
 

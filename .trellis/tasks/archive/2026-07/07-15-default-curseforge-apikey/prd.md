@@ -1,8 +1,8 @@
-# 内置默认 CurseForge API Key（编译时环境变量 + build.sh）
+# 内置默认 CurseForge API Key（GitHub Actions Secret + ldflags）
 
 ## Goal
 
-打包后的应用自带可用的默认 CurseForge API Key，用户无需手动配置即可访问官方 CurseForge 源。密钥在构建时通过环境变量 / `build.sh` 以 ldflags 注入二进制，不写入 Git 跟踪的 Go 源码。
+打包后的应用自带可用的默认 CurseForge API Key，用户无需手动配置即可访问官方 CurseForge 源。密钥保存在 GitHub Actions Secret 中，由 release workflow 在构建时通过 ldflags 注入二进制，不写入 Git 跟踪的 Go 源码或 workflow。
 
 ## Background
 
@@ -10,7 +10,8 @@
 - 当前无编译期内置 key：配置为空且未开 MCIM 时 `SetCurseForgeClient(nil)`（见 `core/appcore/service.go` `configureProviderClients`）。
 - 编译期注入先例：`version.go` 的 `var appVersion` + `-ldflags "-X main.appVersion=..."`（见 `.trellis/spec/app/backend/build-version.md`、CI `wails build`）。
 - core 模块路径：`github.com/link-fgfgui/mod-downloader-core`（`replace => ./core`）。
-- 仓库尚无 `build.sh`。真实 key 不在本仓库源码中；构建侧可从现有配置文件或写在 `build.sh` 中提供。
+- 生产构建入口为 `.github/workflows/build.yml`；真实 key 由
+  `secrets.DEFAULT_CF_API_KEY` 提供，仓库只跟踪 secret 引用。
 - 分支：`api-key`。
 
 ## Decisions
@@ -18,8 +19,8 @@
 | 决策 | 选择 |
 |------|------|
 | UI「清除」key | **回退到内置默认**（配置字段清空，effective key = 编译期默认） |
-| 默认 key 存放 | 可写在 `build.sh` 内作为默认值；也可用环境变量 `DEFAULT_CF_API_KEY` 覆盖 |
-| CI / `.gitignore` | **本任务不做**；由用户后续自行改 |
+| 默认 key 存放 | GitHub Actions Secret `DEFAULT_CF_API_KEY` |
+| CI / `.gitignore` | 更新 CI workflow；不需要跟踪本地 key 文件 |
 
 ## Requirements
 
@@ -34,12 +35,14 @@
    - 用户保存/清除只改配置中的用户 key；**不得**把默认 key 写回 `mod-downloader.toml`。
    - 清除（空字符串）后：配置为空，effective 回退默认；官方 CF 在默认非空时仍可用。
 
-3. **`build.sh`（仓库根目录）**
-   - 读取 `DEFAULT_CF_API_KEY`（可内置 fallback 默认值）；可选 `APP_VERSION`。
-   - 组装 ldflags（version + default CF key）后调用 `wails build`（接受透传额外参数）。
-   - 不把 key 打印到 stdout/stderr。
-   - 未设置 key 时构建仍成功（默认变量保持空）。
-   - 正确处理 key 中的 `$` 等 shell 特殊字符（单引号字面量赋值）。
+3. **GitHub Actions release build**
+   - 在 `.github/workflows/build.yml` 的 Wails build step 中读取
+     `secrets.DEFAULT_CF_API_KEY`。
+   - 组装一个 ldflags 字符串，同时注入 `main.appVersion` 和
+     `configs.DefaultCurseforgeAPIKey`。
+   - workflow 只保存 secret 引用，不打印或硬编码真实 key。
+   - secret 未设置时构建仍成功，默认变量保持空。
+   - 对传入 linker 的 key 值加引号，避免 `$` 等字符破坏参数解析。
 
 4. **兼容**
    - 用户配置 / `KEYS_CF_API_KEY` / CLI `ConfigOverrides` 非空时始终覆盖默认。
@@ -53,13 +56,13 @@
 - [ ] AC3：配置 curseforge key 非空时，出站与 UI mask 使用用户 key，不用默认。
 - [ ] AC4：`SaveApiKeys` 清除后配置字段为空，且不会把默认 key 写入 TOML；effective 回退默认。
 - [ ] AC5：`GetSettings` 在仅有默认 key 时 `hasCurseforgeKey=true` 且 mask 对应默认 key。
-- [ ] AC6：根目录 `build.sh` 可用 `DEFAULT_CF_API_KEY`（或脚本内 fallback）完成带双 ldflags 的构建；不泄露 key。
+- [ ] AC6：GitHub Actions build 使用 `secrets.DEFAULT_CF_API_KEY` 完成带双 ldflags 的构建，且 workflow 和日志不泄露 key。
 - [ ] AC7：相关单元测试覆盖 effective 回退、用户优先、清除不写回默认。
-- [ ] AC8：Go 源码与提交内容中无硬编码真实 key（`build.sh` 内嵌由用户选择，不强制 gitignore）。
+- [ ] AC8：Go 源码、workflow 与其它提交内容中无硬编码真实 key。
 
 ## Out of Scope
 
-- 修改 CI workflow / 添加 GitHub secret / 修改 `.gitignore`（用户自理）。
+- 新增本地构建 wrapper 或把真实 key 写入仓库文件。
 - Modrinth 内置 key。
 - 改动 CurseForge/Modrinth API 业务逻辑。
 - 强制 `wails dev` 注入默认 key（本地 dev 仍可通过配置文件或 env）。
