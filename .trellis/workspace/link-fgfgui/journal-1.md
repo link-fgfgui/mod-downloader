@@ -826,3 +826,37 @@ Added a localized Favorites list context-menu action that imports the active sco
 ### Next Steps
 
 - None - task complete
+
+
+## Session 25: Filter local mods by enabled state
+
+**Date**: 2026-07-15
+**Task**: Filter local mods by enabled state
+**Package**: app
+**Branch**: `master`
+
+### Summary
+
+Added an immediate enabled-state selector to the local mod list, combined it with the debounced text search, localized the controls in Chinese and English, and verified frontend lint and production build.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ca953a7` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

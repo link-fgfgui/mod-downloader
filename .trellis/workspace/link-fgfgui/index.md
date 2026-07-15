@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 24
+- **Total Sessions**: 25
 - **Last Active**: 2026-07-15
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~828 | Active |
+| `journal-1.md` | ~862 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 25 | 2026-07-15 | Filter local mods by enabled state | `ca953a7` | `master` |
 | 24 | 2026-07-15 | Favorites as search results | `3f0d8dc` | `master` |
 | 23 | 2026-07-15 | Add simple mode | `a92e390`, `8c14b24` | `master` |
 | 22 | 2026-07-14 | Limit remote JAR metadata concurrency | `e80da5f`, `9eb6eef` | `master` |
