@@ -133,6 +133,7 @@
                             @update:model-value="settingsStore.scheduleAutoSave('network')" />
                         <v-number-input v-if="settingsStore.draftAdaptiveFileConcurrency"
                             v-model="settingsStore.draftTargetDownloadRateMiB" :min="0.1" :max="5" :step="0.1"
+                            :precision="1"
                             :label="$t('settings.network.targetDownloadRateMiB')" control-variant="stacked" hide-details
                             @update:model-value="settingsStore.scheduleAutoSave('network')"></v-number-input>
                         <v-switch v-model="settingsStore.draftVerifySHA1" color="primary" density="comfortable"

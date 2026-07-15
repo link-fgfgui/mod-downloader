@@ -26,6 +26,8 @@ app adapter or `core/` specs.
   `animation ... both` as the only source of an entrance's hidden state.
 - Keep UI-only state in Vue components or Pinia stores; do not change Wails
   backend contracts for visual-only behavior.
+- Follow [Vuetify Decimal Number Inputs](#vuetify-decimal-number-inputs) when a
+  `VNumberInput` accepts fractional values.
 - Before adding a shared composable, search `frontend/src/composables/` and
   existing components for an equivalent pattern.
 - Reuse `ModVersionList` for provider version choices and keep local parsed
@@ -44,3 +46,25 @@ app adapter or `core/` specs.
 - Run `npm run lint` from `frontend/` after frontend changes.
 - For animation/lifecycle fixes, verify both open/reopen behavior and the
   closing/leave lifecycle so stale snapshot data cannot leak into the next open.
+
+## Vuetify Decimal Number Inputs
+
+Vuetify's `VNumberInput` defaults `precision` to `0`. A fractional `step`
+controls increments but does not enable fractional model values by itself, so
+decimal settings must specify both properties.
+
+Wrong:
+
+```vue
+<v-number-input :step="0.1" />
+```
+
+Correct:
+
+```vue
+<v-number-input :step="0.1" :precision="1" />
+```
+
+For persisted settings, regression tests must use a non-integer representative
+value and assert both the save response and the reloaded configuration retain
+that value.
