@@ -86,6 +86,8 @@ export function RefreshSelectedVersionMods():Promise<structs.VersionInfo>;
 
 export function RefreshVersions():Promise<Array<structs.VersionInfo>>;
 
+export function RemoveCanceledDownload(arg1:string):Promise<boolean>;
+
 export function RemoveFavoriteListReference(arg1:string,arg2:string):Promise<boolean>;
 
 export function RemoveFavoriteMod(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<boolean>;

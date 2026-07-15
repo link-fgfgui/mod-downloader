@@ -387,6 +387,10 @@ func (a *App) RetryDownload(id string) bool {
 	return a.service().RetryDownload(id)
 }
 
+func (a *App) RemoveCanceledDownload(id string) bool {
+	return a.service().RemoveCanceledDownload(id)
+}
+
 func (a *App) DismissOptionalDependencyReminder(id string) bool {
 	return a.service().DismissOptionalDependencyReminder(id)
 }

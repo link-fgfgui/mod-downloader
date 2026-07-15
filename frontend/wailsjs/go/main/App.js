@@ -162,6 +162,10 @@ export function RefreshVersions() {
   return window['go']['main']['App']['RefreshVersions']();
 }
 
+export function RemoveCanceledDownload(arg1) {
+  return window['go']['main']['App']['RemoveCanceledDownload'](arg1);
+}
+
 export function RemoveFavoriteListReference(arg1, arg2) {
   return window['go']['main']['App']['RemoveFavoriteListReference'](arg1, arg2);
 }

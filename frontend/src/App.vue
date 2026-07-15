@@ -153,7 +153,9 @@
                                                         color="primary"
                                                         size="small"
                                                         :aria-label="$t('download.queue.retry')"
+                                                        :aria-description="item.status === 'canceled' ? $t('download.queue.removeCanceled') : undefined"
                                                         @click.stop="retryQueueItem(item.id)"
+                                                        @contextmenu="removeCanceledQueueItem($event, item)"
                                                     />
                                                 </template>
                                             </v-tooltip>
@@ -429,6 +431,13 @@ const cancelQueueItem = (id: string) => {
 
 const retryQueueItem = (id: string) => {
     void downloadQueueStore.retry(id);
+};
+
+const removeCanceledQueueItem = (event: MouseEvent, item: structs.DownloadQueueItem) => {
+    if (item.status !== "canceled") return;
+    event.preventDefault();
+    event.stopPropagation();
+    void downloadQueueStore.removeCanceled(item.id);
 };
 
 const dismissOptionalReminder = (id: string) => {
