@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/app/backend/build-version.md", "reason": "verify ldflags injection does not regress version contract"}
+{"file": ".trellis/spec/core/backend/provider-api-source.md", "reason": "verify official CF enable/disable and MCIM still match contracts with effective key"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "lint/test expectations for backend changes"}
+{"file": ".trellis/spec/app/backend/index.md", "reason": "app-layer quality checks if build.sh or shell integration touches app"}

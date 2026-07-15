@@ -21,6 +21,7 @@ workflow file.
 - [File Transfer](./file-transfer.md)
 - [Network Runtime Configuration](./network-runtime.md)
 - [Provider API Source](./provider-api-source.md)
+- [Default CurseForge API Key](./default-curseforge-api-key.md)
 - [System Proxy](./system-proxy.md)
 - [Local Mod Online Version Metadata](./local-mod-online-version.md)
 - [Connector Compatibility](./connector-compatibility.md)
@@ -41,6 +42,9 @@ workflow file.
   through [Network Runtime Configuration](./network-runtime.md).
 - Keep the official/MCIM API and file source switch synchronized through
   [Provider API Source](./provider-api-source.md).
+- Resolve CurseForge keys through
+  [Default CurseForge API Key](./default-curseforge-api-key.md) (effective key,
+  never persist the compile-time default into TOML).
 - Route every outbound HTTP client through [System Proxy](./system-proxy.md).
 - Preserve parsed JAR versions when adding provider version metadata; see
   [Local Mod Online Version Metadata](./local-mod-online-version.md).

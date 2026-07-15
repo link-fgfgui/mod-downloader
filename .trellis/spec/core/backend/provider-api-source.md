@@ -36,7 +36,9 @@ The environment equivalent is `PREFERS_MCIM_ENABLED`.
   `request.Host`. Go request cloning preserves the original explicit Host;
   leaving it as `api.curseforge.com` makes the MCIM proxy reject the request.
 - MCIM CurseForge requests do not require an API key. The official CurseForge
-  client remains disabled when its key is empty.
+  client remains disabled when the **effective** key is empty (user-configured
+  key empty **and** compile-time `configs.DefaultCurseforgeAPIKey` empty). See
+  [Default CurseForge API Key](./default-curseforge-api-key.md).
 - The source switch preserves the versioned User-Agent and the shared API rate
   limiter.
 - File downloads always use the exact provider-supplied URL so Modrinth and
@@ -50,8 +52,9 @@ The environment equivalent is `PREFERS_MCIM_ENABLED`.
 ### 4. Validation & Error Matrix
 
 - Missing preference -> official sources.
-- MCIM enabled with empty CurseForge key -> construct the mirror client.
-- MCIM disabled with empty CurseForge key -> set the CurseForge client to nil.
+- MCIM enabled with empty effective CurseForge key -> construct the mirror client.
+- MCIM disabled with empty effective CurseForge key -> set the CurseForge client to nil.
+- MCIM disabled with empty user key but non-empty compile-time default -> construct the official client.
 - MCIM URL with `Request.Host=api.curseforge.com` -> proxy rejection (`418`);
   synchronize the Host with `mod.mcimirror.top` before transport dispatch.
 - Any provider download URL -> pass it unchanged to file transfer validation.

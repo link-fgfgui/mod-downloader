@@ -21,7 +21,9 @@ code in `app.go` plus `app_contracts.go`. Reusable domain logic belongs in the
 - Keep Wails runtime imports in the app adapter layer only.
 - Preserve `replace github.com/link-fgfgui/mod-downloader-core => ./core`.
 - Inject release identity through `APP_VERSION` and Go `-X`; see
-  [Build Version](./build-version.md).
+  [Build Version](./build-version.md). Prefer `./build.sh` for production builds
+  so the compile-time default CurseForge key is injected together with version
+  (see [Default CurseForge API Key](../../core/backend/default-curseforge-api-key.md)).
 - When changing language fields or native dialog signatures, preserve the
   cross-layer contract in [Language Preference](../frontend/language-preference.md).
 
