@@ -10,6 +10,19 @@
             :title="versionFileName(version)"
             :subtitle="versionSubtitle(version)"
         >
+            <template #prepend>
+                <v-tooltip :text="$t(releaseTypeMeta(version).label)" location="top">
+                    <template #activator="{ props: releaseTip }">
+                        <v-icon
+                            v-bind="releaseTip"
+                            class="me-3"
+                            :color="releaseTypeMeta(version).color"
+                            :icon="releaseTypeMeta(version).icon"
+                            :aria-label="$t(releaseTypeMeta(version).label)"
+                        ></v-icon>
+                    </template>
+                </v-tooltip>
+            </template>
             <template #append>
                 <v-chip v-if="isInstalled(version)" class="me-2" color="success" size="x-small" variant="tonal">
                     {{ $t("versions.installed") }}
@@ -89,6 +102,17 @@ const versionSubtitle = (version: models.ModVersion) => {
         Boolean(value) && value !== versionFileName(version) && all.indexOf(value) === index,
     );
     return values.join(" · ");
+};
+
+const releaseTypeMeta = (version: models.ModVersion) => {
+    switch (normalized(version.releaseType)) {
+        case "alpha":
+            return { icon: "mdi-alpha-a-circle-outline", color: "warning", label: "versions.releaseType.alpha" };
+        case "beta":
+            return { icon: "mdi-beta", color: "info", label: "versions.releaseType.beta" };
+        default:
+            return { icon: "mdi-check-circle-outline", color: "success", label: "versions.releaseType.stable" };
+    }
 };
 
 const isInstalled = (version: models.ModVersion) => {

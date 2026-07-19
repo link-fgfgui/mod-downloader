@@ -329,6 +329,14 @@ func (a *App) SaveMCIMSettings(req SaveMCIMSettingsRequest) SettingsView {
 	return settingsViewFromCore(next)
 }
 
+func (a *App) SavePreferredReleaseTypeSettings(req SavePreferredReleaseTypeSettingsRequest) SettingsView {
+	next := a.service().SavePreferredReleaseTypeSettings(appcore.SavePreferredReleaseTypeSettingsRequest{
+		PreferredReleaseType: req.PreferredReleaseType,
+	})
+	a.config = a.core.Config()
+	return settingsViewFromCore(next)
+}
+
 func (a *App) SaveNetworkSettings(req SaveNetworkSettingsRequest) SettingsView {
 	next := a.service().SaveNetworkSettings(appcore.SaveNetworkSettingsRequest{
 		FileConcurrency:         req.FileConcurrency,
@@ -514,6 +522,7 @@ func settingsViewFromCore(sv appcore.SettingsView) SettingsView {
 		AnimationDurationMultiplier: sv.AnimationDurationMultiplier,
 		AutoScanUnusedDependencies:  sv.AutoScanUnusedDependencies,
 		MCIMEnabled:                 sv.MCIMEnabled,
+		PreferredReleaseType:        sv.PreferredReleaseType,
 		MinecraftDir:                sv.MinecraftDir,
 		CacheDir:                    sv.CacheDir,
 		CachePath:                   sv.CachePath,

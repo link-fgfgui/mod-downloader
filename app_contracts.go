@@ -22,6 +22,7 @@ type SettingsView struct {
 	AnimationDurationMultiplier float64 `json:"animationDurationMultiplier"`
 	AutoScanUnusedDependencies  bool    `json:"autoScanUnusedDependencies"`
 	MCIMEnabled                 bool    `json:"mcimEnabled"`
+	PreferredReleaseType        string  `json:"preferredReleaseType"`
 	MinecraftDir                string  `json:"minecraftDir"`
 	CacheDir                    string  `json:"cacheDir"`
 	CachePath                   string  `json:"cachePath"`
@@ -63,6 +64,10 @@ type SaveUnusedDependencyCleanupSettingsRequest struct {
 
 type SaveMCIMSettingsRequest struct {
 	MCIMEnabled bool `json:"mcimEnabled"`
+}
+
+type SavePreferredReleaseTypeSettingsRequest struct {
+	PreferredReleaseType string `json:"preferredReleaseType"`
 }
 
 type SaveNetworkSettingsRequest struct {

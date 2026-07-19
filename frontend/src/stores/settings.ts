@@ -8,6 +8,7 @@ import {
     SaveApiKeys,
     SaveUnusedDependencyCleanupSettings,
     SaveMCIMSettings,
+    SavePreferredReleaseTypeSettings,
     SaveNetworkSettings,
     SaveCacheDirPreference,
     ChooseCacheDir,
@@ -54,6 +55,7 @@ export const useSettingsStore = defineStore("settings", {
         draftSimpleMode: false,
         draftAutoScanUnusedDependencies: false,
         draftMCIMEnabled: false,
+        draftPreferredReleaseType: "release",
         draftFileConcurrency: 4,
         draftConcurrentDownloads: 1,
         draftAdaptiveFileConcurrency: false,
@@ -72,7 +74,7 @@ export const useSettingsStore = defineStore("settings", {
         hasModrinthKey: (s) => Boolean(s.view?.hasModrinthKey),
     },
     actions: {
-        scheduleAutoSave(kind: "animations" | "simpleMode" | "cleanup" | "mcim" | "network" | "keys", delay = 600) {
+        scheduleAutoSave(kind: "animations" | "simpleMode" | "cleanup" | "mcim" | "releaseType" | "network" | "keys", delay = 600) {
             const previous = autoSaveTimers.get(kind);
             if (previous) window.clearTimeout(previous);
             autoSaveTimers.set(kind, window.setTimeout(async () => {
@@ -83,6 +85,7 @@ export const useSettingsStore = defineStore("settings", {
                     else if (kind === "simpleMode") await this.saveSimpleModeSettings();
                     else if (kind === "cleanup") await this.saveUnusedDependencyCleanupSettings();
                     else if (kind === "mcim") await this.saveMCIMSettings();
+                    else if (kind === "releaseType") await this.savePreferredReleaseTypeSettings();
                     else if (kind === "network") await this.saveNetworkSettings();
                     else await this.saveApiKeys();
                 } catch (error) {
@@ -107,6 +110,7 @@ export const useSettingsStore = defineStore("settings", {
                 this.draftSimpleMode = this.view?.simpleMode ?? false;
                 this.draftAutoScanUnusedDependencies = this.view?.autoScanUnusedDependencies ?? false;
                 this.draftMCIMEnabled = this.view?.mcimEnabled ?? false;
+                this.draftPreferredReleaseType = this.view?.preferredReleaseType || "release";
                 this.draftFileConcurrency = this.view?.fileConcurrency ?? 4;
                 this.draftConcurrentDownloads = this.view?.concurrentDownloads ?? 1;
                 this.draftAdaptiveFileConcurrency = this.view?.adaptiveFileConcurrency ?? false;
@@ -204,6 +208,11 @@ export const useSettingsStore = defineStore("settings", {
             } finally {
                 this.isSavingMCIM = false;
             }
+        },
+        async savePreferredReleaseTypeSettings() {
+            this.view = await SavePreferredReleaseTypeSettings({ preferredReleaseType: this.draftPreferredReleaseType });
+            this.draftPreferredReleaseType = this.view.preferredReleaseType;
+            return this.view;
         },
         async saveNetworkSettings() {
             this.isSavingNetwork = true;
