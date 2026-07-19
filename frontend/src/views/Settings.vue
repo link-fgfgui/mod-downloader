@@ -54,12 +54,12 @@
                         <div class="d-flex align-center gap-2 mb-3">
                             <v-slider v-model="settingsStore.draftAnimationDurationMultiplier"
                                 :disabled="animationsDisabled" :min="minAnimationDurationMultiplier"
-                                :max="maxAnimationDurationMultiplier" :step="0.25" density="compact" hide-details
+                                :max="maxAnimationDurationMultiplier" :step="0.1" density="compact" hide-details
                                 @update:model-value="settingsStore.scheduleAutoSave('animations')" />
                             <v-text-field v-model.number="settingsStore.draftAnimationDurationMultiplier"
                                 :disabled="animationsDisabled" type="number"
                                 :min="minAnimationDurationMultiplier" :max="maxAnimationDurationMultiplier"
-                                step="0.25" suffix="x" density="compact" hide-details class="multiplier-input"
+                                step="0.1" suffix="x" density="compact" hide-details class="multiplier-input"
                                 @update:model-value="settingsStore.scheduleAutoSave('animations')" />
                         </div>
                     </v-card-text>

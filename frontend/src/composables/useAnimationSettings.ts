@@ -6,7 +6,7 @@ const animationModeVuetify = "vuetify";
 const animationModeGsap = "gsap";
 const defaultAnimationMode = animationModeVuetify;
 const defaultAnimationDurationMultiplier = 1;
-const minAnimationDurationMultiplier = 0.25;
+const minAnimationDurationMultiplier = 0.1;
 const maxAnimationDurationMultiplier = 3;
 
 const baseDurations = {
