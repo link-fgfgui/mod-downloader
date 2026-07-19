@@ -1071,3 +1071,38 @@ Derived balanced HTTP ranges from file size and segment count, preserved adaptiv
 ### Next Steps
 
 - None - task complete
+
+
+## Session 32: Keep disabled mods visible after toggle
+
+**Date**: 2026-07-19
+**Task**: Keep disabled mods visible after toggle
+**Package**: app
+**Branch**: `master`
+
+### Summary
+
+Fixed incremental local-Mod refresh to rescan .jar.disabled targets, preserving disabled entries in the immediate VersionInfo snapshot; added regression assertions and updated the selected-version cache contract. Go tests/build/vet and frontend build/lint passed.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f9a7856` | (see git log) |
+| `f7826e2` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
