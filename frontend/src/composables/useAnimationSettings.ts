@@ -5,6 +5,7 @@ const animationModeOff = "off";
 const animationModeVuetify = "vuetify";
 const animationModeGsap = "gsap";
 const defaultAnimationMode = animationModeVuetify;
+const animationModeSwitchingEnabled = false;
 const defaultAnimationDurationMultiplier = 1;
 const minAnimationDurationMultiplier = 0.1;
 const maxAnimationDurationMultiplier = 3;
@@ -41,6 +42,8 @@ export type AnimationSettings = {
 };
 
 export function normalizeAnimationMode(value: unknown, legacyEnabled?: boolean): AnimationMode {
+    if (!animationModeSwitchingEnabled) return defaultAnimationMode;
+
     const mode = typeof value === "string" ? value.trim().toLowerCase() : "";
     if (mode === animationModeOff || mode === "0" || mode === "false" || mode === "disabled") {
         return animationModeOff;
@@ -269,6 +272,7 @@ export function leaveGsapFab(el: Element, done: () => void) {
 export {
     animationModeGsap,
     animationModeOff,
+    animationModeSwitchingEnabled,
     animationModeVuetify,
     defaultAnimationMode,
     defaultAnimationDurationMultiplier,

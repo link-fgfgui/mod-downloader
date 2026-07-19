@@ -39,7 +39,8 @@
                             {{ $t('settings.animations.mode') }}
                         </div>
                         <v-btn-toggle v-model="settingsStore.draftAnimationMode" color="primary" density="comfortable"
-                            divided mandatory variant="outlined" class="animation-mode-toggle mb-3"
+                            :disabled="!animationModeSwitchingEnabled" divided mandatory variant="outlined"
+                            class="animation-mode-toggle mb-3"
                             @update:model-value="settingsStore.scheduleAutoSave('animations')">
                             <v-btn :value="animationModeOff" size="small">
                                 {{ $t('settings.animations.modes.off') }}
@@ -228,6 +229,7 @@ import { applyVuetifyTheme } from "../composables/useTheme";
 import {
     animationModeGsap,
     animationModeOff,
+    animationModeSwitchingEnabled,
     animationModeVuetify,
     maxAnimationDurationMultiplier,
     minAnimationDurationMultiplier,
