@@ -338,11 +338,11 @@ export namespace main {
 	}
 	export class SavePreferredReleaseTypeSettingsRequest {
 	    preferredReleaseType: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SavePreferredReleaseTypeSettingsRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.preferredReleaseType = source["preferredReleaseType"];
@@ -1619,3 +1619,4 @@ export namespace structs {
 	}
 
 }
+
