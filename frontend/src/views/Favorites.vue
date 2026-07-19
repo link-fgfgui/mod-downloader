@@ -823,8 +823,10 @@ onActivated(() => {
     gap: 20px;
     grid-template-columns: minmax(240px, 310px) minmax(0, 1fr);
     height: calc(100vh - 32px);
+    max-width: 100%;
     min-height: 0;
     overflow: hidden;
+    box-sizing: border-box;
 }
 
 .favorites-rail,
@@ -1007,7 +1009,15 @@ onActivated(() => {
     }
 
     .header-actions {
+        display: grid;
         flex-wrap: wrap;
+        gap: 8px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .header-actions > .v-btn {
+        min-width: 0;
+        width: 100%;
     }
 
     .cross-version-copy-grid {
