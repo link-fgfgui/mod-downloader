@@ -83,8 +83,9 @@ func (s *appcore.Service) RefreshSelectedVersionMods() structs.VersionInfo
 
 - A changed path is removed from the local index before its replacement is
   inserted.
-- Only `.jar` paths are parsed; `.jar.disabled` paths remove/retain state but
-  are not parsed as active mods.
+- Both `.jar` and `.jar.disabled` paths are parsed so incremental snapshots
+  retain the Mod and accurately expose its enabled state; disabled paths are
+  never treated as active by the parser.
 - Watcher events are debounced and emitted through the existing
   `selected-version-changed` snapshot event.
 - Watchers are bound to the selected instance and stopped on instance change
