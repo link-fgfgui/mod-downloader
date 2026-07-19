@@ -4,7 +4,7 @@
             <div class="favorites-rail-header">
                 <h1 class="text-h6 font-weight-medium">{{ $t("favorites.title") }}</h1>
                 <div class="rail-actions">
-                    <v-btn icon="mdi-plus" size="small" variant="tonal" @click="openListEdit()"></v-btn>
+                    <v-btn icon="mdi-plus" size="small" variant="tonal" :disabled="!canCreateList" @click="openListEdit()"></v-btn>
                 </div>
             </div>
 
@@ -424,6 +424,9 @@ const crossVersionCopyDialog = reactive({
 const pinDialog = reactive({ show: false, item: null, versions: [], loading: false, pinnedVersionId: "", busyVersionId: "" });
 
 const targetListOptions = computed(() => favoritesStore.lists.map((list) => ({ title: list.name, value: list.id })));
+const canCreateList = computed(() => Boolean(
+    minecraftStore.selectedMinecraftVersion.trim() && minecraftStore.selectedModLoader.trim(),
+));
 const iconModeOptions = computed(() => [
     { title: "MDI", value: "mdi" },
     { title: t("favorites.dialog.projectIcon"), value: "project" },
@@ -506,13 +509,14 @@ const syncFavoriteDisplayScope = () => {
 };
 
 const openListEdit = (list = null) => {
+    if (!list && !canCreateList.value) return;
     listEdit.show = true;
     listEdit.id = list?.id || "";
     listEdit.name = list?.name || "";
 };
 const saveList = async () => {
     const name = listEdit.name.trim();
-    if (!name) return;
+    if (!name || (!listEdit.id && !canCreateList.value)) return;
     if (listEdit.id) await favoritesStore.renameList(listEdit.id, name);
     else await favoritesStore.createList(name);
     listEdit.show = false;

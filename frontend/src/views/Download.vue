@@ -335,6 +335,7 @@ const favoriteDraftFromResult = (result: models.ModProject): FavoriteModDraft =>
 });
 
 const openAddFavorites = (results: models.ModProject[]) => {
+    if (!minecraftStore.selectedMinecraftVersion.trim() || !minecraftStore.selectedModLoader.trim()) return;
     const drafts = results.map(favoriteDraftFromResult).filter((draft) => draft.platform && draft.modId);
     if (drafts.length) {
         addFavoriteDialog.value?.open(drafts);

@@ -33,7 +33,7 @@
                     color="primary"
                     variant="flat"
                     :loading="isSaving"
-                    :disabled="isSaving || !selectedListName.trim() || drafts.length === 0"
+                    :disabled="isSaving || !canCreateList || !selectedListName.trim() || drafts.length === 0"
                     @click="add"
                 >
                     {{ $t("favorites.actions.add") }}
@@ -61,6 +61,9 @@ const listMenuProps = {
     offset: 4,
 };
 const favoriteListNames = computed(() => favoritesStore.lists.map((list) => list.name));
+const canCreateList = computed(() => drafts.value.every((draft) =>
+    Boolean(draft.minecraftVersion?.trim() && draft.modLoader?.trim())
+));
 
 const open = async (items: FavoriteModDraft[]) => {
     drafts.value = items;
@@ -94,11 +97,12 @@ const resolveListId = async () => {
     const existing = favoritesStore.lists.find((list) => list.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase());
     if (existing) return existing.id;
 
-    return (await favoritesStore.createList(name))?.id || "";
+    const draft = drafts.value[0];
+    return (await favoritesStore.createList(name, draft?.minecraftVersion, draft?.modLoader))?.id || "";
 };
 
 const add = async () => {
-    if (!selectedListName.value.trim() || drafts.value.length === 0 || isSaving.value) return;
+    if (!canCreateList.value || !selectedListName.value.trim() || drafts.value.length === 0 || isSaving.value) return;
     isSaving.value = true;
     try {
         const listId = await resolveListId();

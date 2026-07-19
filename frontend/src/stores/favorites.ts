@@ -163,8 +163,11 @@ export const useFavoritesStore = defineStore("favorites", {
             this.selectedListId = listId;
             await this.loadItems(listId);
         },
-        async createList(name: string) {
-            const list = await CreateFavoriteList(name, this.displayMinecraftVersion, this.displayModLoader);
+        async createList(name: string, minecraftVersion?: string, modLoader?: string) {
+            const scopedMinecraftVersion = normalizeMinecraftVersion(minecraftVersion ?? this.displayMinecraftVersion);
+            const scopedModLoader = normalizeKeyPart(modLoader ?? this.displayModLoader);
+            if (!hasFavoriteScope(scopedMinecraftVersion, scopedModLoader)) return null;
+            const list = await CreateFavoriteList(name, scopedMinecraftVersion, scopedModLoader);
             if (!list?.id) return null;
             this.lists = [...this.lists, list].sort(listOrder);
             this.selectedListId = list.id;

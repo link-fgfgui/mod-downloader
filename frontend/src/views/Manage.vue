@@ -665,7 +665,12 @@ const clearClosedVersionDialog = () => {
 };
 
 const canFavoriteGroup = (group) => {
-    return Boolean(group?.primary?.onlinePlatform && group?.primary?.onlineProjectId);
+    return Boolean(
+        minecraftStore.selectedMinecraftVersion.trim() &&
+        minecraftStore.selectedModLoader.trim() &&
+        group?.primary?.onlinePlatform &&
+        group?.primary?.onlineProjectId,
+    );
 };
 
 const canFavoriteSelection = (groups) => {
