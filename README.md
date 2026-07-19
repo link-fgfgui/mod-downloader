@@ -72,7 +72,7 @@ Environment variables:
 
 `theme` supports `dark`, `light`, or `system`. The Modrinth key field is currently reserved for future use; Modrinth requests are made with the app user agent, while CurseForge requires `curseforge_api_key` or `KEYS_CF_API_KEY` to enable that source.
 
-`file_concurrency` controls the initial number of ranged chunks used for one file. `concurrent_downloads` controls both how many files may download at once and how many uncached remote JARs may be parsed concurrently for mod IDs. When `adaptive_file_concurrency` is enabled, the downloader adds range workers each second while throughput is below `target_download_rate_mib` (0.1-5 MiB/s). `requests_per_second` limits the combined CurseForge and Modrinth API request rate; `0` disables rate limiting.
+`file_concurrency` controls the initial range workers for one file and, when adaptive mode is disabled, the number of balanced ranges. When `adaptive_file_concurrency` is enabled, the downloader reserves a larger balanced range pool, starts with this many workers, and adds workers each second while throughput is below `target_download_rate_mib` (0.1-5 MiB/s). `concurrent_downloads` controls both how many files may download at once and how many uncached remote JARs may be parsed concurrently for mod IDs. `requests_per_second` limits the combined CurseForge and Modrinth API request rate; `0` disables rate limiting.
 
 All outbound API, metadata, and file requests automatically use the process system proxy environment. `NO_PROXY` exclusions are honored; lowercase proxy variable names are also supported by Go.
 
