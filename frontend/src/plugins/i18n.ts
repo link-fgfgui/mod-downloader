@@ -105,6 +105,7 @@ const messages = {
         save: "保存",
         saved: "依赖清理设置已保存",
       },
+      releaseType: { label: "偏好发行变体", hint: "自动安装时优先选择此发行变体；明确选择或固定的版本不受影响", stable: "稳定版", beta: "Beta 版", alpha: "Alpha 版" },
       minecraftDir: { label: ".minecraft 目录", choose: "选择目录", valid: "目录有效", invalid: "目录无效或为空" },
       cacheDir: { label: "缓存目录", path: "实际路径", choose: "选择目录", reset: "恢复默认", default: "默认位置", saved: "缓存目录已保存" },
       mcim: { label: "MCIM API 镜像", hint: "切换 Modrinth、CurseForge 的元数据 API；Mod 文件始终从官方平台下载", useMirror: "API 使用 MCIM", save: "保存", saved: "MCIM API 设置已保存" },
@@ -168,6 +169,7 @@ const messages = {
           onlineAndDeleted: "library 标签，且只被刚删除的 Mod 依赖",
         },
       },
+      releaseType: { label: "Preferred release variant", hint: "Automatic installs prefer this variant; explicit and pinned versions are unchanged.", stable: "Stable", beta: "Beta", alpha: "Alpha" },
       disableImpact: {
         title: "禁用后将缺少前置 Mod",
         body: "选中的 Mod 提供了其它已启用 Mod 所需的前置。你可以取消、继续禁用，或从缓存中选择并重新下载前置 Mod。",

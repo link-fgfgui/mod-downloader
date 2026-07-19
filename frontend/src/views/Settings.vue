@@ -80,6 +80,19 @@
                 </v-card>
 
                 <v-card class="mb-4">
+                    <v-card-title>{{ $t('settings.releaseType.label') }}</v-card-title>
+                    <v-card-subtitle>{{ $t('settings.releaseType.hint') }}</v-card-subtitle>
+                    <v-card-text>
+                        <v-radio-group v-model="settingsStore.draftPreferredReleaseType" hide-details
+                            @update:model-value="settingsStore.scheduleAutoSave('releaseType')">
+                            <v-radio value="release" :label="$t('settings.releaseType.stable')" />
+                            <v-radio value="beta" :label="$t('settings.releaseType.beta')" />
+                            <v-radio value="alpha" :label="$t('settings.releaseType.alpha')" />
+                        </v-radio-group>
+                    </v-card-text>
+                </v-card>
+
+                <v-card class="mb-4">
                     <v-card-title>{{ $t('settings.cacheDir.label') }}</v-card-title>
                     <v-card-text>
                         <v-text-field :model-value="settingsStore.view?.cachePath"

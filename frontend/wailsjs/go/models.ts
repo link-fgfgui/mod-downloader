@@ -336,6 +336,18 @@ export namespace main {
 	        this.requestsPerSecond = source["requestsPerSecond"];
 	    }
 	}
+	export class SavePreferredReleaseTypeSettingsRequest {
+	    preferredReleaseType: string;
+
+	    static createFrom(source: any = {}) {
+	        return new SavePreferredReleaseTypeSettingsRequest(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.preferredReleaseType = source["preferredReleaseType"];
+	    }
+	}
 	export class SaveSimpleModeSettingsRequest {
 	    simpleMode: boolean;
 	
@@ -369,6 +381,7 @@ export namespace main {
 	    animationDurationMultiplier: number;
 	    autoScanUnusedDependencies: boolean;
 	    mcimEnabled: boolean;
+	    preferredReleaseType: string;
 	    minecraftDir: string;
 	    cacheDir: string;
 	    cachePath: string;
@@ -397,6 +410,7 @@ export namespace main {
 	        this.animationDurationMultiplier = source["animationDurationMultiplier"];
 	        this.autoScanUnusedDependencies = source["autoScanUnusedDependencies"];
 	        this.mcimEnabled = source["mcimEnabled"];
+	        this.preferredReleaseType = source["preferredReleaseType"];
 	        this.minecraftDir = source["minecraftDir"];
 	        this.cacheDir = source["cacheDir"];
 	        this.cachePath = source["cachePath"];
@@ -1605,4 +1619,3 @@ export namespace structs {
 	}
 
 }
-

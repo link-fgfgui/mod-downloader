@@ -112,6 +112,8 @@ export function SaveMCIMSettings(arg1:main.SaveMCIMSettingsRequest):Promise<main
 
 export function SaveNetworkSettings(arg1:main.SaveNetworkSettingsRequest):Promise<main.SettingsView>;
 
+export function SavePreferredReleaseTypeSettings(arg1:main.SavePreferredReleaseTypeSettingsRequest):Promise<main.SettingsView>;
+
 export function SaveSimpleModeSettings(arg1:main.SaveSimpleModeSettingsRequest):Promise<main.SettingsView>;
 
 export function SaveTheme(arg1:string):Promise<string>;
