@@ -64,6 +64,8 @@ jobs:
 
       - name: Build Wails App
         shell: bash
+        env:
+          DEFAULT_CF_API_KEY: ${{ secrets.DEFAULT_CF_API_KEY }}
         run: |
           if [[ -z "${APP_VERSION:-}" ]]; then
             if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
@@ -72,7 +74,7 @@ jobs:
               APP_VERSION="${GITHUB_SHA::12}"
             fi
           fi
-          wails build -clean ${{ matrix.build_flags }} -ldflags "-X main.appVersion=${APP_VERSION} -X github.com/link-fgfgui/mod-downloader-core/configs.DefaultCurseforgeAPIKey='${{ secrets.DEFAULT_CF_API_KEY }}'"
+          wails build -clean ${{ matrix.build_flags }} -ldflags "-X main.appVersion=${APP_VERSION} -X github.com/link-fgfgui/mod-downloader-core/configs.DefaultCurseforgeAPIKey=${DEFAULT_CF_API_KEY}"
 
       - name: Package macOS App
         if: matrix.platform == 'darwin'
