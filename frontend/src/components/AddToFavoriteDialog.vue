@@ -10,13 +10,10 @@
             <v-card-title class="text-h6">{{ $t("favorites.addDialog.title") }}</v-card-title>
             <v-card-text>
                 <v-combobox
-                    v-model="selectedChoice"
+                    v-model="selectedListName"
                     v-model:menu="isListMenuOpen"
-                    :items="favoritesStore.lists"
+                    :items="favoriteListNames"
                     :menu-props="listMenuProps"
-                    item-title="name"
-                    item-value="id"
-                    return-object
                     :label="$t('favorites.addDialog.list')"
                     density="comfortable"
                     variant="outlined"
@@ -36,7 +33,7 @@
                     color="primary"
                     variant="flat"
                     :loading="isSaving"
-                    :disabled="isSaving || !selectedChoice || drafts.length === 0"
+                    :disabled="isSaving || !selectedListName.trim() || drafts.length === 0"
                     @click="add"
                 >
                     {{ $t("favorites.actions.add") }}
@@ -47,16 +44,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useFavoritesStore, type FavoriteModDraft } from "../stores/favorites";
-import type { storage } from "../../wailsjs/go/models";
 
 const emit = defineEmits(["added"]);
 
 const favoritesStore = useFavoritesStore();
 const isOpen = ref(false);
 const drafts = ref<FavoriteModDraft[]>([]);
-const selectedChoice = ref<storage.FavoriteList | string | null>(null);
+const selectedListName = ref("");
 const isListMenuOpen = ref(false);
 const isSaving = ref(false);
 const listMenuProps = {
@@ -64,13 +60,14 @@ const listMenuProps = {
     maxHeight: 200,
     offset: 4,
 };
+const favoriteListNames = computed(() => favoritesStore.lists.map((list) => list.name));
 
 const open = async (items: FavoriteModDraft[]) => {
     drafts.value = items;
     await favoritesStore.loadLists();
-    selectedChoice.value = favoritesStore.lists.find((list) => list.id === favoritesStore.selectedListId)
-        || favoritesStore.lists[0]
-        || null;
+    selectedListName.value = favoritesStore.lists.find((list) => list.id === favoritesStore.selectedListId)?.name
+        || favoritesStore.lists[0]?.name
+        || "";
     isOpen.value = true;
 };
 
@@ -87,16 +84,12 @@ const onDialogModelValue = (value: boolean) => {
 const clearClosedDialog = () => {
     if (isOpen.value) return;
     drafts.value = [];
-    selectedChoice.value = null;
+    selectedListName.value = "";
     isListMenuOpen.value = false;
 };
 
 const resolveListId = async () => {
-    const choice = selectedChoice.value;
-    if (!choice) return "";
-    if (typeof choice !== "string") return choice.id;
-
-    const name = choice.trim();
+    const name = selectedListName.value.trim();
     if (!name) return "";
     const existing = favoritesStore.lists.find((list) => list.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase());
     if (existing) return existing.id;
@@ -105,7 +98,7 @@ const resolveListId = async () => {
 };
 
 const add = async () => {
-    if (!selectedChoice.value || drafts.value.length === 0 || isSaving.value) return;
+    if (!selectedListName.value.trim() || drafts.value.length === 0 || isSaving.value) return;
     isSaving.value = true;
     try {
         const listId = await resolveListId();

@@ -1,9 +1,9 @@
 export namespace appcore {
-
+	
 	export class FavoriteBulkAddRequest {
 	    targetListIds: string[];
 	    mods: storage.FavoriteMod[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new FavoriteBulkAddRequest(source);
 	    }
@@ -222,11 +222,11 @@ export namespace appcore {
 	export class FavoriteListCopyRequest {
 	    sourceListId: string;
 	    targetListId: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new FavoriteListCopyRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.sourceListId = source["sourceListId"];
@@ -1603,3 +1603,4 @@ export namespace structs {
 	}
 
 }
+

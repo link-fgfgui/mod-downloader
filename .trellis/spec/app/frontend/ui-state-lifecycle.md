@@ -127,6 +127,12 @@ function closeDialog() {
 }
 ```
 
+When a `v-combobox` accepts a user-defined value (for example, creating a
+favorite list from the add-to-favorites dialog), keep its model as the entered
+string and resolve an existing item's ID only when submitting. Combining
+`return-object` with free-form input can leave the submit path without the
+custom value in Vuetify 4.
+
 Do not accept a visual screenshot alone as verification. With the nested menu
 open, assert that `document.elementFromPoint()` at the center of each dialog
 action resolves to that action, then click Cancel and assert that both the menu
