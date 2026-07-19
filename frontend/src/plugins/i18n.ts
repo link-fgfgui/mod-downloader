@@ -341,7 +341,13 @@ const messages = {
         unknownFile: "文件",
       },
     },
-    versions: { installed: "已安装", pin: "固定此版本", unpin: "取消固定", replace: "替换为此版本" },
+    versions: {
+      installed: "已安装",
+      pin: "固定此版本",
+      unpin: "取消固定",
+      replace: "替换为此版本",
+      releaseType: { stable: "稳定版", beta: "Beta 版", alpha: "Alpha 版" },
+    },
     sidebar: {
       version: "实例版本",
       refresh: "刷新实例",
@@ -694,7 +700,13 @@ const messages = {
         unknownFile: "File",
       },
     },
-    versions: { installed: "Installed", pin: "Pin this version", unpin: "Unpin", replace: "Replace with this version" },
+    versions: {
+      installed: "Installed",
+      pin: "Pin this version",
+      unpin: "Unpin",
+      replace: "Replace with this version",
+      releaseType: { stable: "Stable", beta: "Beta", alpha: "Alpha" },
+    },
     sidebar: {
       version: "Instance Version",
       refresh: "Refresh instances",

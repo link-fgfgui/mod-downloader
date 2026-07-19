@@ -478,6 +478,7 @@ export namespace models {
 	    versionId: string;
 	    name: string;
 	    version: string;
+	    releaseType: string;
 	    fileName: string;
 	    fileSize: number;
 	    downloadUrl: string;
@@ -501,6 +502,7 @@ export namespace models {
 	        this.versionId = source["versionId"];
 	        this.name = source["name"];
 	        this.version = source["version"];
+	        this.releaseType = source["releaseType"];
 	        this.fileName = source["fileName"];
 	        this.fileSize = source["fileSize"];
 	        this.downloadUrl = source["downloadUrl"];
