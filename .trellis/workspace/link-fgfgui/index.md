@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 30
-- **Last Active**: 2026-07-16
+- **Total Sessions**: 31
+- **Last Active**: 2026-07-19
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1038 | Active |
+| `journal-1.md` | ~1073 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 31 | 2026-07-19 | Dynamic download chunk sizing | `fce3665`, `38b3730` | `master` |
 | 30 | 2026-07-15 | 下载队列删除失败和等待任务 | `0d51a18`, `fda148e` | `cancel` |
 | 29 | 2026-07-15 | 下载队列删除已取消任务 | `5c1f504`, `b9f074f` | `cancel` |
 | 28 | 2026-07-16 | Connector compatibility | `582c896`, `e706a43`, `397a683` | `master` |

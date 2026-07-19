@@ -1036,3 +1036,38 @@ Added transient Connector loader switching, multi-loader local mod detection, an
 ### Next Steps
 
 - None - task complete
+
+
+## Session 31: Dynamic download chunk sizing
+
+**Date**: 2026-07-19
+**Task**: Dynamic download chunk sizing
+**Package**: app
+**Branch**: `master`
+
+### Summary
+
+Derived balanced HTTP ranges from file size and segment count, preserved adaptive ramp-up with a larger segment pool, versioned resumable temp layouts, and added regression coverage and documentation.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `fce3665` | (see git log) |
+| `38b3730` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
