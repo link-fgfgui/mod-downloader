@@ -1,3 +1,0 @@
-# Project-scoped Codex configuration
-# Keep AGENTS.md as the primary project instruction file.
-project_doc_fallback_filenames = ["AGENTS.md"]

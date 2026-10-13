@@ -93,10 +93,6 @@ All accumulated technical specifications, domain rules, and hard-won bug prevent
 - [Code Reuse Thinking Guide](docs/specs/guides/code-reuse-thinking-guide.md): When to extract helpers vs when to keep code localized.
 - [Cross-Layer Thinking Guide](docs/specs/guides/cross-layer-thinking-guide.md): Checklists for data crossing Frontend ↔ Wails ↔ Core boundaries.
 
-### Historical Records
-- `docs/tasks/`: Historical task PRDs and design notes.
-- `docs/journals/`: Past developer journals and session histories.
-
 ---
 
 ## 5. Lightweight Historical Experience Accumulation Requirements
@@ -120,7 +116,7 @@ Record new experience immediately whenever work involves:
    - *Requirement*: Append the rule to `docs/specs/backend/quality-guidelines.md` or the corresponding layer spec.
 4. **Significant Feature Solutions (关键特性方案备忘)**:
    - Non-trivial feature decisions (e.g., complex dependency resolution, download chunk calculation).
-   - *Requirement*: Document key constraints and design rationale in `docs/specs/` (or create a task summary under `docs/tasks/`).
+   - *Requirement*: Document key constraints and design rationale in `docs/specs/`.
 
 ### 5.3 Where & How to Record (沉淀归档规范)
 - **Keep it lightweight and tool-free**: Experience is recorded in plain Markdown files in git. No custom Python scripts, no state machines, no JSONL manifests required.
