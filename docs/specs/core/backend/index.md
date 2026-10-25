@@ -25,6 +25,9 @@ workflow file.
 - [System Proxy](./system-proxy.md)
 - [Local Mod Online Version Metadata](./local-mod-online-version.md)
 - [Connector Compatibility](./connector-compatibility.md)
+- [Configurable Jar-in-Jar Detection](./jij-detection.md)
+- [Mod Metadata Parsing](./mod-metadata-parsing.md)
+- [Dependency Pre-flight And Reverse-Dependency Risk](./dependency-preflight.md)
 - [Language Preference](../../app/frontend/language-preference.md)
 
 ## Pre-Development Checklist
@@ -51,6 +54,8 @@ workflow file.
 - Keep local all-loader parsing, scoped JAR cache identity, and transient
   physical-instance views aligned; see
   [Connector Compatibility](./connector-compatibility.md).
+- Decode JAR-declared JSON metadata through the lenient helper; see
+  [Mod Metadata Parsing](./mod-metadata-parsing.md).
 - Keep config parsing and appcore language fields aligned with the app/frontend
   contract; see [Language Preference](../../app/frontend/language-preference.md).
 

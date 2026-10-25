@@ -17,8 +17,7 @@ import {
     prepareDownloadCompletionSound,
 } from "../composables/useDownloadCompletionSound";
 
-const downloadQueueUpdatedEvent = "download-queue-updated";
-const downloadCompletedEvent = "download-completed";
+import { downloadCompletedEvent, downloadQueueUpdatedEvent } from "../utils/events";
 
 type DownloadQueueSnapshot = Pick<
     structs.DownloadQueueState,

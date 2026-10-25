@@ -3,6 +3,7 @@ import i18n from "../plugins/i18n";
 
 import {
     AnalyzeBatchIncompatibleConflicts,
+    CheckDependencyFulfillment,
     GetDownloadStates,
     GetPinnedModVersion,
     ListMatchingProjectVersions,
@@ -13,11 +14,13 @@ import {
 import { EventsOn } from "../../wailsjs/runtime/runtime";
 import type { structs, models } from "../../wailsjs/go/models";
 
-const searchModsUpdatedEvent = "search-mods-updated";
-const downloadQueueUpdatedEvent = "download-queue-updated";
-const downloadFailedEvent = "download-failed";
-const extensionModsAcceptedEvent = "extension-mods-accepted";
-const downloadStatesUpdatedEvent = "download-states-updated";
+import {
+    downloadFailedEvent,
+    downloadQueueUpdatedEvent,
+    downloadStatesUpdatedEvent,
+    extensionModsAcceptedEvent,
+    searchModsUpdatedEvent,
+} from "../utils/events";
 
 const searchPageSize = 10;
 
@@ -66,6 +69,15 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
         downloadQueueMembership: "",
         snackbar: { show: false, key: "", params: {} as Record<string, string>, color: "success" },
         confirmDialog: { show: false, status: "", result: null as SearchModSnapshot | null, key: "", conflictFileName: "" },
+        preflightDialog: {
+            show: false,
+            result: null as SearchModSnapshot | null,
+            key: "",
+            results: [] as SearchModSnapshot[],
+            entries: [] as structs.DependencyPreflightEntry[],
+            missing: 0,
+            conflicts: 0,
+        },
         batchConfirmDialog: {
             show: false,
             conflicts: [] as structs.BatchIncompatibleConflict[],
@@ -221,12 +233,12 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
                 this.confirmDialog = { show: true, status: status || "", result: result || null, key, conflictFileName: conflictFileName || "" };
                 return;
             }
-            await this.doInstall({ result, key });
+            await this.doInstall({ result, key, preflight: true });
         },
         async confirmInstall() {
             const { result, key } = this.confirmDialog;
             this.closeConfirmDialog();
-            await this.doInstall({ result: result || undefined, key });
+            await this.doInstall({ result: result || undefined, key, preflight: true });
         },
         async batchInstall(results: SearchModSnapshot[]) {
             const selected = (results || []).filter(Boolean);
@@ -241,6 +253,19 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
             const conflicts = analysis?.conflicts || [];
             if (conflicts.length > 0) {
                 this.batchConfirmDialog = { show: true, conflicts, pendingResults: selected };
+                return;
+            }
+            const preflight = await this.checkBatchDependencyPreflight(selected);
+            if (preflight.missing > 0 || preflight.conflicts > 0) {
+                this.preflightDialog = {
+                    show: true,
+                    result: null,
+                    key: "",
+                    results: selected,
+                    entries: preflight.entries,
+                    missing: preflight.missing,
+                    conflicts: preflight.conflicts,
+                };
                 return;
             }
             await this.installBatchResults(selected);
@@ -268,8 +293,7 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
                 if (!key) continue;
                 await this.doInstall({ result, key });
             }
-        },
-        closeConfirmDialog() {
+        },        closeConfirmDialog() {
             this.confirmDialog = { ...this.confirmDialog, show: false };
         },
         clearClosedConfirmDialog() {
@@ -277,14 +301,87 @@ export const useDownloadSearchStore = defineStore("downloadSearch", {
                 this.confirmDialog = { show: false, status: "", result: null, key: "", conflictFileName: "" };
             }
         },
-        async doInstall(payload: { result?: SearchModSnapshot; key?: string }) {
-            const { result, key } = payload || {};
+        async checkDependencyPreflight(result: SearchModSnapshot) {
+            try {
+                return await CheckDependencyFulfillment({
+                    projectId: this.modIDFromResult(result) || result.id || "",
+                    result: result as models.ModProject,
+                    minecraftVersion: this.selectedVersion,
+                    modLoader: this.selectedModLoader,
+                } as structs.DependencyPreflightRequest);
+            } catch {
+                // A failed pre-flight must never block installation; the queue
+                // still performs its own dependency resolution.
+                return null;
+            }
+        },
+        async checkBatchDependencyPreflight(results: SearchModSnapshot[]) {
+            const analyses = await Promise.all((results || []).map((result) => this.checkDependencyPreflight(result)));
+            const entries: structs.DependencyPreflightEntry[] = [];
+            let missing = 0;
+            let conflicts = 0;
+            for (const analysis of analyses) {
+                if (!analysis) continue;
+                entries.push(...(analysis.entries || []));
+                missing += analysis.missing || 0;
+                conflicts += analysis.conflicts || 0;
+            }
+            return { entries, missing, conflicts };
+        },
+        async confirmPreflightInstall() {
+            const { result, key, results } = this.preflightDialog;
+            this.closePreflightDialog();
+            if (results.length > 0) {
+                await this.installBatchResults(results);
+                return;
+            }
+            await this.doInstall({ result: result || undefined, key, preflight: false });
+        },
+        closePreflightDialog() {
+            this.preflightDialog = {
+                show: false,
+                result: null,
+                key: "",
+                results: [],
+                entries: [],
+                missing: 0,
+                conflicts: 0,
+            };
+        },
+        clearClosedPreflightDialog() {
+            if (!this.preflightDialog.show) {
+                this.closePreflightDialog();
+            }
+        },
+        async doInstall(payload: { result?: SearchModSnapshot; key?: string; preflight?: boolean }) {
+            const { result, key, preflight } = payload || {};
             if (!key || this.downloadingKeys[key] || !this.hasSelectedInstance || !this.selectedVersion || !this.selectedModLoader) {
                 return;
             }
 
+            // Mark the key busy for the whole operation (pre-flight included) so
+            // the install button shows progress and repeated clicks cannot start
+            // concurrent pre-flight checks.
             this.downloadingKeys = { ...this.downloadingKeys, [key]: true };
             try {
+                // Pre-flight: show the dependency plan before queueing when
+                // required dependencies are missing or conflict locally.
+                if (preflight && result) {
+                    const analysis = await this.checkDependencyPreflight(result);
+                    if (analysis && (analysis.missing > 0 || analysis.conflicts > 0)) {
+                        this.preflightDialog = {
+                            show: true,
+                            result,
+                            key,
+                            results: [],
+                            entries: analysis.entries || [],
+                            missing: analysis.missing,
+                            conflicts: analysis.conflicts,
+                        };
+                        return;
+                    }
+                }
+
                 const res = await QueueModDownload({
                     projectId: key,
                     result: result as models.ModProject,

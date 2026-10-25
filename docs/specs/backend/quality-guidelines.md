@@ -117,6 +117,63 @@ ConcurrentDownloads: MaxConcurrentDownloads + 1
 
 ---
 
+## Convention: Behavior-Affecting Flags Belong In Cache Keys
+
+When a setting changes the parsed/derived result for the same input, that
+setting must be part of the cache key. Otherwise a value cached under the old
+setting is served after the setting changes.
+
+```go
+// Bad: same sha1 yields a JIJ-rich result after the user disables JIJ.
+scope := "local:" + normalizeModLoader(preferredLoader)
+
+// Correct: the toggle is sampled once and encoded into the scope.
+jijEnabled := JijDetectionEnabled()
+scope := "local:" + normalizeModLoader(preferredLoader) + ":jij=" + jijScopeFlag(jijEnabled)
+```
+
+See [Configurable Jar-in-Jar Detection](../core/backend/jij-detection.md).
+
+---
+
+## Convention: One Runtime-Config Entry Point
+
+**Problem**: `downloader.Configure`, `ConfigureSimpleMode`,
+`ConfigurePreferredReleaseType`, `SetJijDetectionEnabled`,
+`configureRemoteModIDConcurrency`, and provider-client setup were repeated in
+`Startup` and several `Save*` methods with slightly different actions.
+
+**Why it's bad**: changing one network/settings path silently missed an action
+that another path performed; the two config sources could diverge.
+
+**Instead**: `Service.applyRuntimeConfig()` is the only place that pushes config
+into process-wide runtime singletons. `Startup` calls it without events; a
+`Save*` callback passes `s.downloadEvents()` when simple-mode cleanup should be
+observable. `providers.StartBackgroundTasks` and `storage.OpenAt` remain
+lifecycle steps, not part of runtime config.
+
+---
+
+## Convention: Shared Settings DTOs Live In `core/structs`
+
+`SettingsView`, `AppPreferences`, and every `Save*SettingsRequest` are defined
+once in `core/structs/settings.go`. Both `appcore` and the Wails adapter import
+them; the adapter must not mirror or field-by-field copy them. Adding a setting
+touches `configs` → shared DTO → frontend, with no silent zero-value mapping
+layer in between.
+
+---
+
+## Convention: Read Endpoints Do Not Mutate Selection
+
+`GetVersions` returns the cached list without calling `ensureSelectedVersion`;
+cache population always happens through `LoadVersionsFromDisk`, which already
+performs the default selection. Read APIs must not change global selection or
+scan state. `LocalMods(versionKey)` is an explicit write/refresh API and is
+documented as such; do not copy its pattern into new read endpoints.
+
+---
+
 ## Code Review Checklist
 
 - [ ] `go build ./... && go vet ./... && go test ./...` all pass.

@@ -22,6 +22,15 @@
                     hide-details
                 ></v-combobox>
 
+                <div v-if="scopeLabel" class="d-flex align-center ga-1 mt-2 text-caption text-medium-emphasis">
+                    <v-icon icon="mdi-tag-outline" size="14"></v-icon>
+                    <span>{{ $t("favorites.addDialog.scopeLabel", { scope: scopeLabel }) }}</span>
+                </div>
+
+                <v-alert v-if="scopeError" class="mt-3" type="warning" variant="tonal" density="compact">
+                    {{ $t("favorites.addDialog.scopeConflict") }}
+                </v-alert>
+
                 <div class="text-caption text-medium-emphasis mt-3">
                     {{ $t("favorites.addDialog.count", { n: drafts.length }) }}
                 </div>
@@ -45,7 +54,13 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useFavoritesStore, type FavoriteModDraft } from "../stores/favorites";
+import {
+    listMatchesScope,
+    normalizeKeyPart,
+    normalizeMinecraftVersion,
+    useFavoritesStore,
+    type FavoriteModDraft,
+} from "../stores/favorites";
 
 const emit = defineEmits(["added"]);
 
@@ -55,21 +70,40 @@ const drafts = ref<FavoriteModDraft[]>([]);
 const selectedListName = ref("");
 const isListMenuOpen = ref(false);
 const isSaving = ref(false);
+const scopeError = ref(false);
 const listMenuProps = {
     location: "top" as const,
     maxHeight: 200,
     offset: 4,
 };
-const favoriteListNames = computed(() => favoritesStore.lists.map((list) => list.name));
+
+// All drafts share the same target scope (they come from one selection), so the
+// first draft is authoritative for filtering and for the scope label.
+const draftMinecraftVersion = computed(() => normalizeMinecraftVersion(drafts.value[0]?.minecraftVersion));
+const draftModLoader = computed(() => normalizeKeyPart(drafts.value[0]?.modLoader));
+
+const favoriteListNames = computed(() => favoritesStore.lists
+    .filter((list) => listMatchesScope(list, draftMinecraftVersion.value, draftModLoader.value))
+    .map((list) => list.name));
+
+const scopeLabel = computed(() => {
+    if (!draftMinecraftVersion.value || !draftModLoader.value) return "";
+    return `${draftMinecraftVersion.value} / ${draftModLoader.value.toUpperCase()}`;
+});
+
 const canCreateList = computed(() => drafts.value.every((draft) =>
     Boolean(draft.minecraftVersion?.trim() && draft.modLoader?.trim())
 ));
 
 const open = async (items: FavoriteModDraft[]) => {
     drafts.value = items;
+    scopeError.value = false;
     await favoritesStore.loadLists();
-    selectedListName.value = favoritesStore.lists.find((list) => list.id === favoritesStore.selectedListId)?.name
-        || favoritesStore.lists[0]?.name
+    const inScope = favoritesStore.lists.filter((list) =>
+        listMatchesScope(list, normalizeMinecraftVersion(items[0]?.minecraftVersion), normalizeKeyPart(items[0]?.modLoader)),
+    );
+    selectedListName.value = inScope.find((list) => list.id === favoritesStore.selectedListId)?.name
+        || inScope[0]?.name
         || "";
     isOpen.value = true;
 };
@@ -89,13 +123,22 @@ const clearClosedDialog = () => {
     drafts.value = [];
     selectedListName.value = "";
     isListMenuOpen.value = false;
+    scopeError.value = false;
 };
 
 const resolveListId = async () => {
     const name = selectedListName.value.trim();
     if (!name) return "";
     const existing = favoritesStore.lists.find((list) => list.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase());
-    if (existing) return existing.id;
+    if (existing) {
+        // Never reuse a list that belongs to a different Minecraft/loader scope:
+        // that would silently pollute the wrong environment.
+        if (!listMatchesScope(existing, draftMinecraftVersion.value, draftModLoader.value)) {
+            scopeError.value = true;
+            return "";
+        }
+        return existing.id;
+    }
 
     const draft = drafts.value[0];
     return (await favoritesStore.createList(name, draft?.minecraftVersion, draft?.modLoader))?.id || "";
@@ -104,6 +147,7 @@ const resolveListId = async () => {
 const add = async () => {
     if (!canCreateList.value || !selectedListName.value.trim() || drafts.value.length === 0 || isSaving.value) return;
     isSaving.value = true;
+    scopeError.value = false;
     try {
         const listId = await resolveListId();
         if (!listId) return;

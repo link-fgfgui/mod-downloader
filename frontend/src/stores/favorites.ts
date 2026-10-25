@@ -44,6 +44,7 @@ export type FavoriteCrossVersionCopyTarget = {
 
 const normalizeKeyPart = (value?: string) => (value || "").trim().toLowerCase();
 const normalizeMinecraftVersion = (value?: string) => (value || "").trim();
+export { normalizeKeyPart, normalizeMinecraftVersion };
 const favoriteKey = (mod: Pick<storage.FavoriteMod, "platform" | "modId" | "minecraftVersion" | "modLoader">) =>
     [normalizeKeyPart(mod.platform), normalizeKeyPart(mod.modId), normalizeMinecraftVersion(mod.minecraftVersion), normalizeKeyPart(mod.modLoader)].join("|");
 
@@ -79,6 +80,7 @@ const listMatchesScope = (list: storage.FavoriteList, minecraftVersion: string, 
     if (!listVersion && !listLoader) return true;
     return hasFavoriteScope(minecraftVersion, modLoader) && listVersion === minecraftVersion && listLoader === modLoader;
 };
+export { listMatchesScope };
 
 export const useFavoritesStore = defineStore("favorites", {
     state: () => ({
@@ -203,8 +205,14 @@ export const useFavoritesStore = defineStore("favorites", {
             const iconValue = value.trim();
             let iconUrl = "";
             if (mode === "project" && iconValue) {
-                const project = await LookupProjectBySlug(platform, iconValue, "", "");
-                iconUrl = project?.iconUrl || "";
+                try {
+                    const project = await LookupProjectBySlug(platform, iconValue, "", "");
+                    iconUrl = project?.iconUrl || "";
+                } catch {
+                    // Optional icon metadata: a missing project should not block
+                    // saving the list itself.
+                    iconUrl = "";
+                }
             }
             return this.updateListMetadata(list, {
                 iconKind: mode,

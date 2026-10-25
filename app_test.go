@@ -7,15 +7,42 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/link-fgfgui/mod-downloader-core/appcore"
 	"github.com/link-fgfgui/mod-downloader-core/configs"
 	"github.com/link-fgfgui/mod-downloader-core/global"
 	"github.com/link-fgfgui/mod-downloader-core/storage"
+	appstructs "github.com/link-fgfgui/mod-downloader-core/structs"
 	structs "github.com/link-fgfgui/mod-downloader-core/structs/minecraft"
 )
 
-func TestGetVersionsSelectsFirstVersionByDefault(t *testing.T) {
+const apiKeyKeepSentinel = appcore.APIKeyKeepSentinel
+
+func newTestApp(t *testing.T, cfg *configs.Config) *App {
+	t.Helper()
+	return &App{core: appcore.New(appcore.Options{Config: cfg, Runtime: appRuntimeOptions()})}
+}
+
+// Test-only shims around core helpers that are otherwise not exposed by App.
+func maskKey(s string) string {
+	return appcore.MaskKey(s)
+}
+
+func loadVersionsFromDisk(mcDir string) []structs.VersionInfo {
+	return appcore.New(appcore.Options{}).LoadVersionsFromDisk(mcDir)
+}
+
+func scanVersionMods(version structs.VersionInfo, mcDir string) structs.VersionInfo {
+	return appcore.ScanVersionMods(version, mcDir)
+}
+
+func scanAllModDirsForHardlinkIndex(mcDir string, versions []structs.VersionInfo, generation uint64) {
+	appcore.ScanAllModDirsForHardlinkIndex(mcDir, versions, generation)
+}
+
+func TestGetVersionsReturnsCachedVersionsWithoutSelecting(t *testing.T) {
 	dir := t.TempDir()
 	global.SetMinecraftDir(dir)
+	global.SetSelectedVersion(structs.VersionInfo{})
 	global.SetVersionsForDir(dir, []structs.VersionInfo{
 		{
 			ID:               "first",
@@ -31,19 +58,19 @@ func TestGetVersionsSelectsFirstVersionByDefault(t *testing.T) {
 		},
 	})
 	t.Cleanup(func() {
+		global.SetSelectedVersion(structs.VersionInfo{})
 		global.SetMinecraftDir("")
 		global.InvalidateVersions()
 	})
 
-	app := &App{}
+	app := newTestApp(t, &configs.Config{})
 	versions := app.GetVersions()
 	if len(versions) != 2 {
 		t.Fatalf("GetVersions() returned %d versions, want 2", len(versions))
 	}
 
-	selected := app.GetSelectedVersion()
-	if selected.ID != "first" {
-		t.Fatalf("GetSelectedVersion().ID = %q, want first", selected.ID)
+	if selected := app.GetSelectedVersion(); selected.ID != "" || selected.Name != "" {
+		t.Fatalf("GetVersions must not select a version, got %q", selected.ID)
 	}
 }
 
@@ -254,14 +281,12 @@ func TestMaskKey(t *testing.T) {
 }
 
 func TestGetSettingsMasksKeys(t *testing.T) {
-	app := &App{
-		config: &configs.Config{
-			Keys: configs.APIKeys{
-				CurseforgeApiKey: "abcd1234wxyz",
-			},
-			Prefers: configs.Preferences{Theme: configs.ThemeSystem},
+	app := newTestApp(t, &configs.Config{
+		Keys: configs.APIKeys{
+			CurseforgeApiKey: "abcd1234wxyz",
 		},
-	}
+		Prefers: configs.Preferences{Theme: configs.ThemeSystem},
+	})
 	sv := app.GetSettings()
 	if sv.Theme != "system" {
 		t.Fatalf("theme = %q, want system", sv.Theme)
@@ -288,7 +313,7 @@ func TestGetSettingsMasksKeys(t *testing.T) {
 		t.Fatalf("ModrinthKeyMask = %q, want empty", sv.ModrinthKeyMask)
 	}
 
-	appEmpty := &App{config: &configs.Config{}}
+	appEmpty := newTestApp(t, &configs.Config{})
 	svEmpty := appEmpty.GetSettings()
 	if svEmpty.HasCurseforgeKey || svEmpty.CurseforgeKeyMask != "" {
 		t.Fatalf("empty key view = %#v", svEmpty)
@@ -311,7 +336,7 @@ func TestAppServiceDefaultsCachePathToCurrentWorkingDirectory(t *testing.T) {
 		}
 	})
 
-	app := &App{config: &configs.Config{}}
+	app := newTestApp(t, &configs.Config{})
 	settings := app.GetSettings()
 	want := filepath.Join(tmp, storage.CacheFileName)
 	if got := settings.CachePath; got != want {
@@ -336,9 +361,9 @@ func TestAppServiceConfiguredCacheDirOverridesGUIDefault(t *testing.T) {
 	})
 
 	cacheDir := filepath.Join(t.TempDir(), "custom-cache")
-	app := &App{config: &configs.Config{
+	app := newTestApp(t, &configs.Config{
 		Runtime: configs.RuntimeConfig{CacheDir: cacheDir},
-	}}
+	})
 	settings := app.GetSettings()
 	want := filepath.Join(cacheDir, storage.CacheFileName)
 	if got := settings.CachePath; got != want {
@@ -361,7 +386,7 @@ func TestSaveThemePersistsAndNormalizes(t *testing.T) {
 		}
 	})
 
-	app := &App{config: &configs.Config{}}
+	app := newTestApp(t, &configs.Config{})
 	if got := app.SaveTheme("2"); got != "system" {
 		t.Fatalf("SaveTheme(2) = %q, want system", got)
 	}
@@ -390,7 +415,7 @@ func TestSaveLanguagePersistsAndNormalizes(t *testing.T) {
 		}
 	})
 
-	app := &App{config: &configs.Config{}}
+	app := newTestApp(t, &configs.Config{})
 	if got := app.SaveLanguage("zh-CN"); got != "zh" {
 		t.Fatalf("SaveLanguage(zh-CN) = %q, want zh", got)
 	}
@@ -434,8 +459,8 @@ func TestSaveAnimationSettingsPersistsAndNormalizes(t *testing.T) {
 		}
 	})
 
-	app := &App{config: &configs.Config{}}
-	sv := app.SaveAnimationSettings(SaveAnimationSettingsRequest{
+	app := newTestApp(t, &configs.Config{})
+	sv := app.SaveAnimationSettings(appstructs.SaveAnimationSettingsRequest{
 		AnimationMode:               configs.AnimationModeGSAP.String(),
 		AnimationEnabled:            true,
 		AnimationDurationMultiplier: 99,
@@ -480,8 +505,8 @@ func TestSaveAnimationSettingsSupportsLegacyDisabledRequest(t *testing.T) {
 		}
 	})
 
-	app := &App{config: &configs.Config{}}
-	sv := app.SaveAnimationSettings(SaveAnimationSettingsRequest{
+	app := newTestApp(t, &configs.Config{})
+	sv := app.SaveAnimationSettings(appstructs.SaveAnimationSettingsRequest{
 		AnimationEnabled:            false,
 		AnimationDurationMultiplier: 1,
 	})
@@ -516,8 +541,8 @@ func TestSaveAnimationSettingsSupportsLegacyEnabledRequest(t *testing.T) {
 		}
 	})
 
-	app := &App{config: &configs.Config{}}
-	sv := app.SaveAnimationSettings(SaveAnimationSettingsRequest{
+	app := newTestApp(t, &configs.Config{})
+	sv := app.SaveAnimationSettings(appstructs.SaveAnimationSettingsRequest{
 		AnimationEnabled:            true,
 		AnimationDurationMultiplier: 1,
 	})
@@ -552,24 +577,24 @@ func TestSaveApiKeysKeepSentinel(t *testing.T) {
 		}
 	})
 
-	app := &App{config: &configs.Config{
+	app := newTestApp(t, &configs.Config{
 		Keys: configs.APIKeys{CurseforgeApiKey: "secret-key-1234"},
-	}}
+	})
 
-	sv := app.SaveApiKeys(SaveApiKeysRequest{CurseforgeApiKey: apiKeyKeepSentinel})
+	sv := app.SaveApiKeys(appstructs.SaveApiKeysRequest{CurseforgeApiKey: apiKeyKeepSentinel})
 	if !sv.HasCurseforgeKey {
 		t.Fatal("keep sentinel should preserve key")
 	}
-	if app.config.Keys.CurseforgeApiKey != "secret-key-1234" {
-		t.Fatalf("key changed unexpectedly: %q", app.config.Keys.CurseforgeApiKey)
+	if app.core.Config().Keys.CurseforgeApiKey != "secret-key-1234" {
+		t.Fatalf("key changed unexpectedly: %q", app.core.Config().Keys.CurseforgeApiKey)
 	}
 
-	sv = app.SaveApiKeys(SaveApiKeysRequest{CurseforgeApiKey: ""})
+	sv = app.SaveApiKeys(appstructs.SaveApiKeysRequest{CurseforgeApiKey: ""})
 	if sv.HasCurseforgeKey {
 		t.Fatal("empty key should clear")
 	}
-	if app.config.Keys.CurseforgeApiKey != "" {
-		t.Fatalf("key not cleared: %q", app.config.Keys.CurseforgeApiKey)
+	if app.core.Config().Keys.CurseforgeApiKey != "" {
+		t.Fatalf("key not cleared: %q", app.core.Config().Keys.CurseforgeApiKey)
 	}
 }
 
@@ -603,7 +628,7 @@ func TestUnpinMod(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	app := &App{}
+	app := newTestApp(t, &configs.Config{})
 	if !app.UnpinMod("Modrinth", "Sodium", "1.21.1", "Fabric") {
 		t.Fatal("UnpinMod returned false for existing pin")
 	}
@@ -615,5 +640,15 @@ func TestUnpinMod(t *testing.T) {
 	}
 	if app.UnpinMod("", "sodium", "1.21.1", "fabric") {
 		t.Fatal("UnpinMod returned true for empty platform")
+	}
+}
+
+func TestOpenLocalModLocationRejectsUnknownPath(t *testing.T) {
+	app := newTestApp(t, &configs.Config{})
+	if err := app.OpenLocalModLocation(""); err == nil {
+		t.Fatal("empty path should be rejected")
+	}
+	if err := app.OpenLocalModLocation(filepath.Join(t.TempDir(), "unknown.jar")); err == nil {
+		t.Fatal("path outside the selected instance should be rejected")
 	}
 }

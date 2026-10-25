@@ -54,7 +54,7 @@ import { GetUsageStats } from "../../wailsjs/go/main/App";
 import type { storage } from "../../wailsjs/go/models";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
 
-const usageStatsUpdatedEvent = "usage-stats-updated";
+import { usageStatsUpdatedEvent } from "../utils/events";
 
 const { locale } = useI18n();
 const stats = ref<storage.UsageStats | null>(null);

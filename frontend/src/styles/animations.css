@@ -314,19 +314,39 @@
   opacity: 0;
 }
 
-/* Floating action button bounce */
+/* Floating action button: enter scales up elastically from the bottom-right,
+ * leave shrinks and fades. Both directions anchor at the bottom-right origin so
+ * the button grows/shrinks out of its own corner instead of the center. */
 .md-fab-enter-active {
-  animation: md-scale-in var(--md-transition-slow) var(--md-ease-spring) both;
+  transform-origin: bottom right;
+  transition: opacity var(--md-transition-slow) var(--md-ease-out),
+    transform var(--md-transition-slow) var(--md-ease-spring);
+}
+
+.md-fab-enter-from {
+  opacity: 0;
+  transform: scale(0.6);
+}
+
+.md-fab-enter-to {
+  opacity: 1;
+  transform: scale(1);
 }
 
 .md-fab-leave-active {
+  transform-origin: bottom right;
   transition: opacity var(--md-transition-fast) var(--md-ease-out),
     transform var(--md-transition-fast) var(--md-ease-out);
 }
 
+.md-fab-leave-from {
+  opacity: 1;
+  transform: scale(1);
+}
+
 .md-fab-leave-to {
   opacity: 0;
-  transform: scale(0.8);
+  transform: scale(0.7);
 }
 
 /* Page container baseline */

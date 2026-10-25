@@ -15,8 +15,7 @@ import { EventsOn } from "../../wailsjs/runtime/runtime";
 import type { structs } from "../../wailsjs/go/models";
 import { currentLocale } from "../plugins/i18n";
 
-const minecraftDirChangedEvent = "minecraft-dir-changed";
-const selectedVersionChangedEvent = "selected-version-changed";
+import { minecraftDirChangedEvent, selectedVersionChangedEvent } from "../utils/events";
 
 type VersionInfoSnapshot = Partial<structs.VersionInfo> & Record<string, any>;
 

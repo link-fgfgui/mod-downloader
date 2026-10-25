@@ -15,6 +15,7 @@ app adapter or `core/` specs.
 - [Download Completion Sound](./download-completion-sound.md)
 - [Download Result Snapshots](./download-result-snapshots.md)
 - [Download Queue Actions](./download-queue-actions.md)
+- [Local Mod Search, Dependency Tree, And Scoped Modals](./local-mod-search-and-tree.md)
 - [Language Preference](./language-preference.md)
 - [Shared Thinking Guides](../../guides/index.md)
 

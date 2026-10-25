@@ -171,6 +171,53 @@
         </v-dialog>
 
         <v-dialog
+            :model-value="preflightDialog.show"
+            transition="scale-fade"
+            max-width="560"
+            @update:model-value="onPreflightDialogModel"
+            @after-leave="clearClosedPreflightDialog"
+        >
+            <v-card class="md-animate-scale">
+                <v-card-title class="text-h6">
+                    {{ $t("download.preflight.title") }}
+                </v-card-title>
+                <v-card-text>
+                    <div class="mb-3">
+                        {{ $t("download.preflight.summary", { missing: preflightDialog.missing, conflicts: preflightDialog.conflicts }) }}
+                    </div>
+                    <v-list density="compact" class="download-preflight-list">
+                        <v-list-item
+                            v-for="(entry, index) in preflightDialog.entries"
+                            :key="`${entry.projectId}-${index}`"
+                            :title="entry.title || entry.projectId"
+                            :subtitle="entry.localName
+                                ? $t('download.preflight.localVersion', { name: entry.localName, version: entry.localVersion || $t('download.preflight.unknownVersion') })
+                                : entry.projectId"
+                        >
+                            <template #prepend>
+                                <v-icon :color="preflightStatusMeta(entry).color" :icon="preflightStatusMeta(entry).icon"></v-icon>
+                            </template>
+                            <template #append>
+                                <v-chip :color="preflightStatusMeta(entry).color" size="x-small" variant="tonal">
+                                    {{ $t(preflightStatusMeta(entry).label) }}
+                                </v-chip>
+                            </template>
+                        </v-list-item>
+                    </v-list>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer></v-spacer>
+                    <v-btn variant="text" @click="closePreflightDialog">
+                        {{ $t("download.preflight.cancel") }}
+                    </v-btn>
+                    <v-btn color="primary" variant="flat" @click="confirmPreflightInstall">
+                        {{ $t("download.preflight.confirm") }}
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+        <v-dialog
             :model-value="batchConfirmDialog.show"
             transition="scale-fade"
             max-width="560"
@@ -254,6 +301,7 @@ const {
     downloadingKeys,
     snackbar,
     confirmDialog,
+    preflightDialog,
     batchConfirmDialog,
 } = storeToRefs(downloadStore);
 
@@ -276,6 +324,25 @@ const skipConflictedBatchInstall = () => downloadStore.skipConflictedBatchInstal
 const cancelBatchInstall = () => downloadStore.cancelBatchInstall();
 const closeConfirmDialog = () => downloadStore.closeConfirmDialog();
 const clearClosedConfirmDialog = () => downloadStore.clearClosedConfirmDialog();
+const confirmPreflightInstall = () => downloadStore.confirmPreflightInstall();
+const closePreflightDialog = () => downloadStore.closePreflightDialog();
+const clearClosedPreflightDialog = () => downloadStore.clearClosedPreflightDialog();
+
+const preflightStatusMeta = (entry: structs.DependencyPreflightEntry) => {
+    switch (entry.status) {
+        case "missing":
+            return { icon: "mdi-download", color: "info", label: "download.preflight.status.missing" };
+        case "conflict":
+            return { icon: "mdi-alert-octagon-outline", color: "error", label: "download.preflight.status.conflict" };
+        default:
+            return { icon: "mdi-check-circle-outline", color: "success", label: "download.preflight.status.fulfilled" };
+    }
+};
+const onPreflightDialogModel = (value: boolean) => {
+    if (!value && preflightDialog.value.show) {
+        closePreflightDialog();
+    }
+};
 const openVersionsOverlay = (result: models.ModProject) =>
     downloadStore.openVersionsOverlay(result);
 const pinVersion = (version: models.ModVersion) =>
@@ -428,6 +495,11 @@ watch(
 .batch-conflict-list {
     display: grid;
     gap: 10px;
+    max-height: min(320px, 52vh);
+    overflow-y: auto;
+}
+
+.download-preflight-list {
     max-height: min(320px, 52vh);
     overflow-y: auto;
 }

@@ -34,6 +34,10 @@ export function CancelDownload(arg1) {
   return window['go']['main']['App']['CancelDownload'](arg1);
 }
 
+export function CheckDependencyFulfillment(arg1) {
+  return window['go']['main']['App']['CheckDependencyFulfillment'](arg1);
+}
+
 export function ChooseCacheDir(arg1) {
   return window['go']['main']['App']['ChooseCacheDir'](arg1);
 }
@@ -142,6 +146,10 @@ export function LookupProjectBySlug(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['LookupProjectBySlug'](arg1, arg2, arg3, arg4);
 }
 
+export function OpenLocalModLocation(arg1) {
+  return window['go']['main']['App']['OpenLocalModLocation'](arg1);
+}
+
 export function PinModVersion(arg1) {
   return window['go']['main']['App']['PinModVersion'](arg1);
 }
@@ -200,6 +208,10 @@ export function SaveApiKeys(arg1) {
 
 export function SaveCacheDirPreference(arg1) {
   return window['go']['main']['App']['SaveCacheDirPreference'](arg1);
+}
+
+export function SaveJijDetectionSettings(arg1) {
+  return window['go']['main']['App']['SaveJijDetectionSettings'](arg1);
 }
 
 export function SaveLanguage(arg1) {

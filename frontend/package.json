@@ -6,13 +6,15 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
+    "test": "node --test \"tests/*.test.ts\"",
     "preview": "vite preview",
-    "lint": "eslint src/",
-    "lint:fix": "eslint src/ --fix"
+    "lint": "eslint src/ tests/",
+    "lint:fix": "eslint src/ tests/ --fix"
   },
   "dependencies": {
     "gsap": "^3.15.0",
     "pinia": "^3.0.4",
+    "pinyin-pro": "^3.29.5",
     "vue": "^3.5.35",
     "vue-i18n": "^11.4.4",
     "vue-router": "^5.1.0",
@@ -21,6 +23,7 @@
   "devDependencies": {
     "@babel/types": "^7.29.7",
     "@mdi/font": "^7.4.47",
+    "@types/node": "^24.19.2",
     "@typescript-eslint/parser": "^8.62.0",
     "@vitejs/plugin-vue": "^6.0.7",
     "eslint": "^9.39.4",

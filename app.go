@@ -4,11 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 
 	"github.com/link-fgfgui/mod-downloader-core/appcore"
-	"github.com/link-fgfgui/mod-downloader-core/configs"
 	"github.com/link-fgfgui/mod-downloader-core/httpserver"
 	"github.com/link-fgfgui/mod-downloader-core/logging"
 	"github.com/link-fgfgui/mod-downloader-core/models"
@@ -30,10 +31,10 @@ const usageStatsUpdatedEvent = "usage-stats-updated"
 
 // App struct
 type App struct {
-	ctx    context.Context
-	config *configs.Config
-	core   *appcore.Service
-	server *httpserver.Server
+	ctx        context.Context
+	core       *appcore.Service
+	server     *httpserver.Server
+	startupErr error
 }
 
 // NewApp creates a new App application struct
@@ -48,17 +49,19 @@ func (a *App) GetAppVersion() string {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.core = appcore.New(appcore.Options{
-		Config:                a.config,
 		Runtime:               appRuntimeOptions(),
 		Version:               currentAppVersion(),
 		LoadMinecraftReleases: true,
 		OnEvent:               a.emitCoreEvent,
 	})
 	if err := a.core.Startup(ctx); err != nil {
-		a.config = a.core.Config()
+		a.startupErr = err
+		// A partially initialized core must not be used: fail fast and leave the
+		// HTTP server down so the frontend sees explicit rejections instead of
+		// silent empty results.
+		logging.Error("core startup failed", "error", err)
 		return
 	}
-	a.config = a.core.Config()
 
 	a.server = httpserver.New(httpserver.DefaultAddr, httpserver.Options{OnEvent: a.emitHTTPServerEvent})
 	if err := a.server.Start(); err != nil {
@@ -67,15 +70,16 @@ func (a *App) startup(ctx context.Context) {
 }
 
 func (a *App) service() *appcore.Service {
-	if a.core == nil {
-		a.core = appcore.New(appcore.Options{
-			Config:  a.config,
-			Runtime: appRuntimeOptions(),
-			Version: currentAppVersion(),
-			OnEvent: a.emitCoreEvent,
-		})
+	if a.startupErr != nil {
+		reason := "core startup failed: " + a.startupErr.Error()
+		logging.Error("app service unavailable", "reason", reason)
+		panic(reason)
 	}
-	a.config = a.core.Config()
+	if a.core == nil {
+		reason := "core not initialized"
+		logging.Error("app service unavailable", "reason", reason)
+		panic(reason)
+	}
 	return a.core
 }
 
@@ -139,12 +143,12 @@ func (a *App) ListMatchingProjectVersions(result models.ModProject, minecraftVer
 	return a.service().ListMatchingProjectVersions(result, minecraftVersion, modLoader)
 }
 
-func (a *App) LookupProjectBySlug(platform, slug, mcVersion, modLoader string) models.ModProject {
+func (a *App) LookupProjectBySlug(platform, slug, mcVersion, modLoader string) (models.ModProject, error) {
 	project, ok := a.service().LookupProjectBySlug(platform, slug, mcVersion, modLoader)
 	if !ok {
-		return models.ModProject{}
+		return models.ModProject{}, fmt.Errorf("project not found: %s/%s", platform, slug)
 	}
-	return project
+	return project, nil
 }
 
 func (a *App) GetPinnedModVersion(platform string, modID string, minecraftVersion string, modLoader string) storage.PinnedMod {
@@ -264,111 +268,69 @@ func (a *App) GetMinecraftReleaseVersions() []string {
 	return a.service().GetMinecraftReleaseVersions()
 }
 
-func (a *App) GetPreferences() AppPreferences {
-	prefs := a.service().GetPreferences()
-	return AppPreferences{
-		Theme:                       prefs.Theme,
-		Language:                    prefs.Language,
-		AnimationMode:               prefs.AnimationMode,
-		AnimationEnabled:            prefs.AnimationEnabled,
-		AnimationDurationMultiplier: prefs.AnimationDurationMultiplier,
-	}
+func (a *App) GetPreferences() appstructs.AppPreferences {
+	return a.service().GetPreferences()
 }
 
 // GetSettings returns a read-only view of the current settings.
-func (a *App) GetSettings() SettingsView {
-	return settingsViewFromCore(a.service().GetSettings())
-}
-
-// maskKey keeps the first 4 and last 4 characters, replacing the middle with ****; fully masks if too short.
-func maskKey(s string) string {
-	return appcore.MaskKey(s)
+func (a *App) GetSettings() appstructs.SettingsView {
+	return a.service().GetSettings()
 }
 
 // SaveTheme updates the theme preference and persists it immediately. Returns the updated theme string.
 // Invalid values fall back to dark.
 func (a *App) SaveTheme(theme string) string {
-	next := a.service().SaveTheme(theme)
-	a.config = a.core.Config()
-	return next
+	return a.service().SaveTheme(theme)
 }
 
 func (a *App) SaveLanguage(language string) string {
-	next := a.service().SaveLanguage(language)
-	a.config = a.core.Config()
-	return next
+	return a.service().SaveLanguage(language)
 }
 
-func (a *App) SaveAnimationSettings(req SaveAnimationSettingsRequest) SettingsView {
-	next := a.service().SaveAnimationSettings(appcore.SaveAnimationSettingsRequest{
-		AnimationMode:               req.AnimationMode,
-		AnimationEnabled:            req.AnimationEnabled,
-		AnimationDurationMultiplier: req.AnimationDurationMultiplier,
-	})
-	a.config = a.core.Config()
-	return settingsViewFromCore(next)
+func (a *App) SaveAnimationSettings(req appstructs.SaveAnimationSettingsRequest) appstructs.SettingsView {
+	return a.service().SaveAnimationSettings(req)
 }
 
-func (a *App) SaveSimpleModeSettings(req SaveSimpleModeSettingsRequest) SettingsView {
-	next := a.service().SaveSimpleModeSettings(appcore.SaveSimpleModeSettingsRequest{SimpleMode: req.SimpleMode})
-	a.config = a.core.Config()
-	return settingsViewFromCore(next)
+func (a *App) SaveSimpleModeSettings(req appstructs.SaveSimpleModeSettingsRequest) appstructs.SettingsView {
+	return a.service().SaveSimpleModeSettings(req)
 }
 
-func (a *App) SaveUnusedDependencyCleanupSettings(req SaveUnusedDependencyCleanupSettingsRequest) SettingsView {
-	next := a.service().SaveUnusedDependencyCleanupSettings(appcore.SaveUnusedDependencyCleanupSettingsRequest{
-		AutoScanUnusedDependencies: req.AutoScanUnusedDependencies,
-	})
-	a.config = a.core.Config()
-	return settingsViewFromCore(next)
+func (a *App) SaveUnusedDependencyCleanupSettings(req appstructs.SaveUnusedDependencyCleanupSettingsRequest) appstructs.SettingsView {
+	return a.service().SaveUnusedDependencyCleanupSettings(req)
 }
 
-func (a *App) SaveMCIMSettings(req SaveMCIMSettingsRequest) SettingsView {
-	next := a.service().SaveMCIMSettings(appcore.SaveMCIMSettingsRequest{MCIMEnabled: req.MCIMEnabled})
-	a.config = a.core.Config()
-	return settingsViewFromCore(next)
+func (a *App) SaveMCIMSettings(req appstructs.SaveMCIMSettingsRequest) appstructs.SettingsView {
+	return a.service().SaveMCIMSettings(req)
 }
 
-func (a *App) SavePreferredReleaseTypeSettings(req SavePreferredReleaseTypeSettingsRequest) SettingsView {
-	next := a.service().SavePreferredReleaseTypeSettings(appcore.SavePreferredReleaseTypeSettingsRequest{
-		PreferredReleaseType: req.PreferredReleaseType,
-	})
-	a.config = a.core.Config()
-	return settingsViewFromCore(next)
+func (a *App) SaveJijDetectionSettings(req appstructs.SaveJijDetectionSettingsRequest) appstructs.SettingsView {
+	return a.service().SaveJijDetectionSettings(req)
 }
 
-func (a *App) SaveNetworkSettings(req SaveNetworkSettingsRequest) SettingsView {
-	next := a.service().SaveNetworkSettings(appcore.SaveNetworkSettingsRequest{
-		FileConcurrency:         req.FileConcurrency,
-		ConcurrentDownloads:     req.ConcurrentDownloads,
-		AdaptiveFileConcurrency: req.AdaptiveFileConcurrency,
-		TargetDownloadRateMiB:   req.TargetDownloadRateMiB,
-		VerifySHA1:              req.VerifySHA1,
-		RequestsPerSecond:       req.RequestsPerSecond,
-	})
-	a.config = a.core.Config()
-	return settingsViewFromCore(next)
+func (a *App) SavePreferredReleaseTypeSettings(req appstructs.SavePreferredReleaseTypeSettingsRequest) appstructs.SettingsView {
+	return a.service().SavePreferredReleaseTypeSettings(req)
 }
 
-func (a *App) SaveCacheDirPreference(dir string) SettingsView {
-	next := a.service().SaveCacheDirPreference(dir)
-	a.config = a.core.Config()
-	return settingsViewFromCore(next)
+func (a *App) SaveNetworkSettings(req appstructs.SaveNetworkSettingsRequest) appstructs.SettingsView {
+	return a.service().SaveNetworkSettings(req)
+}
+
+func (a *App) SaveCacheDirPreference(dir string) appstructs.SettingsView {
+	return a.service().SaveCacheDirPreference(dir)
 }
 
 // SaveApiKeys updates API keys and persists them immediately + reinitializes clients.
 // An empty string means clear the key; the special value (see above) means keep unchanged.
-func (a *App) SaveApiKeys(req SaveApiKeysRequest) SettingsView {
-	next := a.service().SaveApiKeys(appcore.SaveApiKeysRequest{
-		CurseforgeApiKey: req.CurseforgeApiKey,
-		ModrinthApiKey:   req.ModrinthApiKey,
-	})
-	a.config = a.core.Config()
-	return settingsViewFromCore(next)
+func (a *App) SaveApiKeys(req appstructs.SaveApiKeysRequest) appstructs.SettingsView {
+	return a.service().SaveApiKeys(req)
 }
 
 func (a *App) QueueModDownload(req appstructs.ModDownloadRequest) appstructs.ModDownloadResult {
 	return a.service().QueueModDownload(req)
+}
+
+func (a *App) CheckDependencyFulfillment(req appstructs.DependencyPreflightRequest) appstructs.DependencyPreflightResult {
+	return a.service().CheckDependencyFulfillment(req)
 }
 
 func (a *App) AnalyzeLocalModDisableImpact(req appstructs.LocalModDisableImpactRequest) (appstructs.LocalModDisableImpactResult, error) {
@@ -423,8 +385,9 @@ func (a *App) shutdown(ctx context.Context) {
 	if a.server != nil {
 		a.server.Stop()
 	}
-	a.service().Shutdown()
-	a.config = a.core.Config()
+	if a.core != nil {
+		a.core.Shutdown()
+	}
 }
 
 func (a *App) ChooseMinecraftDir(locale string) string {
@@ -439,7 +402,7 @@ func (a *App) ChooseMinecraftDir(locale string) string {
 	return a.service().SetMinecraftDir(dir)
 }
 
-func (a *App) ChooseCacheDir(locale string) SettingsView {
+func (a *App) ChooseCacheDir(locale string) appstructs.SettingsView {
 	dir, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
 		Title:           localizedDialogText(locale).chooseCacheDir,
 		ShowHiddenFiles: true,
@@ -492,6 +455,39 @@ func (a *App) ApplyLocalModBatchOperation(req appstructs.LocalModBatchOperationR
 	return version, nil
 }
 
+// OpenLocalModLocation reveals a scanned local mod in the OS file manager.
+// Only paths that belong to the currently selected instance are accepted, so
+// the renderer cannot turn this into an arbitrary-file-open primitive.
+func (a *App) OpenLocalModLocation(path string) error {
+	target := filepath.Clean(strings.TrimSpace(path))
+	if target == "" || target == "." {
+		return fmt.Errorf("missing mod path")
+	}
+	selected := a.service().GetSelectedVersion()
+	for _, mod := range selected.Mods {
+		if mod.Path == "" {
+			continue
+		}
+		if filepath.Clean(mod.Path) == target {
+			return openInFileManager(filepath.Dir(target))
+		}
+	}
+	return fmt.Errorf("path is not a mod in the selected instance")
+}
+
+func openInFileManager(dir string) error {
+	var cmd *exec.Cmd
+	switch goruntime.GOOS {
+	case "windows":
+		cmd = exec.Command("explorer", dir)
+	case "darwin":
+		cmd = exec.Command("open", dir)
+	default:
+		cmd = exec.Command("xdg-open", dir)
+	}
+	return cmd.Start()
+}
+
 func (a *App) ScanUnusedDependencies(req appstructs.UnusedDependencyScanRequest) (appstructs.UnusedDependencyScanResult, error) {
 	result, err := a.service().ScanUnusedDependencies(req)
 	if err != nil {
@@ -510,33 +506,6 @@ func (a *App) SelectVersion(versionKey string) (structs.VersionInfo, error) {
 		message = "version not found"
 	}
 	return structs.VersionInfo{}, fmt.Errorf("select version failed: %s", message)
-}
-
-func settingsViewFromCore(sv appcore.SettingsView) SettingsView {
-	return SettingsView{
-		Theme:                       sv.Theme,
-		Language:                    sv.Language,
-		SimpleMode:                  sv.SimpleMode,
-		AnimationMode:               sv.AnimationMode,
-		AnimationEnabled:            sv.AnimationEnabled,
-		AnimationDurationMultiplier: sv.AnimationDurationMultiplier,
-		AutoScanUnusedDependencies:  sv.AutoScanUnusedDependencies,
-		MCIMEnabled:                 sv.MCIMEnabled,
-		PreferredReleaseType:        sv.PreferredReleaseType,
-		MinecraftDir:                sv.MinecraftDir,
-		CacheDir:                    sv.CacheDir,
-		CachePath:                   sv.CachePath,
-		HasCurseforgeKey:            sv.HasCurseforgeKey,
-		CurseforgeKeyMask:           sv.CurseforgeKeyMask,
-		HasModrinthKey:              sv.HasModrinthKey,
-		ModrinthKeyMask:             sv.ModrinthKeyMask,
-		FileConcurrency:             sv.FileConcurrency,
-		ConcurrentDownloads:         sv.ConcurrentDownloads,
-		AdaptiveFileConcurrency:     sv.AdaptiveFileConcurrency,
-		TargetDownloadRateMiB:       sv.TargetDownloadRateMiB,
-		VerifySHA1:                  sv.VerifySHA1,
-		RequestsPerSecond:           sv.RequestsPerSecond,
-	}
 }
 
 type dialogText struct {
@@ -561,16 +530,4 @@ func localizedDialogText(locale string) dialogText {
 		exportPackwizTitle: "Export packwiz modpack",
 		zipArchives:        "ZIP archives (*.zip)",
 	}
-}
-
-func loadVersionsFromDisk(mcDir string) []structs.VersionInfo {
-	return appcore.New(appcore.Options{}).LoadVersionsFromDisk(mcDir)
-}
-
-func scanVersionMods(version structs.VersionInfo, mcDir string) structs.VersionInfo {
-	return appcore.ScanVersionMods(version, mcDir)
-}
-
-func scanAllModDirsForHardlinkIndex(mcDir string, versions []structs.VersionInfo, generation uint64) {
-	appcore.ScanAllModDirsForHardlinkIndex(mcDir, versions, generation)
 }

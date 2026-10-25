@@ -24,6 +24,14 @@
                 </v-tooltip>
             </template>
             <template #append>
+                <v-tooltip v-if="isRisky(version)" :text="riskTooltip(version)" location="top" max-width="320">
+                    <template #activator="{ props: riskTip }">
+                        <v-chip v-bind="riskTip" class="me-2" color="warning" size="x-small" variant="tonal"
+                            prepend-icon="mdi-link-variant-off">
+                            {{ $t("versions.dependencyBreakWarning") }}
+                        </v-chip>
+                    </template>
+                </v-tooltip>
                 <v-chip v-if="isInstalled(version)" class="me-2" color="success" size="x-small" variant="tonal">
                     {{ $t("versions.installed") }}
                 </v-chip>
@@ -58,7 +66,15 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import type { models } from "../../wailsjs/go/models";
+import { hasMajorVersionChange, isVersionDowngrade } from "../utils/versionCompare";
+
+type DependencyBreakDetail = {
+    name: string;
+    modId: string;
+    version?: string;
+};
 
 const props = withDefaults(defineProps<{
     versions?: models.ModVersion[];
@@ -68,6 +84,10 @@ const props = withDefaults(defineProps<{
     busyVersionId?: string;
     installedVersionId?: string;
     installedSha1?: string;
+    installedVersion?: string;
+    dependencyBreakRisk?: boolean;
+    dependencyBreakMods?: string[];
+    dependencyBreakDetails?: DependencyBreakDetail[];
     disableInstalledAction?: boolean;
     showPinAction?: boolean;
     pinBusyVersionId?: string;
@@ -80,6 +100,10 @@ const props = withDefaults(defineProps<{
     busyVersionId: "",
     installedVersionId: "",
     installedSha1: "",
+    installedVersion: "",
+    dependencyBreakRisk: false,
+    dependencyBreakMods: () => [],
+    dependencyBreakDetails: () => [],
     disableInstalledAction: false,
     showPinAction: false,
     pinBusyVersionId: "",
@@ -90,6 +114,8 @@ const emit = defineEmits<{
     select: [version: models.ModVersion];
     pin: [version: models.ModVersion];
 }>();
+
+const { t } = useI18n();
 
 const normalized = (value?: string) => (value || "").trim().toLowerCase();
 const versionId = (version: models.ModVersion) => version.id || version.versionId;
@@ -145,6 +171,35 @@ const isActionDisabled = (version: models.ModVersion) =>
         (props.busyVersionId && props.busyVersionId !== versionId(version)) ||
         (props.disableInstalledAction && isInstalled(version)),
     );
+
+// A risky change breaks the dependency chain when another installed mod still
+// requires this mod at the (higher) installed version. Compare the declared
+// version field, never the file name: "sodium-fabric-0.5.8.jar" sorts above
+// "0.5.11" segment-wise and would hide every real downgrade. Crossing a major
+// version boundary is risky even when the candidate is newer.
+const isRisky = (version: models.ModVersion) =>
+    props.dependencyBreakRisk &&
+    props.dependencyBreakMods.length > 0 &&
+    (
+        isVersionDowngrade(version.version, props.installedVersion) ||
+        hasMajorVersionChange(version.version, props.installedVersion)
+    );
+
+const riskTooltip = (version: models.ModVersion) => {
+    const lines = [versionFileName(version)];
+    if (props.dependencyBreakDetails.length > 0) {
+        for (const detail of props.dependencyBreakDetails) {
+            lines.push(t("versions.dependencyBreakDetail", {
+                mod: detail.name,
+                dep: detail.modId,
+                version: (detail.version || "").trim() || t("versions.dependencyVersionUnknown"),
+            }));
+        }
+    } else {
+        lines.push(...props.dependencyBreakMods);
+    }
+    return lines.join("\n");
+};
 </script>
 
 <style scoped>

@@ -81,6 +81,24 @@
                 </v-card>
 
                 <v-card class="mb-4">
+                    <v-card-title>{{ $t('settings.advanced.label') }}</v-card-title>
+                    <v-card-text>
+                        <v-switch
+                            v-model="settingsStore.draftEnableJijDetection"
+                            color="primary"
+                            density="comfortable"
+                            hide-details
+                            :loading="settingsStore.isSavingJijDetection"
+                            :label="$t('settings.advanced.jijDetection')"
+                            @update:model-value="onJijDetectionChange"
+                        />
+                        <div class="text-caption text-medium-emphasis mt-1">
+                            {{ $t('settings.advanced.jijDetectionSubtitle') }}
+                        </div>
+                    </v-card-text>
+                </v-card>
+
+                <v-card class="mb-4">
                     <v-card-title>{{ $t('settings.releaseType.label') }}</v-card-title>
                     <v-card-subtitle>{{ $t('settings.releaseType.hint') }}</v-card-subtitle>
                     <v-card-text>
@@ -225,6 +243,7 @@
 import { computed, onActivated, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useSettingsStore } from "../stores/settings";
+import { useMinecraftStore } from "../stores/minecraft";
 import { applyVuetifyTheme } from "../composables/useTheme";
 import {
     animationModeGsap,
@@ -237,6 +256,7 @@ import {
 
 const { t } = useI18n();
 const settingsStore = useSettingsStore();
+const minecraftStore = useMinecraftStore();
 const snackbar = ref({ show: false, message: "", color: "success" });
 const animationsDisabled = computed(() => settingsStore.draftAnimationMode === animationModeOff);
 const languageOptions = computed(() => [
@@ -258,6 +278,14 @@ async function onThemeChange() {
 async function onLanguageChange() {
     await settingsStore.saveLanguage();
     snackbar.value = { show: true, message: t('settings.language.saved'), color: "success" };
+}
+
+async function onJijDetectionChange() {
+    await settingsStore.saveJijDetectionSettings();
+    // The scan toggle changes how JARs are parsed; re-scan the active instance
+    // so the mod list immediately reflects the new nested-jar policy.
+    await minecraftStore.refreshSelectedMods();
+    snackbar.value = { show: true, message: t('settings.advanced.saved'), color: "success" };
 }
 
 async function chooseCacheDir() {

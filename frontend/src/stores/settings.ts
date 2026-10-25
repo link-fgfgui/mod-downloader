@@ -8,12 +8,13 @@ import {
     SaveApiKeys,
     SaveUnusedDependencyCleanupSettings,
     SaveMCIMSettings,
+    SaveJijDetectionSettings,
     SavePreferredReleaseTypeSettings,
     SaveNetworkSettings,
     SaveCacheDirPreference,
     ChooseCacheDir,
 } from "../../wailsjs/go/main/App";
-import type { main } from "../../wailsjs/go/models";
+import type { structs } from "../../wailsjs/go/models";
 import {
     animationModeEnabled,
     applyAnimationSettings,
@@ -37,7 +38,7 @@ const autoSaveTimers = new Map<string, number>();
 
 export const useSettingsStore = defineStore("settings", {
     state: () => ({
-        view: null as main.SettingsView | null,
+        view: null as structs.SettingsView | null,
         isLoading: false,
         isSavingTheme: false,
         isSavingLanguage: false,
@@ -45,6 +46,7 @@ export const useSettingsStore = defineStore("settings", {
         isSavingSimpleMode: false,
         isSavingUnusedDependencyCleanup: false,
         isSavingMCIM: false,
+        isSavingJijDetection: false,
         isSavingKeys: false,
         isSavingCacheDir: false,
         isChoosingCacheDir: false,
@@ -55,6 +57,7 @@ export const useSettingsStore = defineStore("settings", {
         draftSimpleMode: false,
         draftAutoScanUnusedDependencies: false,
         draftMCIMEnabled: false,
+        draftEnableJijDetection: true,
         draftPreferredReleaseType: "release",
         draftFileConcurrency: 4,
         draftConcurrentDownloads: 1,
@@ -110,6 +113,7 @@ export const useSettingsStore = defineStore("settings", {
                 this.draftSimpleMode = this.view?.simpleMode ?? false;
                 this.draftAutoScanUnusedDependencies = this.view?.autoScanUnusedDependencies ?? false;
                 this.draftMCIMEnabled = this.view?.mcimEnabled ?? false;
+                this.draftEnableJijDetection = this.view?.enableJijDetection ?? true;
                 this.draftPreferredReleaseType = this.view?.preferredReleaseType || "release";
                 this.draftFileConcurrency = this.view?.fileConcurrency ?? 4;
                 this.draftConcurrentDownloads = this.view?.concurrentDownloads ?? 1;
@@ -207,6 +211,16 @@ export const useSettingsStore = defineStore("settings", {
                 return this.view;
             } finally {
                 this.isSavingMCIM = false;
+            }
+        },
+        async saveJijDetectionSettings() {
+            this.isSavingJijDetection = true;
+            try {
+                this.view = await SaveJijDetectionSettings({ enableJijDetection: this.draftEnableJijDetection });
+                this.draftEnableJijDetection = this.view.enableJijDetection;
+                return this.view;
+            } finally {
+                this.isSavingJijDetection = false;
             }
         },
         async savePreferredReleaseTypeSettings() {

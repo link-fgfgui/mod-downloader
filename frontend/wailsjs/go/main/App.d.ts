@@ -22,7 +22,9 @@ export function ApplyLocalModBatchOperation(arg1:structs.LocalModBatchOperationR
 
 export function CancelDownload(arg1:string):Promise<boolean>;
 
-export function ChooseCacheDir(arg1:string):Promise<main.SettingsView>;
+export function CheckDependencyFulfillment(arg1:structs.DependencyPreflightRequest):Promise<structs.DependencyPreflightResult>;
+
+export function ChooseCacheDir(arg1:string):Promise<structs.SettingsView>;
 
 export function ChooseMinecraftDir(arg1:string):Promise<string>;
 
@@ -50,11 +52,11 @@ export function GetMinecraftReleaseVersions():Promise<Array<string>>;
 
 export function GetPinnedModVersion(arg1:string,arg2:string,arg3:string,arg4:string):Promise<storage.PinnedMod>;
 
-export function GetPreferences():Promise<main.AppPreferences>;
+export function GetPreferences():Promise<structs.AppPreferences>;
 
 export function GetSelectedVersion():Promise<structs.VersionInfo>;
 
-export function GetSettings():Promise<main.SettingsView>;
+export function GetSettings():Promise<structs.SettingsView>;
 
 export function GetUsageStats():Promise<storage.UsageStats>;
 
@@ -75,6 +77,8 @@ export function ListMatchingProjectVersions(arg1:models.ModProject,arg2:string,a
 export function ListPinnedMods():Promise<Array<storage.PinnedMod>>;
 
 export function LookupProjectBySlug(arg1:string,arg2:string,arg3:string,arg4:string):Promise<models.ModProject>;
+
+export function OpenLocalModLocation(arg1:string):Promise<void>;
 
 export function PinModVersion(arg1:structs.ModVersionPinRequest):Promise<storage.PinnedMod>;
 
@@ -100,25 +104,27 @@ export function RestoreCachedDependency(arg1:structs.RestoreCachedDependencyRequ
 
 export function RetryDownload(arg1:string):Promise<boolean>;
 
-export function SaveAnimationSettings(arg1:main.SaveAnimationSettingsRequest):Promise<main.SettingsView>;
+export function SaveAnimationSettings(arg1:structs.SaveAnimationSettingsRequest):Promise<structs.SettingsView>;
 
-export function SaveApiKeys(arg1:main.SaveApiKeysRequest):Promise<main.SettingsView>;
+export function SaveApiKeys(arg1:structs.SaveApiKeysRequest):Promise<structs.SettingsView>;
 
-export function SaveCacheDirPreference(arg1:string):Promise<main.SettingsView>;
+export function SaveCacheDirPreference(arg1:string):Promise<structs.SettingsView>;
+
+export function SaveJijDetectionSettings(arg1:structs.SaveJijDetectionSettingsRequest):Promise<structs.SettingsView>;
 
 export function SaveLanguage(arg1:string):Promise<string>;
 
-export function SaveMCIMSettings(arg1:main.SaveMCIMSettingsRequest):Promise<main.SettingsView>;
+export function SaveMCIMSettings(arg1:structs.SaveMCIMSettingsRequest):Promise<structs.SettingsView>;
 
-export function SaveNetworkSettings(arg1:main.SaveNetworkSettingsRequest):Promise<main.SettingsView>;
+export function SaveNetworkSettings(arg1:structs.SaveNetworkSettingsRequest):Promise<structs.SettingsView>;
 
-export function SavePreferredReleaseTypeSettings(arg1:main.SavePreferredReleaseTypeSettingsRequest):Promise<main.SettingsView>;
+export function SavePreferredReleaseTypeSettings(arg1:structs.SavePreferredReleaseTypeSettingsRequest):Promise<structs.SettingsView>;
 
-export function SaveSimpleModeSettings(arg1:main.SaveSimpleModeSettingsRequest):Promise<main.SettingsView>;
+export function SaveSimpleModeSettings(arg1:structs.SaveSimpleModeSettingsRequest):Promise<structs.SettingsView>;
 
 export function SaveTheme(arg1:string):Promise<string>;
 
-export function SaveUnusedDependencyCleanupSettings(arg1:main.SaveUnusedDependencyCleanupSettingsRequest):Promise<main.SettingsView>;
+export function SaveUnusedDependencyCleanupSettings(arg1:structs.SaveUnusedDependencyCleanupSettingsRequest):Promise<structs.SettingsView>;
 
 export function ScanUnusedDependencies(arg1:structs.UnusedDependencyScanRequest):Promise<structs.UnusedDependencyScanResult>;
 

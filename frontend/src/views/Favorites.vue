@@ -274,80 +274,7 @@
             </v-card>
         </v-dialog>
 
-        <v-dialog
-            v-model="crossVersionCopyDialog.show"
-            max-width="760"
-            :persistent="crossVersionCopyDialog.isApplying"
-            @after-leave="clearClosedCrossVersionCopyDialog"
-        >
-            <v-card>
-                <v-card-title>{{ $t("favorites.dialog.crossVersionCopyTitle") }}</v-card-title>
-                <v-card-text>
-                    <div class="cross-version-copy-grid">
-                        <MinecraftTargetFields
-                            v-model:minecraft-version="crossVersionCopyDialog.minecraftVersion"
-                            v-model:mod-loader="crossVersionCopyDialog.modLoader"
-                            :versions="minecraftStore.releaseVersions"
-                            :mod-loaders="minecraftStore.modLoaderList"
-                            :minecraft-version-label="$t('favorites.dialog.minecraftVersion')"
-                            :mod-loader-label="$t('favorites.dialog.modLoader')"
-                            :disabled="crossVersionCopyDialog.isApplying"
-                        ></MinecraftTargetFields>
-                    </div>
-                    <v-alert class="mt-3" type="info" variant="tonal" density="compact">
-                        {{ $t("favorites.crossVersionCopy.target", {
-                            name: crossVersionCopyDialog.sourceListName,
-                            minecraftVersion: crossVersionCopyDialog.minecraftVersion,
-                            modLoader: crossVersionCopyDialog.modLoader,
-                        }) }}
-                    </v-alert>
-                    <v-checkbox
-                        v-model="crossVersionCopyDialog.ignoreConflicts"
-                        :label="$t('favorites.dialog.ignoreConflicts')"
-                        :disabled="crossVersionCopyDialog.isApplying"
-                    ></v-checkbox>
-                    <v-btn
-                        variant="tonal"
-                        prepend-icon="mdi-eye"
-                        :disabled="!crossVersionCopyReady || crossVersionCopyDialog.isApplying"
-                        :loading="crossVersionCopyDialog.isPreviewing"
-                        @click="previewCrossVersionCopy"
-                    >{{ $t("favorites.actions.preview") }}</v-btn>
-
-                    <div v-if="crossVersionCopyDialog.preview" class="cross-version-copy-preview mt-4">
-                        <v-alert v-if="crossVersionCopyDialog.preview.nameConflict" class="mb-3" type="error" variant="tonal" density="compact">
-                            {{ $t("favorites.crossVersionCopy.nameConflict") }}
-                        </v-alert>
-                        <v-alert
-                            v-else-if="crossVersionCopyDialog.preview.errors?.length"
-                            class="mb-3"
-                            type="error"
-                            variant="tonal"
-                            density="compact"
-                        >
-                            <div v-for="message in crossVersionCopyDialog.preview.errors" :key="message">{{ message }}</div>
-                        </v-alert>
-                        <v-chip size="small" color="success" variant="tonal">{{ $t("favorites.crossVersionCopy.matched", { n: crossVersionCopyDialog.preview.matched?.length || 0 }) }}</v-chip>
-                        <v-chip size="small" color="warning" variant="tonal">{{ $t("favorites.crossVersionCopy.conflicts", { n: crossVersionCopyDialog.preview.conflicts?.length || 0 }) }}</v-chip>
-                        <v-list density="compact" class="mt-2">
-                            <v-list-item v-for="match in crossVersionCopyDialog.preview.matched || []" :key="`m-${match.source.id}`" prepend-icon="mdi-check" :title="displayName(match.source)" :subtitle="match.version.versionId || match.version.id"></v-list-item>
-                            <v-list-item v-for="conflict in crossVersionCopyDialog.preview.conflicts || []" :key="`c-${conflict.source.id}`" prepend-icon="mdi-alert" :title="displayName(conflict.source)" :subtitle="conflict.reason"></v-list-item>
-                        </v-list>
-                    </div>
-                </v-card-text>
-                <v-card-actions>
-                    <v-spacer></v-spacer>
-                    <v-btn variant="text" :disabled="crossVersionCopyDialog.isApplying" @click="crossVersionCopyDialog.show = false">{{ $t("favorites.actions.cancel") }}</v-btn>
-                    <v-btn
-                        color="primary"
-                        variant="flat"
-                        :disabled="!crossVersionCopyApplyReady"
-                        :loading="crossVersionCopyDialog.isApplying"
-                        @click="applyCrossVersionCopy"
-                    >{{ $t("favorites.actions.apply") }}</v-btn>
-                </v-card-actions>
-            </v-card>
-        </v-dialog>
+        <FavoritesCrossVersionCopyDialog ref="crossVersionCopyDialog" @message="showMessage"></FavoritesCrossVersionCopyDialog>
 
         <v-dialog v-model="deleteDialog.show" max-width="420" @after-leave="clearClosedDeleteDialog">
             <v-card>
@@ -361,18 +288,7 @@
             </v-card>
         </v-dialog>
 
-        <v-dialog v-model="pinDialog.show" max-width="680" @after-leave="clearClosedPinDialog">
-            <v-card class="version-dialog">
-                <v-toolbar density="compact" color="surface">
-                    <v-toolbar-title>{{ displayName(pinDialog.item || {}) }}</v-toolbar-title>
-                    <v-btn icon="mdi-close" variant="text" @click="pinDialog.show = false"></v-btn>
-                </v-toolbar>
-                <v-divider></v-divider>
-                <ModVersionList :versions="pinDialog.versions" :loading="pinDialog.loading" action="pin"
-                    :pinned-version-id="pinDialog.pinnedVersionId" :busy-version-id="pinDialog.busyVersionId"
-                    @select="pinFavoriteVersion"></ModVersionList>
-            </v-card>
-        </v-dialog>
+        <FavoritePinDialog ref="pinDialog"></FavoritePinDialog>
 
         <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="3500">
             {{ snackbar.message }}
@@ -384,13 +300,12 @@
 import { computed, onActivated, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
-import MinecraftTargetFields from "../components/MinecraftTargetFields.vue";
-import ModVersionList from "../components/ModVersionList.vue";
+import FavoritesCrossVersionCopyDialog from "../components/FavoritesCrossVersionCopyDialog.vue";
+import FavoritePinDialog from "../components/FavoritePinDialog.vue";
 import VirtualList from "../components/VirtualList.vue";
 import { useFavoritesStore } from "../stores/favorites";
 import { useDownloadSearchStore } from "../stores/downloadSearch";
 import { useMinecraftStore } from "../stores/minecraft";
-import { GetPinnedModVersion, ListMatchingProjectVersions, PinModVersion } from "../../wailsjs/go/main/App";
 
 const favoritesStore = useFavoritesStore();
 const downloadStore = useDownloadSearchStore();
@@ -401,27 +316,14 @@ const selectedList = computed(() => favoritesStore.selectedList);
 const draggedListId = ref("");
 const dropTargetId = ref("");
 const pendingClearSelection = ref(null);
-const crossVersionCopyOperation = ref(0);
+const crossVersionCopyDialog = ref(null);
 
 const listEdit = reactive({ show: false, id: "", name: "" });
 const listMenu = reactive({ show: false, list: null, target: null });
 const deleteDialog = reactive({ show: false, list: null });
 const metadataDialog = reactive({ show: false, list: null, pinned: false, iconKind: "mdi", iconValue: "", iconPlatform: "modrinth" });
 const copyDialog = reactive({ show: false, mode: "selected", sourceListId: "", targetListId: "", targetListIds: [], mods: [] });
-const crossVersionCopyDialog = reactive({
-    show: false,
-    sourceListId: "",
-    sourceListName: "",
-    sourceMinecraftVersion: "",
-    sourceModLoader: "",
-    minecraftVersion: "",
-    modLoader: "",
-    ignoreConflicts: false,
-    preview: null,
-    isPreviewing: false,
-    isApplying: false,
-});
-const pinDialog = reactive({ show: false, item: null, versions: [], loading: false, pinnedVersionId: "", busyVersionId: "" });
+const pinDialog = ref(null);
 
 const targetListOptions = computed(() => favoritesStore.lists.map((list) => ({ title: list.name, value: list.id })));
 const canCreateList = computed(() => Boolean(
@@ -438,32 +340,6 @@ const copyDialogTitle = computed(() => {
     return t("favorites.dialog.copySelectedTitle");
 });
 const copyDialogReady = computed(() => copyDialog.mode === "selected" ? copyDialog.targetListIds.length > 0 : Boolean(copyDialog.targetListId));
-const crossVersionCopyReady = computed(() => {
-    const minecraftVersion = crossVersionCopyDialog.minecraftVersion.trim();
-    const modLoader = crossVersionCopyDialog.modLoader.trim().toLocaleLowerCase();
-    const sourceMinecraftVersion = crossVersionCopyDialog.sourceMinecraftVersion.trim();
-    const sourceModLoader = crossVersionCopyDialog.sourceModLoader.trim().toLocaleLowerCase();
-    return Boolean(
-        crossVersionCopyDialog.sourceListId &&
-        minecraftVersion &&
-        modLoader &&
-        (minecraftVersion !== sourceMinecraftVersion || modLoader !== sourceModLoader)
-    );
-});
-const crossVersionCopyPreviewIsCurrent = computed(() => {
-    const preview = crossVersionCopyDialog.preview;
-    if (!preview) return false;
-    return preview.sourceListId === crossVersionCopyDialog.sourceListId &&
-        preview.minecraftVersion === crossVersionCopyDialog.minecraftVersion.trim() &&
-        preview.modLoader === crossVersionCopyDialog.modLoader.trim().toLocaleLowerCase();
-});
-const crossVersionCopyApplyReady = computed(() => {
-    const preview = crossVersionCopyDialog.preview;
-    if (!crossVersionCopyReady.value || !crossVersionCopyPreviewIsCurrent.value || !preview) return false;
-    if (crossVersionCopyDialog.isPreviewing || crossVersionCopyDialog.isApplying) return false;
-    if (preview.nameConflict || (preview.errors || []).length > 0 || (preview.matched || []).length === 0) return false;
-    return crossVersionCopyDialog.ignoreConflicts || (preview.conflicts || []).length === 0;
-});
 const snackbar = ref({ show: false, message: "", color: "success" });
 
 const itemKey = (item) => favoritesStore.itemKey(item);
@@ -535,46 +411,8 @@ const clearClosedDeleteDialog = () => {
     if (deleteDialog.show) return;
     deleteDialog.list = null;
 };
-const openPinDialog = async (item) => {
-    if (!canPinItem(item)) return;
-    pinDialog.show = true;
-    pinDialog.item = item;
-    pinDialog.versions = [];
-    pinDialog.pinnedVersionId = "";
-    pinDialog.loading = true;
-    try {
-        const [versions, pin] = await Promise.all([
-            ListMatchingProjectVersions(projectFromFavorite(item), favoritesStore.displayMinecraftVersion, favoritesStore.displayModLoader),
-            GetPinnedModVersion(item.platform, item.modId, favoritesStore.displayMinecraftVersion, favoritesStore.displayModLoader),
-        ]);
-        pinDialog.versions = versions || [];
-        pinDialog.pinnedVersionId = pin?.versionId || "";
-    } finally {
-        pinDialog.loading = false;
-    }
-};
-const pinFavoriteVersion = async (version) => {
-    const item = pinDialog.item;
-    if (!item || pinDialog.busyVersionId) return;
-    pinDialog.busyVersionId = version.id;
-    try {
-        const pin = await PinModVersion({
-            platform: item.platform,
-            modId: item.modId,
-            versionId: version.id,
-            minecraftVersion: favoritesStore.displayMinecraftVersion,
-            modLoader: favoritesStore.displayModLoader,
-        });
-        pinDialog.pinnedVersionId = pin?.versionId || "";
-    } finally {
-        pinDialog.busyVersionId = "";
-    }
-};
-const clearClosedPinDialog = () => {
-    if (pinDialog.show) return;
-    pinDialog.item = null;
-    pinDialog.versions = [];
-    pinDialog.pinnedVersionId = "";
+const openPinDialog = (favorite) => {
+    pinDialog.value?.open(favorite);
 };
 const openMetadata = (list) => {
     metadataDialog.show = true;
@@ -636,89 +474,7 @@ const applyCopyDialog = async () => {
     copyDialog.show = false;
 };
 const openCrossVersionCopy = (list) => {
-    crossVersionCopyOperation.value += 1;
-    crossVersionCopyDialog.show = true;
-    crossVersionCopyDialog.sourceListId = list.id;
-    crossVersionCopyDialog.sourceListName = list.name;
-    crossVersionCopyDialog.sourceMinecraftVersion = list.minecraftVersion || "";
-    crossVersionCopyDialog.sourceModLoader = list.modLoader || "";
-    crossVersionCopyDialog.minecraftVersion = minecraftStore.selectedMinecraftVersion;
-    crossVersionCopyDialog.modLoader = minecraftStore.selectedModLoader;
-    crossVersionCopyDialog.ignoreConflicts = false;
-    crossVersionCopyDialog.preview = null;
-    crossVersionCopyDialog.isPreviewing = false;
-    crossVersionCopyDialog.isApplying = false;
-};
-const crossVersionCopyRequest = () => ({
-    sourceListId: crossVersionCopyDialog.sourceListId,
-    minecraftVersion: crossVersionCopyDialog.minecraftVersion.trim(),
-    modLoader: crossVersionCopyDialog.modLoader.trim().toLocaleLowerCase(),
-    ignoreConflicts: crossVersionCopyDialog.ignoreConflicts,
-});
-const crossVersionCopyRequestIsCurrent = (request) =>
-    crossVersionCopyDialog.show &&
-    request.sourceListId === crossVersionCopyDialog.sourceListId &&
-    request.minecraftVersion === crossVersionCopyDialog.minecraftVersion.trim() &&
-    request.modLoader === crossVersionCopyDialog.modLoader.trim().toLocaleLowerCase();
-const previewCrossVersionCopy = async () => {
-    if (!crossVersionCopyReady.value || crossVersionCopyDialog.isPreviewing) return;
-    const request = crossVersionCopyRequest();
-    const operation = crossVersionCopyOperation.value;
-    crossVersionCopyDialog.isPreviewing = true;
-    try {
-        const preview = await favoritesStore.previewCrossVersionCopy(request);
-        if (operation === crossVersionCopyOperation.value && crossVersionCopyRequestIsCurrent(request)) {
-            crossVersionCopyDialog.preview = preview;
-        }
-    } catch (error) {
-        if (operation === crossVersionCopyOperation.value && crossVersionCopyRequestIsCurrent(request)) {
-            showMessage(t("favorites.crossVersionCopy.notApplied", { reason: errorMessage(error) }), "error");
-        }
-    } finally {
-        if (operation === crossVersionCopyOperation.value) {
-            crossVersionCopyDialog.isPreviewing = false;
-        }
-    }
-};
-const applyCrossVersionCopy = async () => {
-    if (!crossVersionCopyApplyReady.value) return;
-    const request = crossVersionCopyRequest();
-    crossVersionCopyDialog.isApplying = true;
-    try {
-        const result = await favoritesStore.applyCrossVersionCopy(request);
-        crossVersionCopyDialog.preview = result?.preview || crossVersionCopyDialog.preview;
-        if (result?.applied && result.targetList?.id) {
-            crossVersionCopyDialog.show = false;
-            showMessage(t("favorites.crossVersionCopy.success", {
-                name: result.targetList.name,
-                added: result.result?.added || 0,
-                skipped: result.result?.skipped || 0,
-            }));
-            return;
-        }
-        const reason = result?.result?.errors?.[0] ||
-            result?.preview?.errors?.[0] ||
-            t("favorites.crossVersionCopy.unknownError");
-        showMessage(t("favorites.crossVersionCopy.notApplied", { reason }), "error");
-    } catch (error) {
-        showMessage(t("favorites.crossVersionCopy.notApplied", { reason: errorMessage(error) }), "error");
-    } finally {
-        crossVersionCopyDialog.isApplying = false;
-    }
-};
-const clearClosedCrossVersionCopyDialog = () => {
-    if (crossVersionCopyDialog.show) return;
-    crossVersionCopyOperation.value += 1;
-    crossVersionCopyDialog.sourceListId = "";
-    crossVersionCopyDialog.sourceListName = "";
-    crossVersionCopyDialog.sourceMinecraftVersion = "";
-    crossVersionCopyDialog.sourceModLoader = "";
-    crossVersionCopyDialog.minecraftVersion = "";
-    crossVersionCopyDialog.modLoader = "";
-    crossVersionCopyDialog.ignoreConflicts = false;
-    crossVersionCopyDialog.preview = null;
-    crossVersionCopyDialog.isPreviewing = false;
-    crossVersionCopyDialog.isApplying = false;
+    crossVersionCopyDialog.value?.open(list);
 };
 const removeSelected = async (items, clearSelection) => {
     await favoritesStore.removeMany(items.filter((item) => !item.referenced));
@@ -800,13 +556,6 @@ const errorMessage = (error) => {
     if (typeof error === "string") return error;
     return error.message || String(error);
 };
-
-watch(
-    () => [crossVersionCopyDialog.minecraftVersion, crossVersionCopyDialog.modLoader],
-    () => {
-        crossVersionCopyDialog.preview = null;
-    },
-);
 
 watch(
     () => [minecraftStore.selectedMinecraftVersion, minecraftStore.selectedModLoader],
@@ -983,10 +732,6 @@ onActivated(() => {
     cursor: pointer;
 }
 
-.cross-version-copy-grid {
-    min-width: 0;
-}
-
 @media (max-width: 900px) {
     .favorites-page {
         grid-template-columns: 1fr;
@@ -1007,11 +752,6 @@ onActivated(() => {
         padding: 16px !important;
     }
 
-    .header-actions,
-    .cross-version-copy-grid {
-        width: 100%;
-    }
-
     .header-actions {
         display: grid;
         flex-wrap: wrap;
@@ -1022,10 +762,6 @@ onActivated(() => {
     .header-actions > .v-btn {
         min-width: 0;
         width: 100%;
-    }
-
-    .cross-version-copy-grid {
-        grid-template-columns: 1fr;
     }
 
     .favorites-items :deep(.v-list-item__prepend) {
