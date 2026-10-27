@@ -1,5 +1,5 @@
 <template>
-    <v-container fluid>
+    <v-container class="unpin-page" fluid>
         <v-row class="align-center mb-4">
             <v-col cols="12" md="auto">
                 <h1 class="text-h5">{{ $t('unpin.title') }}</h1>
@@ -99,6 +99,12 @@ async function unpinAll() {
 </script>
 
 <style scoped>
+.unpin-page {
+    height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+}
+
 .unpin-action-row {
     display: flex;
     flex-wrap: wrap;
@@ -112,6 +118,7 @@ async function unpinAll() {
 .unpin-table-wrap {
     max-width: 100%;
     overflow-x: auto;
+    padding-bottom: 16px;
 }
 
 .unpin-table {

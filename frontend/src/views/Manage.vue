@@ -1,5 +1,5 @@
 <template>
-    <v-container class="manage-page pa-6 md-page" fluid>
+    <v-container class="manage-page pa-6" fluid>
         <ManageToolbar
             v-model:search-input="searchInput"
             v-model:enabled-filter="enabledFilter"
@@ -14,56 +14,58 @@
             @refresh="refreshMods"
         ></ManageToolbar>
 
-        <v-alert v-if="!hasSelectedInstance" type="info" variant="tonal">
-            {{ $t("manage.noInstance") }}
-        </v-alert>
+        <Transition name="manage-view" mode="out-in">
+            <v-alert v-if="!hasSelectedInstance" key="alert" type="info" variant="tonal">
+                {{ $t("manage.noInstance") }}
+            </v-alert>
 
-        <ManageTreeView v-else-if="viewMode === 'tree'"
-            :mods="minecraftStore.mods"
-            :groups="allGroupedMods"
-            :applied-search="appliedSearch"
-            :enabled-filter="enabledFilter"
-            :busy="isBatchBusy"
-            :has-selected-instance="hasSelectedInstance"
-            @toggle="onTreeToggle"
-            @uninstall="onTreeUninstall"
-            @search-version="onTreeSearchVersion"
-            @error="onTreeError"
-        ></ManageTreeView>
+            <ManageTreeView v-else-if="viewMode === 'tree'" key="tree"
+                :mods="minecraftStore.mods"
+                :groups="allGroupedMods"
+                :applied-search="appliedSearch"
+                :enabled-filter="enabledFilter"
+                :busy="isBatchBusy"
+                :has-selected-instance="hasSelectedInstance"
+                @toggle="onTreeToggle"
+                @uninstall="onTreeUninstall"
+                @search-version="onTreeSearchVersion"
+                @error="onTreeError"
+            ></ManageTreeView>
 
-        <div v-else-if="groupedMods.length === 0" class="empty-state md-animate-fade-up">
-            <v-icon class="md-animate-float" icon="mdi-package-variant" size="48"></v-icon>
-            <div class="text-body-1 mt-3">
-                {{ hasActiveFilter ? $t("manage.search.empty") : $t("manage.noMods") }}
+            <div v-else-if="groupedMods.length === 0" key="empty" class="empty-state">
+                <v-icon icon="mdi-package-variant" size="48"></v-icon>
+                <div class="text-body-1 mt-3">
+                    {{ hasActiveFilter ? $t("manage.search.empty") : $t("manage.noMods") }}
+                </div>
             </div>
-        </div>
 
-        <ManageModList v-else
-            :items="managedRows"
-            :item-key="modRowKey"
-            :selectable="isManagedRowSelectable"
-            :busy="isBatchBusy"
-            :pending-toggle-path="pendingTogglePath"
-            :incompatible-expanded="incompatibleExpanded"
-            :incompatible-count="incompatibleGroupedMods.length"
-            :display-name="displayModName"
-            :has-grouped-details="hasGroupedDetails"
-            :group-tooltip="groupTooltip"
-            :strong-mod-ids="strongModIds"
-            :version-tooltip="versionTooltip"
-            :can-replace-version="canReplaceVersion"
-            :categories="modCategories"
-            :category-tooltip="categoryTooltip"
-            :can-favorite-group="canFavoriteGroup"
-            :can-favorite-selection="canFavoriteSelection"
-            :unused-candidate-for="unusedCandidateFor"
-            :unused-tooltip="unusedTooltip"
-            :selection-actions="manageSelectionActions"
-            @toggle-incompatible="incompatibleExpanded = !incompatibleExpanded"
-            @open-versions="openVersionDialog"
-            @open-favorites="openAddFavorites"
-            @toggle-group="toggleGroup"
-        ></ManageModList>
+            <ManageModList v-else key="list"
+                :items="managedRows"
+                :item-key="modRowKey"
+                :selectable="isManagedRowSelectable"
+                :busy="isBatchBusy"
+                :pending-toggle-path="pendingTogglePath"
+                :incompatible-expanded="incompatibleExpanded"
+                :incompatible-count="incompatibleGroupedMods.length"
+                :display-name="displayModName"
+                :has-grouped-details="hasGroupedDetails"
+                :group-tooltip="groupTooltip"
+                :strong-mod-ids="strongModIds"
+                :version-tooltip="versionTooltip"
+                :can-replace-version="canReplaceVersion"
+                :categories="modCategories"
+                :category-tooltip="categoryTooltip"
+                :can-favorite-group="canFavoriteGroup"
+                :can-favorite-selection="canFavoriteSelection"
+                :unused-candidate-for="unusedCandidateFor"
+                :unused-tooltip="unusedTooltip"
+                :selection-actions="manageSelectionActions"
+                @toggle-incompatible="incompatibleExpanded = !incompatibleExpanded"
+                @open-versions="openVersionDialog"
+                @open-favorites="openAddFavorites"
+                @toggle-group="toggleGroup"
+            ></ManageModList>
+        </Transition>
 
         <ManageModDialogs
             v-model:delete-dialog="deleteDialog"
@@ -492,12 +494,31 @@ onDeactivated(() => {
 
 <style scoped>
 .manage-page {
-    height: calc(100vh - 32px);
+    height: 100%;
     max-width: 1080px;
     min-height: 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+}
+
+.manage-view-enter-active {
+    transition:
+        opacity var(--md-transition-normal) var(--md-ease-out),
+        transform var(--md-transition-normal) var(--md-ease-out);
+}
+
+.manage-view-leave-active {
+    transition: opacity var(--md-transition-fast) var(--md-ease-in);
+}
+
+.manage-view-enter-from {
+    opacity: 0;
+    transform: translateY(6px);
+}
+
+.manage-view-leave-to {
+    opacity: 0;
 }
 
 .empty-state {

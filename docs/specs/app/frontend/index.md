@@ -9,7 +9,7 @@ app adapter or `core/` specs.
 ## Required References
 
 - [UI State Lifecycle](./ui-state-lifecycle.md)
-- [Animation Modes](./animation-modes.md)
+- [Motion Guidelines](./motion-guidelines.md)
 - [Local Mod Version Selection](./local-mod-version-selection.md)
 - [Connector Compatibility](../../core/backend/connector-compatibility.md)
 - [Download Completion Sound](./download-completion-sound.md)
@@ -23,10 +23,10 @@ app adapter or `core/` specs.
 
 - Read [UI State Lifecycle](./ui-state-lifecycle.md) before changing dialogs,
   overlays, transitions, action bars, or other leaving UI surfaces.
-- Read [Animation Modes](./animation-modes.md) before changing `animations.css`,
-  `useAnimationSettings.ts`, the settings animation flow, or route/FAB
-  transitions. Keep one application entry, non-overlapping mode ownership, and
-  `animation ... both` as the only source of an entrance's hidden state.
+- Read [Motion Guidelines](./motion-guidelines.md) before changing
+  `animations.css`, `useAnimationSettings.ts`, the settings animation flow, or
+  route/FAB transitions. Keep one timing entry, one entrance owner per surface,
+  and GSAP cleanup that always calls Vue's transition `done`.
 - Keep UI-only state in Vue components or Pinia stores; do not change Wails
   backend contracts for visual-only behavior.
 - Follow [Vuetify Decimal Number Inputs](#vuetify-decimal-number-inputs) when a

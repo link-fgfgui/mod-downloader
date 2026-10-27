@@ -26,6 +26,7 @@ workflow file.
 - [Local Mod Online Version Metadata](./local-mod-online-version.md)
 - [Connector Compatibility](./connector-compatibility.md)
 - [Configurable Jar-in-Jar Detection](./jij-detection.md)
+- [Webview Hardware Acceleration](./hardware-acceleration.md)
 - [Mod Metadata Parsing](./mod-metadata-parsing.md)
 - [Dependency Pre-flight And Reverse-Dependency Risk](./dependency-preflight.md)
 - [Language Preference](../../app/frontend/language-preference.md)

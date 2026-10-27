@@ -90,10 +90,7 @@ const messages = {
       theme: { label: "Theme", dark: "Dark", light: "Light", system: "System", saved: "Theme applied" },
       animations: {
         label: "Animations",
-        mode: "Mode",
-        modes: { off: "Off", vuetify: "Vuetify", gsap: "GSAP (Experimental)" },
-        save: "Save",
-        saved: "Animation settings applied",
+        speed: "Speed",
       },
       cleanup: {
         label: "Dependency Cleanup",
@@ -101,7 +98,13 @@ const messages = {
         save: "Save",
         saved: "Dependency cleanup settings saved",
       },
-      releaseType: { label: "Preferred release variant", hint: "Automatic installs prefer this variant; explicit and pinned versions are unchanged", stable: "Stable", beta: "Beta", alpha: "Alpha" },
+      releaseType: { label: "Preferred release variant", hint: "Automatic installs prefer this variant; explicit and pinned versions are unchanged", latest: "Latest", stable: "Stable", beta: "Beta", alpha: "Alpha" },
+      hardwareAcceleration: {
+        label: "Hardware acceleration (Linux)",
+        enabled: "Enable WebView hardware acceleration",
+        hint: "Force GPU rendering for the webview; restart the app to apply. Disable this if the window goes black or renders incorrectly",
+        saved: "Hardware acceleration setting saved; restart the app to apply",
+      },
       advanced: {
         label: "Mod Management / Advanced",
         jijDetection: "Detect bundled dependencies (Jar-in-Jar)",
@@ -313,6 +316,14 @@ const messages = {
         "The current directory is empty or unavailable. Please select a .minecraft folder at the bottom-left first.",
       noMatchingVersions:
         "No versions match the current Minecraft version and Mod Loader.",
+      searchIdle: {
+        title: "Search for mods",
+        hint: "Enter a name, author, or keyword to search Modrinth and CurseForge.",
+      },
+      searchEmpty: {
+        title: "No matching mods",
+        hint: "Try a different keyword, or check the Minecraft version and loader on the left.",
+      },
       queued: "Added to download queue",
       queue: {
         title: "Download Queue",

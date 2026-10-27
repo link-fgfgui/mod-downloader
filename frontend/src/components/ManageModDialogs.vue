@@ -134,5 +134,6 @@ const disableImpactSubtitle = (impact) => {
 .disable-impact-list {
     max-height: min(48vh, 420px);
     overflow-y: auto;
+    padding-inline-end: 16px;
 }
 </style>

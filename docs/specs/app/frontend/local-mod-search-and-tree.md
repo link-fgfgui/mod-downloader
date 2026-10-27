@@ -64,6 +64,52 @@ their ancestors + attached synthetic missing leaves) and passes it to
 `forceExpand` so matched branches are revealed without manual expansion. Never
 render the tree from the unfiltered mod list while filter controls are visible.
 
+### Don't: render the expanded forest as a plain list with index-based keys
+
+**Problem**: `ManageTreeView` used to render every flattened row through a plain
+`v-list` keyed by `${row.depth}-${row.node.key}-${index}`.
+
+**Why it's bad**: a shared library appears once per parent path, so expanding
+branches multiplies rows (a 600-mod test graph with 60 libraries already yields
+~350k rows at full expansion). The plain list mounts every row (each row is a
+`v-list-item` with avatar/image/chips/buttons), and because the index was part
+of the key, inserting children re-keyed every row after the toggle point,
+remounting the rest of the tree on each expand/collapse. The result was a
+multi-second freeze.
+
+**Instead**: `flattenModDependencyTree` emits a stable per-occurrence `key`
+built from the ancestor path (`parentRowKey + "\u0000" + node.key`), and
+`ManageTreeView` renders rows through `v-virtual-scroll` with a fixed row-height
+estimate (`TREE_ROW_HEIGHT`). Never key tree rows by array index or render the
+whole forest eagerly. `collectRelatedTreeKeys` must also walk descendants with
+one shared `visited` set; cloning an ancestor set per path re-walks shared
+subtrees combinatorially.
+
+### Tree expand/collapse motion on a virtualized list
+
+The chevron rotation is a CSS transition. Row motion is driven by the Web
+Animations API because only the visible window exists in the DOM:
+
+- **Expand**: FLIP the rows that were already rendered to their pushed-down
+  positions. They get an opaque background and a higher stacking order for the
+  duration; the new rows stay underneath, invisible for the first 40% of the
+  motion and then fade in after the moving rows have cleared their slots. Never
+  put the opaque new rows on top of moving rows — the boundary cuts through a
+  row and reads as torn text.
+- **Collapse**: the virtual list drops the subtree immediately and the rows
+  below jump up. Clone the visible subtree into an opaque block above the list
+  and animate the block's height to zero; the jump stays hidden and the settled
+  rows are revealed as the block shrinks.
+- Never cross-fade translucent ghosts over the jumped-up rows — both texts are
+  visible at the same place. The ghost block background must match the nearest
+  opaque ancestor's background, not `surface` (which is lighter than the page).
+- Skip WAAPI motion when `documentElement.dataset.mdAnimations === "off"` or
+  `prefers-reduced-motion: reduce` matches. Read durations from the
+  `--md-transition-*` custom properties so the settings multiplier applies.
+  `data-tree-key` stores the encoded row key; the NUL separator from the
+  flatten key must be `encodeURIComponent`-encoded before it enters an
+  attribute.
+
 ### Node status and interactions
 
 `ModTreeNode` carries `isOptional`, `isJij`, `isRoot`, and `isMissing` in
@@ -123,7 +169,8 @@ already exposes per-row and multi-select actions.
   the selection action bar. Display/selection logic is injected as functions;
   the view owns the underlying state.
 - `ManageTreeView` owns graph construction, filtering, selection relation
-  highlighting, and the node context menu.
+  highlighting, virtualized row rendering with stable path keys, and the node
+  context menu.
 - `ManageVersionDialog` owns version listing, pre-flight, downgrade/major-change
   confirmation, and queueing; the parent only calls `open(group)`.
 - `ManageModDialogs` owns delete/disable-impact confirmation rendering.

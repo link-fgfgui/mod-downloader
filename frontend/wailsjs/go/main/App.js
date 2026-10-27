@@ -210,6 +210,10 @@ export function SaveCacheDirPreference(arg1) {
   return window['go']['main']['App']['SaveCacheDirPreference'](arg1);
 }
 
+export function SaveHardwareAccelerationSettings(arg1) {
+  return window['go']['main']['App']['SaveHardwareAccelerationSettings'](arg1);
+}
+
 export function SaveJijDetectionSettings(arg1) {
   return window['go']['main']['App']['SaveJijDetectionSettings'](arg1);
 }

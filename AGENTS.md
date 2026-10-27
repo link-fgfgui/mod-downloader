@@ -86,7 +86,7 @@ All accumulated technical specifications, domain rules, and hard-won bug prevent
 ### Frontend Specifications (`docs/specs/app/frontend/`)
 - [UI State Lifecycle](docs/specs/app/frontend/ui-state-lifecycle.md): State cleanup, debounce, and modal lifecycles.
 - [Download Queue Actions](docs/specs/app/frontend/download-queue-actions.md): Queue states, progress aggregation, and cancellation handling.
-- [Animation Modes](docs/specs/app/frontend/animation-modes.md): CSS animations, hardware acceleration, and reduced-motion modes.
+- [Motion Guidelines](docs/specs/app/frontend/motion-guidelines.md): GSAP/Vuetify/CSS ownership, route/FAB contracts, timing tokens, and reduced-motion behavior.
 - [Language Preference](docs/specs/app/frontend/language-preference.md): Vue i18n and system locale synchronization.
 
 ### Thinking Guides (`docs/specs/guides/`)

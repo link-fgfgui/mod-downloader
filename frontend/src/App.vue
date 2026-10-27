@@ -2,15 +2,15 @@
     <v-app>
         <SideBar />
         <v-main>
-            <v-container fluid class="position-relative">
+            <div class="route-stage">
                 <router-view v-slot="{ Component, route }">
-                    <transition v-bind="routeTransitionProps">
+                    <transition v-bind="routeTransitionProps" mode="out-in">
                         <keep-alive>
                             <component :is="Component" :key="route.path" />
                         </keep-alive>
                     </transition>
                 </router-view>
-            </v-container>
+            </div>
             <v-overlay
                 v-model="minecraftStore.isLoading"
                 contained
@@ -26,20 +26,17 @@
 <script setup lang="ts">
 import SideBar from "./components/SideBar/SideBar.vue";
 import DownloadQueuePanel from "./components/DownloadQueuePanel.vue";
-import { computed, onMounted, onUnmounted } from "vue";
+import { onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { GetPreferences } from "../wailsjs/go/main/App";
 import { useMinecraftStore } from "./stores/minecraft";
 import { initTheme, applyVuetifyTheme, stopThemeListener } from "./composables/useTheme";
 import {
     afterGsapRouteLeave,
-    animationModeGsap,
-    animationModeOff,
     applyAnimationSettings,
     beforeGsapRouteEnter,
     enterGsapRoute,
     leaveGsapRoute,
-    useActiveAnimationMode,
 } from "./composables/useAnimationSettings";
 
 const themeDark = "dark";
@@ -48,31 +45,18 @@ initTheme();
 
 const router = useRouter();
 const minecraftStore = useMinecraftStore();
-const activeAnimationMode = useActiveAnimationMode();
 
-const gsapAnimationsActive = computed(() => activeAnimationMode.value === animationModeGsap);
-const animationsOff = computed(() => activeAnimationMode.value === animationModeOff);
-
-// Route transition — one <transition>, props swapped per mode. `appear` makes the
-// first paint (initial load / reload on any route) animate too, so gsap-owned
-// entrances are never skipped and content can't get stuck hidden.
-const routeTransitionProps = computed(() => {
-    if (animationsOff.value) {
-        return { css: false, mode: "out-in" as const };
-    }
-    if (gsapAnimationsActive.value) {
-        return {
-            css: false,
-            appear: true,
-            mode: "out-in" as const,
-            onBeforeEnter: beforeGsapRouteEnter,
-            onEnter: enterGsapRoute,
-            onLeave: leaveGsapRoute,
-            onAfterLeave: afterGsapRouteLeave,
-        };
-    }
-    return { name: "slide-fade", appear: true, mode: "out-in" as const };
-});
+// Route transition — GSAP owns the page entrance. The leaving page is absolutely
+// positioned by `leaveGsapRoute`, so the incoming page can enter at the same time
+// without an `out-in` blank gap. `appear` covers the first paint and reloads.
+const routeTransitionProps = {
+    css: false,
+    appear: true,
+    onBeforeEnter: beforeGsapRouteEnter,
+    onEnter: enterGsapRoute,
+    onLeave: leaveGsapRoute,
+    onAfterLeave: afterGsapRouteLeave,
+};
 
 const isEditableTarget = (target: EventTarget | null) => {
     if (!(target instanceof HTMLElement)) return false;

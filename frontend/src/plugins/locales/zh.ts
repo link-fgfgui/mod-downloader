@@ -90,11 +90,7 @@ const messages = {
       theme: { label: "主题", dark: "深色", light: "浅色", system: "跟随系统", saved: "主题已应用" },
       animations: {
         label: "动画",
-        mode: "模式",
-        modes: {
-          off: "关", vuetify: "Vuetify", gsap: "GSAP(EXP)" },
-        save: "保存",
-        saved: "动画设置已应用",
+        speed: "速度",
       },
       cleanup: {
         label: "依赖清理",
@@ -108,7 +104,13 @@ const messages = {
         jijDetectionSubtitle: "开启时将深度扫描模组 JAR 内嵌的子模组；关闭后可显著提升模组扫描速度并保持列表精简",
         saved: "内置依赖检测设置已保存",
       },
-      releaseType: { label: "偏好发行变体", hint: "自动安装时优先选择此发行变体；明确选择或固定的版本不受影响", stable: "稳定版", beta: "Beta 版", alpha: "Alpha 版" },
+      hardwareAcceleration: {
+        label: "硬件加速（Linux）",
+        enabled: "启用 WebView 硬件加速",
+        hint: "强制 WebView 使用 GPU 渲染；修改后需重启应用生效。若出现黑屏或画面异常请关闭",
+        saved: "硬件加速设置已保存，重启应用后生效",
+      },
+      releaseType: { label: "偏好发行变体", hint: "自动安装时优先选择此发行变体；明确选择或固定的版本不受影响", latest: "最新版", stable: "稳定版", beta: "Beta 版", alpha: "Alpha 版" },
       minecraftDir: { label: ".minecraft 目录", choose: "选择目录", valid: "目录有效", invalid: "目录无效或为空" },
       cacheDir: { label: "缓存目录", path: "实际路径", choose: "选择目录", reset: "恢复默认", default: "默认位置", saved: "缓存目录已保存" },
       mcim: { label: "MCIM API 镜像", hint: "切换 Modrinth、CurseForge 的元数据 API；Mod 文件始终从官方平台下载", useMirror: "API 使用 MCIM", save: "保存", saved: "MCIM API 设置已保存" },
@@ -312,6 +314,14 @@ const messages = {
       selectDirTitle: "需要先选择有效的 .minecraft 目录",
       selectDirDesc: "当前目录为空或不可用，请先在左侧底部选择 .minecraft 目录。",
       noMatchingVersions: "没有匹配当前 Minecraft 版本和加载器的版本。",
+      searchIdle: {
+        title: "搜索 Mod",
+        hint: "输入名称、作者或关键词，从 Modrinth 与 CurseForge 查找 Mod。",
+      },
+      searchEmpty: {
+        title: "没有找到匹配的 Mod",
+        hint: "尝试更换关键词，或检查左侧选择的 Minecraft 版本与加载器。",
+      },
       queued: "已加入下载队列",
       queue: {
         title: "下载队列",

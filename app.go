@@ -311,6 +311,10 @@ func (a *App) SavePreferredReleaseTypeSettings(req appstructs.SavePreferredRelea
 	return a.service().SavePreferredReleaseTypeSettings(req)
 }
 
+func (a *App) SaveHardwareAccelerationSettings(req appstructs.SaveHardwareAccelerationSettingsRequest) appstructs.SettingsView {
+	return a.service().SaveHardwareAccelerationSettings(req)
+}
+
 func (a *App) SaveNetworkSettings(req appstructs.SaveNetworkSettingsRequest) appstructs.SettingsView {
 	return a.service().SaveNetworkSettings(req)
 }

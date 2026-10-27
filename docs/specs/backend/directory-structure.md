@@ -553,7 +553,7 @@ Wrong:
 
 ```go
 type Preferences struct {
-    AnimationsEnabled *bool `toml:"animations_enabled" env:"ANIMATIONS_ENABLED"`
+    AutoScanUnusedDependencies *bool `toml:"auto_scan_unused_dependencies" env:"AUTO_SCAN_UNUSED_DEPENDENCIES"`
 }
 ```
 
@@ -561,14 +561,14 @@ Correct:
 
 ```go
 type Preferences struct {
-    AnimationsEnabled *bool `toml:"animations_enabled" json:"animations_enabled"`
+    AutoScanUnusedDependencies *bool `toml:"auto_scan_unused_dependencies" json:"auto_scan_unused_dependencies"`
 }
 
-func (p Preferences) AnimationsEnabledValue() bool {
-    if p.AnimationsEnabled == nil {
-        return true
+func (p Preferences) AutoScanUnusedDependenciesValue() bool {
+    if p.AutoScanUnusedDependencies == nil {
+        return false
     }
-    return *p.AnimationsEnabled
+    return *p.AutoScanUnusedDependencies
 }
 ```
 

@@ -36,29 +36,15 @@
                     <v-card-title>{{ $t('settings.animations.label') }}</v-card-title>
                     <v-card-text>
                         <div class="text-caption text-medium-emphasis mb-2">
-                            {{ $t('settings.animations.mode') }}
+                            {{ $t('settings.animations.speed') }}
                         </div>
-                        <v-btn-toggle v-model="settingsStore.draftAnimationMode" color="primary" density="comfortable"
-                            :disabled="!animationModeSwitchingEnabled" divided mandatory variant="outlined"
-                            class="animation-mode-toggle mb-3"
-                            @update:model-value="settingsStore.scheduleAutoSave('animations')">
-                            <v-btn :value="animationModeOff" size="small">
-                                {{ $t('settings.animations.modes.off') }}
-                            </v-btn>
-                            <v-btn :value="animationModeVuetify" size="small">
-                                {{ $t('settings.animations.modes.vuetify') }}
-                            </v-btn>
-                            <v-btn :value="animationModeGsap" size="small">
-                                {{ $t('settings.animations.modes.gsap') }}
-                            </v-btn>
-                        </v-btn-toggle>
-                        <div class="d-flex align-center gap-2 mb-3">
+                        <div class="d-flex align-center gap-2">
                             <v-slider v-model="settingsStore.draftAnimationDurationMultiplier"
-                                :disabled="animationsDisabled" :min="minAnimationDurationMultiplier"
+                                :min="minAnimationDurationMultiplier"
                                 :max="maxAnimationDurationMultiplier" :step="0.1" density="compact" hide-details
                                 @update:model-value="settingsStore.scheduleAutoSave('animations')" />
                             <v-text-field v-model.number="settingsStore.draftAnimationDurationMultiplier"
-                                :disabled="animationsDisabled" type="number"
+                                type="number"
                                 :min="minAnimationDurationMultiplier" :max="maxAnimationDurationMultiplier"
                                 step="0.1" suffix="x" density="compact" hide-details class="multiplier-input"
                                 @update:model-value="settingsStore.scheduleAutoSave('animations')" />
@@ -99,11 +85,30 @@
                 </v-card>
 
                 <v-card class="mb-4">
+                    <v-card-title>{{ $t('settings.hardwareAcceleration.label') }}</v-card-title>
+                    <v-card-text>
+                        <v-switch
+                            v-model="settingsStore.draftHardwareAcceleration"
+                            color="primary"
+                            density="comfortable"
+                            hide-details
+                            :loading="settingsStore.isSavingHardwareAcceleration"
+                            :label="$t('settings.hardwareAcceleration.enabled')"
+                            @update:model-value="onHardwareAccelerationChange"
+                        />
+                        <div class="text-caption text-medium-emphasis mt-1">
+                            {{ $t('settings.hardwareAcceleration.hint') }}
+                        </div>
+                    </v-card-text>
+                </v-card>
+
+                <v-card class="mb-4">
                     <v-card-title>{{ $t('settings.releaseType.label') }}</v-card-title>
                     <v-card-subtitle>{{ $t('settings.releaseType.hint') }}</v-card-subtitle>
                     <v-card-text>
                         <v-radio-group v-model="settingsStore.draftPreferredReleaseType" hide-details
                             @update:model-value="settingsStore.scheduleAutoSave('releaseType')">
+                            <v-radio value="latest" :label="$t('settings.releaseType.latest')" />
                             <v-radio value="release" :label="$t('settings.releaseType.stable')" />
                             <v-radio value="beta" :label="$t('settings.releaseType.beta')" />
                             <v-radio value="alpha" :label="$t('settings.releaseType.alpha')" />
@@ -246,10 +251,6 @@ import { useSettingsStore } from "../stores/settings";
 import { useMinecraftStore } from "../stores/minecraft";
 import { applyVuetifyTheme } from "../composables/useTheme";
 import {
-    animationModeGsap,
-    animationModeOff,
-    animationModeSwitchingEnabled,
-    animationModeVuetify,
     maxAnimationDurationMultiplier,
     minAnimationDurationMultiplier,
 } from "../composables/useAnimationSettings";
@@ -258,7 +259,6 @@ const { t } = useI18n();
 const settingsStore = useSettingsStore();
 const minecraftStore = useMinecraftStore();
 const snackbar = ref({ show: false, message: "", color: "success" });
-const animationsDisabled = computed(() => settingsStore.draftAnimationMode === animationModeOff);
 const languageOptions = computed(() => [
     { title: t('settings.language.system'), value: 'system' },
     { title: t('settings.language.zh'), value: 'zh' },
@@ -286,6 +286,11 @@ async function onJijDetectionChange() {
     // so the mod list immediately reflects the new nested-jar policy.
     await minecraftStore.refreshSelectedMods();
     snackbar.value = { show: true, message: t('settings.advanced.saved'), color: "success" };
+}
+
+async function onHardwareAccelerationChange() {
+    await settingsStore.saveHardwareAccelerationSettings();
+    snackbar.value = { show: true, message: t('settings.hardwareAcceleration.saved'), color: "success" };
 }
 
 async function chooseCacheDir() {
@@ -323,6 +328,12 @@ function clearModrinth() {
 </script>
 
 <style scoped>
+.settings-page {
+    height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+}
+
 .gap-2 {
     gap: 8px;
 }
@@ -353,15 +364,6 @@ function clearModrinth() {
 
 .multiplier-input {
     max-width: 112px;
-}
-
-.animation-mode-toggle {
-    width: 100%;
-}
-
-.animation-mode-toggle :deep(.v-btn) {
-    flex: 1 1 0;
-    min-width: 0;
 }
 
 .network-settings-grid {

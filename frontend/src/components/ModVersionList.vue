@@ -206,6 +206,7 @@ const riskTooltip = (version: models.ModVersion) => {
 .mod-version-list {
     max-height: calc(100vh - 160px);
     overflow-y: auto;
+    padding-inline-end: 16px;
 }
 
 .mod-version-list__installed {

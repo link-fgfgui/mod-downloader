@@ -1,64 +1,29 @@
 import { gsap } from "gsap";
-import { readonly, ref } from "vue";
 
-const animationModeOff = "off";
-const animationModeVuetify = "vuetify";
-const animationModeGsap = "gsap";
-const defaultAnimationMode = animationModeVuetify;
-const animationModeSwitchingEnabled = false;
 const defaultAnimationDurationMultiplier = 1;
 const minAnimationDurationMultiplier = 0.1;
 const maxAnimationDurationMultiplier = 3;
 
 const baseDurations = {
     fast: 120,
-    normal: 220,
-    slow: 360,
-    stagger: 40,
+    normal: 180,
+    slow: 240,
 };
 
-const pageContentSelector = [
-    ".v-card",
-    ".v-data-table",
-    ".v-data-table__tr",
-    ".v-alert",
-    "h1",
-    ".empty-state",
-    ".search-controls",
-    ".manage-header",
-    ".md-stagger > *",
-].join(", ");
+const routeEnterDuration = 0.18;
+const routeLeaveDuration = 0.1;
+const routeEnterOffset = 8;
+const routeLeaveOffset = -4;
+const finishGuardPaddingMs = 400;
 
-type AnimationMode = typeof animationModeOff | typeof animationModeVuetify | typeof animationModeGsap;
-
-const activeAnimationMode = ref<AnimationMode>(defaultAnimationMode);
-const activeGsapElements = new Set<Element>();
+const routeLeaveClass = "route-leave-active";
+const activeTimelines = new WeakMap<Element, ReturnType<typeof gsap.timeline>>();
 const pendingGsapDone = new Map<Element, () => void>();
+const finishGuards = new WeakMap<Element, number>();
 
 export type AnimationSettings = {
-    animationMode?: string;
-    animationEnabled?: boolean;
     animationDurationMultiplier?: number;
 };
-
-export function normalizeAnimationMode(value: unknown, legacyEnabled?: boolean): AnimationMode {
-    if (!animationModeSwitchingEnabled) return defaultAnimationMode;
-
-    const mode = typeof value === "string" ? value.trim().toLowerCase() : "";
-    if (mode === animationModeOff || mode === "0" || mode === "false" || mode === "disabled") {
-        return animationModeOff;
-    }
-    if (mode === animationModeVuetify || mode === "1" || mode === "true" || mode === "enabled" || mode === "on") {
-        return animationModeVuetify;
-    }
-    if (mode === animationModeGsap || mode === "2") {
-        return animationModeGsap;
-    }
-    if (typeof legacyEnabled === "boolean") {
-        return legacyEnabled ? animationModeVuetify : animationModeOff;
-    }
-    return defaultAnimationMode;
-}
 
 export function normalizeAnimationDurationMultiplier(value: unknown): number {
     const numeric = typeof value === "number" ? value : Number(value);
@@ -66,26 +31,12 @@ export function normalizeAnimationDurationMultiplier(value: unknown): number {
     return Math.min(maxAnimationDurationMultiplier, Math.max(minAnimationDurationMultiplier, numeric));
 }
 
-export function animationModeEnabled(mode: unknown): boolean {
-    return normalizeAnimationMode(mode) !== animationModeOff;
-}
-
-export function useActiveAnimationMode() {
-    return readonly(activeAnimationMode);
-}
-
 export function applyAnimationSettings(settings?: AnimationSettings | null) {
-    const root = document.documentElement;
-    const mode = normalizeAnimationMode(settings?.animationMode, settings?.animationEnabled);
     const multiplier = normalizeAnimationDurationMultiplier(settings?.animationDurationMultiplier);
-
-    if (activeAnimationMode.value !== mode) cleanupActiveGsapAnimations();
-    activeAnimationMode.value = mode;
-    root.dataset.mdAnimations = mode;
+    const root = document.documentElement;
     root.style.setProperty("--md-transition-fast", `${baseDurations.fast * multiplier}ms`);
     root.style.setProperty("--md-transition-normal", `${baseDurations.normal * multiplier}ms`);
     root.style.setProperty("--md-transition-slow", `${baseDurations.slow * multiplier}ms`);
-    root.style.setProperty("--md-stagger-delay", `${baseDurations.stagger * multiplier}ms`);
 }
 
 function prefersReducedMotion(): boolean {
@@ -94,131 +45,129 @@ function prefersReducedMotion(): boolean {
 
 function gsapDuration(baseSeconds: number): number {
     if (prefersReducedMotion()) return 0;
-    const root = document.documentElement;
-    const normal = root.style.getPropertyValue("--md-transition-normal");
+    const normal = document.documentElement.style.getPropertyValue("--md-transition-normal");
     const normalMs = Number.parseFloat(normal);
     const multiplier = Number.isFinite(normalMs) && normalMs > 0 ? normalMs / baseDurations.normal : 1;
     return Math.max(0, baseSeconds * multiplier);
 }
 
-function clearGsapProps(el: Element | Element[]) {
-    gsap.set(el, { clearProps: "opacity,transform,scale,rotation" });
+function settleOnce(done: () => void): () => void {
+    let called = false;
+    return () => {
+        if (called) return;
+        called = true;
+        done();
+    };
 }
 
-function trackGsapElements(elements: Element[]) {
-    elements.forEach((element) => activeGsapElements.add(element));
+function clearFinishGuard(el: Element) {
+    const timer = finishGuards.get(el);
+    if (timer === undefined) return;
+    window.clearTimeout(timer);
+    finishGuards.delete(el);
 }
 
-function finishGsapAnimation(root: Element, elements: Element[], done?: () => void) {
-    clearGsapProps(elements);
-    elements.forEach((element) => activeGsapElements.delete(element));
-    pendingGsapDone.delete(root);
-    done?.();
+function killTimeline(el: Element) {
+    activeTimelines.get(el)?.kill();
+    activeTimelines.delete(el);
+    clearFinishGuard(el);
 }
 
-export function cleanupActiveGsapAnimations() {
-    const elements = [...activeGsapElements];
-    if (elements.length > 0) {
-        gsap.killTweensOf(elements);
-        clearGsapProps(elements);
-    }
-    activeGsapElements.clear();
-    const callbacks = [...new Set(pendingGsapDone.values())];
-    pendingGsapDone.clear();
-    callbacks.forEach((done) => done());
+function settlePendingDone(el: Element) {
+    const pending = pendingGsapDone.get(el);
+    if (!pending) return;
+    pendingGsapDone.delete(el);
+    pending();
 }
 
-function getPageContentTargets(root: Element, selector = pageContentSelector): Element[] {
-    return Array.from(root.querySelectorAll(selector));
+function finishGsapAnimation(el: Element) {
+    activeTimelines.delete(el);
+    clearFinishGuard(el);
+    gsap.killTweensOf(el);
+    gsap.set(el, { clearProps: "opacity,transform" });
+    el.classList.remove(routeLeaveClass);
+    settlePendingDone(el);
 }
 
-function getVisiblePageContentTargets(root: Element, selector = pageContentSelector): Element[] {
-    return getPageContentTargets(root, selector).filter((el) => {
-        const rect = el.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0;
+// Every JS-driven transition gets a wall-clock fallback. If rAF is throttled,
+// a timeline is killed, or a component unmounts mid-flight, the Vue transition
+// `done` callback still fires instead of leaving the router stuck.
+function armFinishGuard(el: Element, seconds: number) {
+    clearFinishGuard(el);
+    const timer = window.setTimeout(() => {
+        finishGuards.delete(el);
+        killTimeline(el);
+        finishGsapAnimation(el);
+    }, gsapDuration(seconds) * 1000 + finishGuardPaddingMs);
+    finishGuards.set(el, timer);
+}
+
+function playTimeline(el: Element, done: () => void, guardSeconds: number, config: gsap.TweenVars) {
+    pendingGsapDone.set(el, settleOnce(done));
+    armFinishGuard(el, guardSeconds);
+    const timeline = gsap.timeline({
+        onComplete: () => finishGsapAnimation(el),
     });
-}
-
-function routeAnimationTargets(el: Element): Element[] {
-    return [el, ...getVisiblePageContentTargets(el)];
+    activeTimelines.set(el, timeline);
+    timeline.to(el, config);
 }
 
 export function beforeGsapRouteEnter(el: Element) {
-    const targets = [el, ...getVisiblePageContentTargets(el)];
-    gsap.killTweensOf(targets);
-    trackGsapElements(targets);
-    gsap.set(el, { opacity: 0 });
-    if (targets.length > 1) {
-        gsap.set(targets.slice(1), { opacity: 0, y: 24, scale: 0.985 });
-    }
+    killTimeline(el);
+    settlePendingDone(el);
+    el.classList.remove(routeLeaveClass);
+    gsap.killTweensOf(el);
+    gsap.set(el, { opacity: 0, y: routeEnterOffset });
 }
 
 export function enterGsapRoute(el: Element, done: () => void) {
-    const targets = getVisiblePageContentTargets(el);
-    const allTargets = [el, ...targets];
-    trackGsapElements(allTargets);
-    pendingGsapDone.set(el, done);
-    const timeline = gsap.timeline({
-        onComplete: () => finishGsapAnimation(el, allTargets, done),
-    });
-
-    timeline.to(el, {
+    playTimeline(el, done, routeEnterDuration, {
         opacity: 1,
-        duration: gsapDuration(0.32),
+        y: 0,
+        duration: gsapDuration(routeEnterDuration),
         ease: "expo.out",
-    }, 0);
-
-    if (targets.length > 0) {
-        timeline.to(targets, {
-            opacity: 1,
-            y: 0,
-            scale: 1,
-            duration: gsapDuration(0.42),
-            ease: "power3.out",
-            stagger: {
-                each: gsapDuration(0.05),
-                from: "start",
-            },
-        }, 0.06);
-    }
+    });
 }
 
 export function leaveGsapRoute(el: Element, done: () => void) {
-    const targets = routeAnimationTargets(el);
-    gsap.killTweensOf(targets);
-    trackGsapElements(targets);
-    pendingGsapDone.set(el, done);
-    gsap.to(el, {
+    killTimeline(el);
+    settlePendingDone(el);
+    gsap.killTweensOf(el);
+    el.classList.add(routeLeaveClass);
+    playTimeline(el, done, routeLeaveDuration, {
         opacity: 0,
-        duration: gsapDuration(0.26),
-        ease: "power2.in",
-        onComplete: () => finishGsapAnimation(el, targets, done),
+        y: routeLeaveOffset,
+        duration: gsapDuration(routeLeaveDuration),
+        ease: "power1.in",
     });
 }
 
 export function afterGsapRouteLeave(el: Element) {
-    finishGsapAnimation(el, routeAnimationTargets(el));
+    finishGsapAnimation(el);
 }
 
 export function beforeGsapFabEnter(el: Element) {
+    killTimeline(el);
+    settlePendingDone(el);
     gsap.killTweensOf(el);
-    trackGsapElements([el]);
     gsap.set(el, {
         opacity: 0,
-        scale: 0.35,
-        x: 30,
-        y: 30,
-        rotation: 18,
+        scale: 0.55,
+        x: 20,
+        y: 20,
+        rotation: 8,
         transformOrigin: "center center",
     });
 }
 
 export function enterGsapFab(el: Element, done: () => void) {
-    trackGsapElements([el]);
-    pendingGsapDone.set(el, done);
+    const settle = settleOnce(done);
+    pendingGsapDone.set(el, settle);
+    armFinishGuard(el, 0.65);
     const timeline = gsap.timeline({
-        onComplete: () => finishGsapAnimation(el, [el], done),
+        onComplete: () => finishGsapAnimation(el),
     });
+    activeTimelines.set(el, timeline);
 
     timeline
         .to(el, {
@@ -227,55 +176,54 @@ export function enterGsapFab(el: Element, done: () => void) {
             x: 0,
             y: 0,
             rotation: 0,
-            duration: gsapDuration(0.55),
-            ease: "elastic.out(1, 0.65)",
+            duration: gsapDuration(0.45),
+            ease: "back.out(1.5)",
         })
         .to(el, {
-            scaleX: 1.08,
+            scaleX: 1.06,
             scaleY: 0.94,
-            duration: gsapDuration(0.09),
+            duration: gsapDuration(0.08),
             ease: "power2.out",
-        }, `-=${gsapDuration(0.08)}`)
+        }, `-=${gsapDuration(0.06)}`)
         .to(el, {
             scaleX: 1,
             scaleY: 1,
-            duration: gsapDuration(0.16),
+            duration: gsapDuration(0.14),
             ease: "back.out(2)",
         });
 }
 
 export function leaveGsapFab(el: Element, done: () => void) {
+    killTimeline(el);
+    settlePendingDone(el);
     gsap.killTweensOf(el);
-    trackGsapElements([el]);
-    pendingGsapDone.set(el, done);
+    const settle = settleOnce(done);
+    pendingGsapDone.set(el, settle);
+    armFinishGuard(el, 0.27);
     const timeline = gsap.timeline({
-        onComplete: () => finishGsapAnimation(el, [el], done),
+        onComplete: () => finishGsapAnimation(el),
     });
+    activeTimelines.set(el, timeline);
 
     timeline
         .to(el, {
-            scale: 1.08,
-            duration: gsapDuration(0.08),
+            scale: 1.05,
+            duration: gsapDuration(0.07),
             ease: "power2.out",
         })
         .to(el, {
             opacity: 0,
-            scale: 0.35,
-            x: 26,
-            y: 26,
-            rotation: 16,
-            duration: gsapDuration(0.24),
-            ease: "power3.in",
+            scale: 0.55,
+            x: 16,
+            y: 16,
+            rotation: 6,
+            duration: gsapDuration(0.2),
+            ease: "power2.in",
         });
 }
 
 export {
-    animationModeGsap,
-    animationModeOff,
-    animationModeSwitchingEnabled,
-    animationModeVuetify,
-    defaultAnimationMode,
     defaultAnimationDurationMultiplier,
-    minAnimationDurationMultiplier,
     maxAnimationDurationMultiplier,
+    minAnimationDurationMultiplier,
 };

@@ -1,14 +1,7 @@
 <template>
-    <v-container class="download-page pb-6 px-6 pt-0 md-page" fluid>
-        <div
-            :class="[
-                'search-spacer',
-                { 'search-spacer--expanded': isEmptySearch },
-            ]"
-        ></div>
-
+    <v-container class="download-page pb-6 px-6 pt-0" fluid>
         <div class="search-controls">
-            <v-row class="align-center md-stagger" density="comfortable">
+            <v-row class="align-center" density="comfortable">
                 <v-col cols="12" md="10">
                     <v-text-field
                         v-model="searchText"
@@ -38,30 +31,38 @@
             </v-row>
         </div>
 
-        <div
-            :class="[
-                'search-spacer',
-                { 'search-spacer--expanded': isEmptySearch },
-            ]"
-        ></div>
+        <Transition name="md-fade-slide" mode="out-in">
+            <div v-if="isEmptySearch" key="empty" class="search-empty">
+                <v-icon
+                    :icon="hasSearchQuery ? 'mdi-file-search-outline' : 'mdi-compass-outline'"
+                    color="primary"
+                    size="56"
+                ></v-icon>
+                <div class="text-h6 mt-4">
+                    {{ hasSearchQuery ? $t("download.searchEmpty.title") : $t("download.searchIdle.title") }}
+                </div>
+                <div class="text-body-2 text-medium-emphasis mt-2">
+                    {{ hasSearchQuery ? $t("download.searchEmpty.hint") : $t("download.searchIdle.hint") }}
+                </div>
+            </div>
 
-        <SearchResultList
-            :class="[
-                'search-result-list',
-                { 'search-result-list--empty': isEmptySearch },
-            ]"
-            :results="searchResults"
-            :loading-more="isLoadingMore"
-            :has-more="hasMoreResults"
-            :states="downloadStates"
-            :downloading-keys="downloadingKeys"
-            @install="installMod"
-            @load-more="loadMoreSearchResults"
-            @show-versions="openVersionsOverlay"
-            @batch-download="batchDownload"
-            @batch-unpin="batchUnpin"
-            @add-favorite="openAddFavorites"
-        ></SearchResultList>
+            <SearchResultList
+                v-else
+                key="results"
+                class="search-result-list"
+                :results="searchResults"
+                :loading-more="isLoadingMore"
+                :has-more="hasMoreResults"
+                :states="downloadStates"
+                :downloading-keys="downloadingKeys"
+                @install="installMod"
+                @load-more="loadMoreSearchResults"
+                @show-versions="openVersionsOverlay"
+                @batch-download="batchDownload"
+                @batch-unpin="batchUnpin"
+                @add-favorite="openAddFavorites"
+            ></SearchResultList>
+        </Transition>
 
         <v-overlay
             v-model="showDirOverlay"
@@ -72,12 +73,12 @@
             scrim="surface"
         >
             <v-card
-                class="pa-6 text-center md-animate-scale"
+                class="pa-6 text-center"
                 max-width="420"
                 variant="elevated"
             >
                 <v-icon
-                    class="mb-3 md-animate-pulse"
+                    class="mb-3"
                     color="warning"
                     icon="mdi-folder-alert"
                     size="48"
@@ -138,11 +139,10 @@
 
         <v-dialog
             v-model="confirmDialog.show"
-            transition="scale-fade"
             max-width="420"
             @after-leave="clearClosedConfirmDialog"
         >
-            <v-card class="md-animate-scale">
+            <v-card>
                 <v-card-title class="text-h6">
                     {{ $t(confirmDialogTitleKey) }}
                 </v-card-title>
@@ -172,12 +172,11 @@
 
         <v-dialog
             :model-value="preflightDialog.show"
-            transition="scale-fade"
             max-width="560"
             @update:model-value="onPreflightDialogModel"
             @after-leave="clearClosedPreflightDialog"
         >
-            <v-card class="md-animate-scale">
+            <v-card>
                 <v-card-title class="text-h6">
                     {{ $t("download.preflight.title") }}
                 </v-card-title>
@@ -219,11 +218,10 @@
 
         <v-dialog
             :model-value="batchConfirmDialog.show"
-            transition="scale-fade"
             max-width="560"
             @update:model-value="onBatchDialogModel"
         >
-            <v-card class="md-animate-scale">
+            <v-card>
                 <v-card-title class="text-h6">
                     {{ $t("download.confirmReplace.batchIncompatibleTitle") }}
                 </v-card-title>
@@ -308,6 +306,7 @@ const {
 const isEmptySearch = computed(
     () => !searchResults.value.length && !isSearching.value,
 );
+const hasSearchQuery = computed(() => searchText.value.trim().length > 0);
 
 const searchMods = () => downloadStore.runSearch();
 const loadMoreSearchResults = () => downloadStore.loadMoreSearchResults();
@@ -454,19 +453,10 @@ watch(
 .download-page {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 32px);
+    height: 100%;
     max-width: 960px;
     min-height: 0;
     overflow: hidden;
-}
-
-.search-spacer {
-    flex: 0 0 0;
-    transition: flex 0.4s var(--md-ease-out);
-}
-
-.search-spacer--expanded {
-    flex: 1 1 0;
 }
 
 .search-controls {
@@ -474,18 +464,20 @@ watch(
     padding-top: 12px;
 }
 
+.search-empty {
+    align-items: center;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 0;
+    padding-bottom: 96px;
+    text-align: center;
+}
+
 .search-result-list {
     flex: 1 1 auto;
     min-height: 0;
-    transition:
-        flex 0.4s var(--md-ease-out),
-        opacity 0.4s var(--md-ease-out);
-}
-
-.search-result-list--empty {
-    flex: 0 0 0 !important;
-    min-height: 0 !important;
-    opacity: 0;
 }
 
 .version-overlay {
@@ -497,11 +489,13 @@ watch(
     gap: 10px;
     max-height: min(320px, 52vh);
     overflow-y: auto;
+    padding-inline-end: 16px;
 }
 
 .download-preflight-list {
     max-height: min(320px, 52vh);
     overflow-y: auto;
+    padding-inline-end: 16px;
 }
 
 .batch-conflict-entry {

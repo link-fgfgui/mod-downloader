@@ -1,8 +1,8 @@
 <template>
     <v-divider></v-divider>
     <div class="pa-2 position-relative">
-        <transition name="md-expand">
-            <div v-show="isExpanded" class="md-animate-fade-up">
+        <v-expand-transition>
+            <div v-show="isExpanded">
                 <div class="d-flex align-center" style="gap: 8px">
                     <v-select
                         v-model="selectedVersionName"
@@ -58,7 +58,7 @@
                     @click="selectFolder"
                 ></v-text-field>
             </div>
-        </transition>
+        </v-expand-transition>
         <div
             v-show="!isExpanded"
             class="version-rail-summary"

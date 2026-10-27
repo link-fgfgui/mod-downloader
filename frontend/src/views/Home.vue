@@ -1,5 +1,5 @@
 <template>
-  <v-container class="home-page pa-4 pa-sm-6 md-page" fluid>
+  <v-container class="home-page pa-4 pa-sm-6" fluid>
     <header class="dashboard-header">
       <div>
         <div class="text-overline text-primary font-weight-bold">{{ $t("home.kicker") }}</div>
@@ -144,9 +144,11 @@ onDeactivated(() => {
 
 <style scoped>
 .home-page {
+  height: 100%;
   margin: 0 auto;
   max-width: 1180px;
-  min-height: calc(100vh - 24px);
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .dashboard-header,

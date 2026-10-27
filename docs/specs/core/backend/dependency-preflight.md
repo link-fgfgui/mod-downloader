@@ -11,7 +11,10 @@ resolution instead of re-implementing it:
 
 - **Target version**: `modbridge.ResolveVersion` (explicit `VersionID`, then the
   pinned version, then the preferred release type). Never re-derive the ordering:
-  a pinned mod would otherwise be analyzed at the wrong version.
+  a pinned mod would otherwise be analyzed at the wrong version. The preferred
+  release type defaults to `latest` (no channel filter, so the newest matching
+  version wins); `release`/`beta`/`alpha` restrict the channel and fall back to
+  all versions when no version of that channel exists.
 - **Dependency status**: `modbridge.InstallStatusPrecise` on the request built by
   `modbridge.DependencyDownloadRequest`. `new` → `missing`, `installed` →
   `fulfilled`, anything else (`update`/`conflict`) → `conflict`. The downloader

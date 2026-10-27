@@ -63,6 +63,22 @@ test("flatten honors expanded keys and depth", () => {
     assert.deepEqual(expanded.map((row) => row.node.name), ["A", "B", "C"]);
 });
 
+test("shared dependency occurrences get distinct, stable row keys", () => {
+    const graph = buildModDependencyGraph([
+        mod({ id: "a", path: "/a.jar", name: "A", dependencies: [{ modId: "c", type: "required" }] }),
+        mod({ id: "b", path: "/b.jar", name: "B", dependencies: [{ modId: "c", type: "required" }] }),
+        mod({ id: "c", path: "/c.jar", name: "C" }),
+    ]);
+    const partiallyExpanded = flattenModDependencyTree(graph.roots, new Set(["/a.jar"]));
+    assert.deepEqual(partiallyExpanded.map((row) => row.node.name), ["A", "C", "B"]);
+
+    const fullyExpanded = flattenModDependencyTree(graph.roots, new Set(["/a.jar", "/b.jar"]));
+    assert.deepEqual(fullyExpanded.map((row) => row.node.name), ["A", "C", "B", "C"]);
+    assert.equal(new Set(fullyExpanded.map((row) => row.key)).size, fullyExpanded.length);
+    // Expanding B must not change the keys of the rows above it.
+    assert.deepEqual(fullyExpanded.slice(0, 3).map((row) => row.key), partiallyExpanded.map((row) => row.key));
+});
+
 test("dependency cycles still produce a root and a bounded tree", () => {
     const graph = buildModDependencyGraph([
         mod({ id: "a", path: "/a.jar", name: "A", dependencies: [{ modId: "b", type: "required" }] }),
@@ -159,6 +175,18 @@ test("related keys cover both dependency directions", () => {
     assert.deepEqual([...relations.dependencies], ["/c.jar"]);
     assert.deepEqual([...relations.dependents].sort(), ["/a.jar", "/d.jar"]);
     assert.deepEqual([...collectRelatedTreeKeys(graph.roots, "").dependencies], []);
+});
+
+test("related keys stay bounded for shared subtrees and cycles", () => {
+    const graph = buildModDependencyGraph([
+        mod({ id: "a", path: "/a.jar", name: "A", dependencies: [{ modId: "b", type: "required" }, { modId: "c", type: "required" }] }),
+        mod({ id: "b", path: "/b.jar", name: "B", dependencies: [{ modId: "d", type: "required" }] }),
+        mod({ id: "c", path: "/c.jar", name: "C", dependencies: [{ modId: "d", type: "required" }] }),
+        mod({ id: "d", path: "/d.jar", name: "D", dependencies: [{ modId: "a", type: "required" }] }),
+    ]);
+    const relations = collectRelatedTreeKeys(graph.roots, "/a.jar");
+    assert.deepEqual([...relations.dependencies].sort(), ["/b.jar", "/c.jar", "/d.jar"]);
+    assert.deepEqual([...relations.dependents].sort(), ["/b.jar", "/c.jar", "/d.jar"]);
 });
 
 test("reverse dependents apply required-only, enabled, and pseudo filtering", () => {

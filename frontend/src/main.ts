@@ -5,6 +5,7 @@ import vuetify from "./plugins/vuetify";
 import router from "./router";
 import i18n, { applyLanguagePreference } from "./plugins/i18n";
 import { GetPreferences } from "../wailsjs/go/main/App";
+import "./style.css";
 import "./styles/animations.css";
 
 async function bootstrap() {

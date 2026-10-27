@@ -10,17 +10,15 @@ import {
     SaveMCIMSettings,
     SaveJijDetectionSettings,
     SavePreferredReleaseTypeSettings,
+    SaveHardwareAccelerationSettings,
     SaveNetworkSettings,
     SaveCacheDirPreference,
     ChooseCacheDir,
 } from "../../wailsjs/go/main/App";
 import type { structs } from "../../wailsjs/go/models";
 import {
-    animationModeEnabled,
     applyAnimationSettings,
-    defaultAnimationMode,
     defaultAnimationDurationMultiplier,
-    normalizeAnimationMode,
     normalizeAnimationDurationMultiplier,
 } from "../composables/useAnimationSettings";
 import {
@@ -47,18 +45,19 @@ export const useSettingsStore = defineStore("settings", {
         isSavingUnusedDependencyCleanup: false,
         isSavingMCIM: false,
         isSavingJijDetection: false,
+        isSavingHardwareAcceleration: false,
         isSavingKeys: false,
         isSavingCacheDir: false,
         isChoosingCacheDir: false,
         draftTheme: "",
         draftLanguage: languageSystem,
-        draftAnimationMode: defaultAnimationMode,
         draftAnimationDurationMultiplier: defaultAnimationDurationMultiplier,
         draftSimpleMode: false,
         draftAutoScanUnusedDependencies: false,
         draftMCIMEnabled: false,
         draftEnableJijDetection: true,
-        draftPreferredReleaseType: "release",
+        draftHardwareAcceleration: true,
+        draftPreferredReleaseType: "latest",
         draftFileConcurrency: 4,
         draftConcurrentDownloads: 1,
         draftAdaptiveFileConcurrency: false,
@@ -103,10 +102,6 @@ export const useSettingsStore = defineStore("settings", {
                 this.view = await GetSettings();
                 this.draftTheme = this.view?.theme || themeDark;
                 this.draftLanguage = normalizeLanguagePreference(this.view?.language);
-                this.draftAnimationMode = normalizeAnimationMode(
-                    this.view?.animationMode,
-                    this.view?.animationEnabled
-                );
                 this.draftAnimationDurationMultiplier = normalizeAnimationDurationMultiplier(
                     this.view?.animationDurationMultiplier ?? defaultAnimationDurationMultiplier
                 );
@@ -114,7 +109,8 @@ export const useSettingsStore = defineStore("settings", {
                 this.draftAutoScanUnusedDependencies = this.view?.autoScanUnusedDependencies ?? false;
                 this.draftMCIMEnabled = this.view?.mcimEnabled ?? false;
                 this.draftEnableJijDetection = this.view?.enableJijDetection ?? true;
-                this.draftPreferredReleaseType = this.view?.preferredReleaseType || "release";
+                this.draftHardwareAcceleration = this.view?.hardwareAcceleration ?? true;
+                this.draftPreferredReleaseType = this.view?.preferredReleaseType || "latest";
                 this.draftFileConcurrency = this.view?.fileConcurrency ?? 4;
                 this.draftConcurrentDownloads = this.view?.concurrentDownloads ?? 1;
                 this.draftAdaptiveFileConcurrency = this.view?.adaptiveFileConcurrency ?? false;
@@ -156,27 +152,18 @@ export const useSettingsStore = defineStore("settings", {
         async saveAnimationSettings() {
             this.isSavingAnimations = true;
             try {
-                const animationMode = normalizeAnimationMode(this.draftAnimationMode);
                 const req = {
-                    animationMode,
-                    animationEnabled: animationModeEnabled(animationMode),
                     animationDurationMultiplier: normalizeAnimationDurationMultiplier(
                         this.draftAnimationDurationMultiplier
                     ),
                 };
                 this.view = await SaveAnimationSettings(req);
-                this.draftAnimationMode = normalizeAnimationMode(this.view.animationMode, this.view.animationEnabled);
                 this.draftAnimationDurationMultiplier = normalizeAnimationDurationMultiplier(
                     this.view.animationDurationMultiplier
                 );
-                // Single source of truth: apply the persisted result live so both
-                // mode AND duration-multiplier changes take effect immediately.
+                // Single source of truth: apply the persisted duration live.
                 applyAnimationSettings(this.view);
-                return {
-                    animationMode: this.draftAnimationMode,
-                    animationEnabled: animationModeEnabled(this.draftAnimationMode),
-                    animationDurationMultiplier: this.draftAnimationDurationMultiplier,
-                };
+                return this.draftAnimationDurationMultiplier;
             } finally {
                 this.isSavingAnimations = false;
             }
@@ -221,6 +208,18 @@ export const useSettingsStore = defineStore("settings", {
                 return this.view;
             } finally {
                 this.isSavingJijDetection = false;
+            }
+        },
+        async saveHardwareAccelerationSettings() {
+            this.isSavingHardwareAcceleration = true;
+            try {
+                this.view = await SaveHardwareAccelerationSettings({
+                    hardwareAcceleration: this.draftHardwareAcceleration,
+                });
+                this.draftHardwareAcceleration = this.view.hardwareAcceleration;
+                return this.view;
+            } finally {
+                this.isSavingHardwareAcceleration = false;
             }
         },
         async savePreferredReleaseTypeSettings() {

@@ -75,6 +75,22 @@ function clearActionBarSnapshot() {
 Do not keep the real selection alive just to preserve exit text; that changes
 behavior outside the visual leave lifecycle.
 
+### Don't: Rely on page `height: 100%` without the shell stylesheet
+
+**Problem**: Page roots and virtual lists use `height: 100%`, but the fixed
+application shell (`src/style.css`: `html/body/#app`, `.v-application__wrap`,
+`.v-main`, `.route-stage`) is not imported by `frontend/src/main.ts`.
+
+**Why it's bad**: `height: 100%` resolves against an auto-height parent, so a
+long virtual list grows the page instead of scrolling inside it. The floating
+selection action bar is anchored with `position: absolute; bottom: 16px` inside
+the list wrapper, so it lands thousands of pixels below the viewport and looks
+like it never rendered. Short lists hide the bug.
+
+**Instead**: Keep `import "./style.css"` in `frontend/src/main.ts` and verify a
+long list (60+ rows) keeps the action bar inside the window, including at small
+viewport heights.
+
 ## Queue or Backend-Driven Surfaces
 
 When a backend event can replace active state with an inactive or empty payload,
@@ -152,39 +168,45 @@ the wrapper becomes visible or changes size. Calling `calculateVisibleItems`
 alone is insufficient because it calculates from Vuetify's cached scroll
 offset instead of reading the current DOM offset.
 
-Do not attach CSS or GSAP entrance animations to virtualized rows. Recycling an
+Do not attach page-level entrance animations to virtualized rows. Recycling an
 animated row during a scrollbar drag causes flashes, unnecessary main-thread
 work, and a changing scroll range. Hover and direct-interaction transitions are
 allowed because they do not run as rows enter the viewport.
 
 Route-level GSAP animation must obey these contracts:
 
-- Exclude `.v-list-item` from global page-content targets.
-- Animate the route root with opacity only. Never translate or scale a root
-  containing scrollable content, because that also moves or scales scrollbars.
-- Select visible content targets before both hiding and animating them. Do not
-  hide inactive dialogs or other zero-size targets that the matching enter
-  animation will not restore.
-- Animation-off mode must not apply Vue route transition classes. CSS animation
-  utilities must use their final visible state instead of a `0.01ms` first
-  keyframe.
+- Only the page root animates. There are no page-content targets: no `.v-card`,
+  `h1`, `.v-list-item`, or `.v-data-table__tr` entrance, because virtualized rows
+  recycle and must never animate.
+- Enter is `opacity 0→1` plus `y 8→0`; leave is `opacity 1→0` plus `y 0→-4`.
+  Never scale the root.
+- Use `mode="out-in"`. The outgoing page stays in flow, so it must not be
+  absolutely positioned. The fixed `.route-stage` (`overflow: hidden`) keeps the
+  height stable.
+- Every enter/leave path calls `done` exactly once through
+  `finishGsapAnimation()`. `armFinishGuard()` fires a fallback `done` within
+  `duration + 400ms`, so a throttled rAF or a killed timeline cannot hang the
+  router.
+- The page root owns scrolling (`height: 100%`) and the shell never scrolls.
+  Scroll containers reserve `padding-inline-end: 16px` for WebKitGTK overlay
+  scrollbars; `scrollbar-gutter` is unsupported there.
 
 Correct:
 
 ```ts
-const targets = getVisiblePageContentTargets(routeRoot);
-gsap.set(routeRoot, { opacity: 0 });
-gsap.set(targets, { opacity: 0, y: 24 });
+gsap.set(pageRoot, { opacity: 0, y: 8 });
+gsap.to(pageRoot, { opacity: 1, y: 0, duration: gsapDuration(0.18), ease: "expo.out" });
 ```
 
 Wrong:
 
 ```ts
-const targets = routeRoot.querySelectorAll(".v-list-item, .v-card");
-gsap.set(routeRoot, { opacity: 0, y: 20, scale: 0.985 });
-gsap.set(targets, { opacity: 0 }); // Also hides inactive dialog content.
+const targets = pageRoot.querySelectorAll(".v-card, .v-list-item");
+gsap.set(targets, { opacity: 0, y: 12 }); // Per-element stagger; recycles rows.
+pageRoot.classList.add("route-leave-active"); // Must not become absolute.
 ```
 
-Verification must cover animation modes `off`, `vuetify`, and `gsap`; rapid
-scrollbar dragging; route leave/re-entry; and opening content that was hidden
-during the initial route enter. Always run frontend lint and production build.
+Verification must cover rapid navigation, the Manage list/tree switch, picking
+from a select/combobox, dragging virtual-list scrollbars, route leave/re-entry,
+and opening content that was hidden during the initial route enter. Always run
+frontend lint and production build.

@@ -386,14 +386,19 @@ export function collectRelatedTreeKeys(roots: ModTreeNode[], selectedKey: string
     const selected = index.get(selectedKey);
     if (!selected) return { dependencies, dependents };
 
-    const walkDown = (node: ModTreeNode, ancestors: Set<string>) => {
+    // The highlighted set is global, so one visited set is enough. Re-walking a
+    // shared subtree for every parent path would go exponential on modpacks
+    // where many mods depend on the same library graph.
+    const visited = new Set([selected.key]);
+    const walkDown = (node: ModTreeNode) => {
         for (const child of node.children) {
-            if (ancestors.has(child.key)) continue;
+            if (visited.has(child.key)) continue;
+            visited.add(child.key);
             dependencies.add(child.key);
-            walkDown(child, new Set(ancestors).add(child.key));
+            walkDown(child);
         }
     };
-    walkDown(selected, new Set([selected.key]));
+    walkDown(selected);
 
     const walkUp = (node: ModTreeNode, seen: Set<string>) => {
         for (const parentKey of node.parents) {
@@ -448,6 +453,8 @@ export function findReverseDependents(
 }
 
 export interface FlattenedTreeRow {
+    /** Stable per-occurrence key built from the ancestor path. */
+    key: string;
     node: ModTreeNode;
     depth: number;
     hasChildren: boolean;
@@ -467,13 +474,17 @@ const isVisible = (node: ModTreeNode, options: FlattenTreeOptions) =>
     !options.visibleKeys || options.visibleKeys.has(node.key);
 
 // Flatten the forest into indented rows for list rendering, honoring the set of
-// expanded keys and guarding against cycles / excessive depth.
+// expanded keys and guarding against cycles / excessive depth. A shared
+// dependency can appear under several parents, so the row key is the ancestor
+// path (not the node key and never the array index): expanding one branch must
+// not re-key the rows after it.
 export function flattenModDependencyTree(
     roots: ModTreeNode[],
     expandedKeys: Set<string>,
     options: FlattenTreeOptions = {},
     depth = 0,
     ancestors: Set<string> = new Set(),
+    parentRowKey = "",
 ): FlattenedTreeRow[] {
     const rows: FlattenedTreeRow[] = [];
     for (const node of roots) {
@@ -481,10 +492,11 @@ export function flattenModDependencyTree(
         const visibleChildren = node.children.filter((child) => isVisible(child, options));
         const hasChildren = visibleChildren.length > 0 && depth < MAX_VISIBLE_DEPTH;
         const expanded = hasChildren && (options.forceExpand || expandedKeys.has(node.key));
-        rows.push({ node, depth, hasChildren, expanded });
+        const key = parentRowKey ? `${parentRowKey}\u0000${node.key}` : node.key;
+        rows.push({ key, node, depth, hasChildren, expanded });
         if (expanded && !ancestors.has(node.key)) {
             const nextAncestors = new Set(ancestors).add(node.key);
-            rows.push(...flattenModDependencyTree(visibleChildren, expandedKeys, options, depth + 1, nextAncestors));
+            rows.push(...flattenModDependencyTree(visibleChildren, expandedKeys, options, depth + 1, nextAncestors, key));
         }
     }
     return rows;

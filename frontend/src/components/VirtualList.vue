@@ -1,6 +1,6 @@
 <template>
     <div ref="wrapperRef" class="virtual-list-wrapper" @keydown="onKeydown" @mousemove="emit('pointer-move')">
-        <v-virtual-scroll ref="virtualScroll" :items="virtualItems" class="virtual-list-scroll px-2" :item-height="itemHeight"
+        <v-virtual-scroll ref="virtualScroll" :items="virtualItems" class="virtual-list-scroll ps-2 pe-4" :item-height="itemHeight"
             :style="{ '--virtual-list-item-height': `${itemHeight}px` }"
             tabindex="0"
             @scroll.passive="onScroll">
@@ -378,7 +378,6 @@ watch(() => props.itemHeight, scheduleMeasure);
 .virtual-list-scroll {
     flex: 1 1 auto;
     min-height: 0;
-    scrollbar-gutter: stable;
 }
 
 .virtual-list-scroll :deep(.v-virtual-scroll__item) {

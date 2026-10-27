@@ -75,6 +75,7 @@ const listMenuProps = {
     location: "top" as const,
     maxHeight: 200,
     offset: 4,
+    transition: "md-menu-pop",
 };
 
 // All drafts share the same target scope (they come from one selection), so the

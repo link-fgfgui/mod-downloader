@@ -11,7 +11,7 @@
         <template #item="{ item, index, selected, onClick }">
             <v-list-item :key="itemKey(item, index)" :title="item.title"
                 :subtitle="item.description"
-                :class="['mb-2 border-b md-hover-lift', { 'search-result-selected': selected }]"
+                :class="['search-result-row mb-2 border-b md-hover-lift', { 'search-result-selected': selected }]"
                 :bg-color="selected ? undefined : 'surface'"
                 rounded="xl" elevation="1"
                 lines="two"
@@ -33,12 +33,12 @@
                             {{ item.platform }}
                         </v-chip>
 
-                        <v-btn class="search-result-favorite-btn md-btn-press md-hover-scale transition-btn" icon="mdi-playlist-plus"
+                        <v-btn class="search-result-favorite-btn md-btn-press md-hover-scale" icon="mdi-playlist-plus"
                             variant="tonal" rounded="xl" size="small" color="secondary"
                             @click.stop="emit('add-favorite', [item])">
                         </v-btn>
 
-                        <v-btn class="md-btn-press md-hover-scale transition-btn" icon variant="tonal" rounded="xl"
+                        <v-btn class="md-btn-press md-hover-scale" icon variant="tonal" rounded="xl"
                             size="small" :color="colorFor(index)" :loading="loadingFor(index)"
                             :disabled="disabledFor(index)" @click.stop="onInstall(index, true)"
                             @contextmenu.prevent.stop="onInstall(index, false)">
@@ -147,13 +147,15 @@ const selectionActions = (selectedItems, clearSelection) => [
     gap: 8px;
 }
 
-.transition-btn {
-    transition: transform 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+.search-result-row {
+    transition: background-color var(--md-transition-fast) var(--md-ease-out);
 }
 
 .icon-fade-enter-active,
 .icon-fade-leave-active {
-    transition: opacity 0.2s ease, transform 0.2s ease;
+    transition:
+        opacity var(--md-transition-fast) var(--md-ease-out),
+        transform var(--md-transition-fast) var(--md-ease-out);
 }
 
 .icon-fade-enter-from,
@@ -168,7 +170,6 @@ const selectionActions = (selectedItems, clearSelection) => [
 
 .search-result-selected {
     background-color: rgba(var(--v-theme-primary), 0.12) !important;
-    transition: background-color var(--md-transition-fast) ease;
 }
 
 @media (max-width: 599.98px) {

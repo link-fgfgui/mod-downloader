@@ -20,7 +20,9 @@
                     {{ $t(incompatibleExpanded ? "manage.incompatible.expanded" : "manage.incompatible.collapsed") }}
                 </v-list-item-subtitle>
                 <template #append>
-                    <v-icon :icon="incompatibleExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down'"></v-icon>
+                    <v-icon class="manage-incompatible-chevron"
+                        :class="{ 'manage-incompatible-chevron--expanded': incompatibleExpanded }"
+                        icon="mdi-chevron-down"></v-icon>
                 </template>
             </v-list-item>
             <v-list-item v-else class="mb-2 border-b md-hover-lift"
@@ -203,6 +205,14 @@ onBeforeUnmount(() => {
 .incompatible-toggle {
     background: rgba(var(--v-theme-warning), 0.08);
     cursor: pointer;
+}
+
+.manage-incompatible-chevron {
+    transition: transform var(--md-transition-fast) var(--md-ease-out);
+}
+
+.manage-incompatible-chevron--expanded {
+    transform: rotate(180deg);
 }
 
 .manage-item-selected {

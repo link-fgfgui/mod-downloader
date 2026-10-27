@@ -110,6 +110,8 @@ export function SaveApiKeys(arg1:structs.SaveApiKeysRequest):Promise<structs.Set
 
 export function SaveCacheDirPreference(arg1:string):Promise<structs.SettingsView>;
 
+export function SaveHardwareAccelerationSettings(arg1:structs.SaveHardwareAccelerationSettingsRequest):Promise<structs.SettingsView>;
+
 export function SaveJijDetectionSettings(arg1:structs.SaveJijDetectionSettingsRequest):Promise<structs.SettingsView>;
 
 export function SaveLanguage(arg1:string):Promise<string>;

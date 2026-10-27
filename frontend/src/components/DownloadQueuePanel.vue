@@ -214,12 +214,9 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 
 import { useDownloadQueueStore } from "../stores/downloadQueue";
 import {
-    animationModeGsap,
-    animationModeOff,
     beforeGsapFabEnter,
     enterGsapFab,
     leaveGsapFab,
-    useActiveAnimationMode,
 } from "../composables/useAnimationSettings";
 import type { structs } from "../../wailsjs/go/models";
 
@@ -246,7 +243,6 @@ type DownloadQueueSnapshot = {
 };
 
 const downloadQueueStore = useDownloadQueueStore();
-const activeAnimationMode = useActiveAnimationMode();
 const downloadQueueOpen = ref(false);
 const downloadQueueTab = ref("downloads");
 const visibleQueueSnapshot = ref<DownloadQueueSnapshot | null>(null);
@@ -283,24 +279,13 @@ const queueFabIcon = computed(() => (reminderOnly.value ? "mdi-bell-outline" : "
 const downloadQueueItems = computed(() => visibleDownloadQueue.value.items || []);
 const downloadQueueReminders = computed(() => visibleDownloadQueue.value.optionalReminders || []);
 
-const gsapAnimationsActive = computed(() => activeAnimationMode.value === animationModeGsap);
-const animationsOff = computed(() => activeAnimationMode.value === animationModeOff);
-
-const fabTransitionProps = computed(() => {
-    if (animationsOff.value) {
-        return { css: false, onAfterLeave: clearDownloadQueueSnapshot };
-    }
-    if (gsapAnimationsActive.value) {
-        return {
-            css: false,
-            onBeforeEnter: beforeGsapFabEnter,
-            onEnter: enterGsapFab,
-            onLeave: leaveGsapFab,
-            onAfterLeave: clearDownloadQueueSnapshot,
-        };
-    }
-    return { name: "md-fab", onAfterLeave: clearDownloadQueueSnapshot };
-});
+const fabTransitionProps = {
+    css: false,
+    onBeforeEnter: beforeGsapFabEnter,
+    onEnter: enterGsapFab,
+    onLeave: leaveGsapFab,
+    onAfterLeave: () => clearDownloadQueueSnapshot(),
+};
 
 const queueStatusIcon = (status: string) => {
     switch (status) {
@@ -516,7 +501,7 @@ onUnmounted(() => {
 .download-queue-items {
     max-height: 340px;
     overflow-y: auto;
-    padding: 6px;
+    padding: 6px 16px 6px 6px;
 }
 
 .download-queue-empty {

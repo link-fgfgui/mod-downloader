@@ -7,4 +7,11 @@ export default createVuetify({
   theme: {
     defaultTheme: "dark",
   },
+  defaults: {
+    // VSelect owns its own transition prop; combobox/autocomplete pass it
+    // through menuProps. VMenu keeps the anchored VDialogTransition.
+    VSelect: { transition: "md-menu-pop" },
+    VCombobox: { menuProps: { transition: "md-menu-pop" } },
+    VAutocomplete: { menuProps: { transition: "md-menu-pop" } },
+  },
 });

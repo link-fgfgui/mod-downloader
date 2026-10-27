@@ -1,5 +1,5 @@
 <template>
-    <v-container class="favorites-page pa-6 md-page" fluid>
+    <v-container class="favorites-page pa-6" fluid>
         <aside class="favorites-rail">
             <div class="favorites-rail-header">
                 <h1 class="text-h6 font-weight-medium">{{ $t("favorites.title") }}</h1>
@@ -138,17 +138,18 @@
                 </div>
             </div>
 
-            <div v-if="!selectedList" class="empty-state">
-                <v-icon icon="mdi-playlist-plus" size="48"></v-icon>
-                <div class="text-body-1 mt-3">{{ $t("favorites.empty.selectOrCreate") }}</div>
-            </div>
+            <Transition name="md-fade-slide" mode="out-in">
+                <div v-if="!selectedList" key="select" class="empty-state">
+                    <v-icon icon="mdi-playlist-plus" size="48"></v-icon>
+                    <div class="text-body-1 mt-3">{{ $t("favorites.empty.selectOrCreate") }}</div>
+                </div>
 
-            <div v-else-if="!favoritesStore.isLoadingItems && favoritesStore.items.length === 0" class="empty-state">
-                <v-icon icon="mdi-star-outline" size="48"></v-icon>
-                <div class="text-body-1 mt-3">{{ $t("favorites.empty.noItems") }}</div>
-            </div>
+                <div v-else-if="!favoritesStore.isLoadingItems && favoritesStore.items.length === 0" key="empty" class="empty-state">
+                    <v-icon icon="mdi-star-outline" size="48"></v-icon>
+                    <div class="text-body-1 mt-3">{{ $t("favorites.empty.noItems") }}</div>
+                </div>
 
-            <VirtualList v-else class="favorites-items" :items="favoritesStore.items" :item-height="82" :item-key="itemKey">
+                <VirtualList v-else key="items" class="favorites-items" :items="favoritesStore.items" :item-height="82" :item-key="itemKey">
                 <template #item="{ item, selected, onClick }">
                     <v-list-item
                         class="favorite-mod-row mb-2 border-b md-hover-lift"
@@ -209,6 +210,7 @@
                     </v-tooltip>
                 </template>
             </VirtualList>
+            </Transition>
         </main>
 
         <v-dialog v-model="listEdit.show" max-width="420">
@@ -575,7 +577,7 @@ onActivated(() => {
     display: grid;
     gap: 20px;
     grid-template-columns: minmax(240px, 310px) minmax(0, 1fr);
-    height: calc(100vh - 32px);
+    height: 100%;
     max-width: 100%;
     min-height: 0;
     overflow: hidden;
@@ -637,6 +639,7 @@ onActivated(() => {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
+    padding-inline-end: 16px;
 }
 
 .rail-section {
