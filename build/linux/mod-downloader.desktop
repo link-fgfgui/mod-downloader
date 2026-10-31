@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=mod-downloader
+Exec=mod-downloader
+Icon=mod-downloader
+Categories=Development;
+Terminal=false
+Keywords=wails
+Version=1.0
+StartupNotify=false

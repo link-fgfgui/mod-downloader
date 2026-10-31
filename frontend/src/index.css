@@ -1,0 +1,250 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --md-transition-fast: 120ms;
+  --md-transition-normal: 180ms;
+  --md-transition-slow: 240ms;
+  --md-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --md-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --md-ease-spring: cubic-bezier(0.22, 1.2, 0.36, 1);
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --radius: 0.625rem;
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+}
+
+* { border-color: var(--border); }
+html, body, #root { min-height: 100%; }
+body { margin: 0; background: var(--background); color: var(--foreground); font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+button, input, select { font: inherit; }
+
+@layer utilities {
+  .duration-md {
+    transition-duration: var(--md-transition-normal, 180ms);
+  }
+
+  /* Shared hover treatment for clickable rows. Kept as a utility so hover,
+     selected and relation states can be composed without one overriding the
+     other, and so pressed feedback works on plain <div>/<button> rows too.
+     Only transform/opacity animate on press; hover stays on color-like
+     properties so it never fights an entrance animation. */
+  .md-row-interactive {
+    transition-property: background-color, border-color, box-shadow, color, opacity, transform;
+    transition-duration: var(--md-transition-normal, 180ms);
+    transition-timing-function: var(--md-ease-out, ease-out);
+  }
+
+  .md-row-interactive:active {
+    transform: scale(0.997);
+    transition-duration: 70ms;
+    transition-timing-function: var(--md-ease-in, ease-in);
+  }
+
+  /* Shared pressed feedback for hand-written buttons that do not use the
+     shadcn Button component. */
+  .md-pressable {
+    transition-property: color, background-color, border-color, box-shadow, opacity, transform, translate, scale;
+    transition-duration: var(--md-transition-normal, 180ms);
+    transition-timing-function: var(--md-ease-out, ease-out);
+  }
+
+  .md-pressable:active:not(:disabled) {
+    transform: scale(0.94);
+    transition-duration: 70ms;
+    transition-timing-function: var(--md-ease-in, ease-in);
+  }
+
+  .md-selection-toolbar {
+    transform-origin: bottom center;
+    will-change: opacity, transform, translate, scale;
+  }
+}
+
+/* Custom combobox ------------------------------------------------------- */
+
+/* The panel grows out of the trigger instead of fading rows in one by one.
+   Content is revealed by the clip path, so the text spreads out from the
+   trigger edge and its final position is the measured layout position. */
+.md-combobox-panel {
+  transform-origin: top center;
+  transition-property: clip-path, opacity, transform;
+  transition-duration: var(--md-transition-normal, 180ms);
+  transition-timing-function: var(--md-ease-out, ease-out);
+  will-change: clip-path, opacity, transform;
+  scrollbar-gutter: stable;
+}
+
+.md-combobox-panel[data-side="top"] {
+  transform-origin: bottom center;
+}
+
+/* The first frame is used only to measure and settle on a side. Do not
+   animate the temporary default side into the real one. */
+.md-combobox-panel[data-ready="false"] {
+  transition: none;
+}
+
+.md-combobox-panel[data-state="open"] {
+  clip-path: inset(0 0 0 0 round 10px);
+  opacity: 1;
+  transform: none;
+}
+
+.md-combobox-panel[data-side="bottom"][data-state="closed"] {
+  clip-path: inset(0 0 100% 0 round 10px);
+  opacity: 0;
+  transform: translateY(-4px) scaleY(0.985);
+}
+
+.md-combobox-panel[data-side="top"][data-state="closed"] {
+  clip-path: inset(100% 0 0 0 round 10px);
+  opacity: 0;
+  transform: translateY(4px) scaleY(0.985);
+}
+
+/* Each close reason has its own shape so the user can tell what happened:
+   - selecting a new value retracts towards the trigger;
+   - re-selecting the current value nudges down before it disappears;
+   - clicking outside fades in place without moving;
+   - Escape pulls the panel slightly away. */
+.md-combobox-panel[data-close-reason="outside"][data-state="closed"] {
+  clip-path: inset(0 0 0 0 round 10px);
+  opacity: 0;
+  transform: scale(0.992);
+  transition-duration: 140ms;
+}
+
+.md-combobox-panel[data-close-reason="escape"][data-state="closed"] {
+  clip-path: inset(0 0 0 0 round 10px);
+  opacity: 0;
+  transform: scale(0.97);
+  transition-duration: 150ms;
+}
+
+.md-combobox-panel[data-close-reason="same"][data-state="closed"] {
+  clip-path: inset(0 0 0 0 round 10px);
+  opacity: 0;
+  transform: translateY(3px) scale(0.965);
+  transition-duration: 160ms;
+  transition-timing-function: var(--md-ease-in, ease-in);
+}
+
+.md-combobox-list {
+  scrollbar-gutter: stable;
+}
+
+@keyframes md-combobox-confirm {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--ring) 45%, transparent);
+  }
+  45% {
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 28%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@keyframes md-combobox-nudge {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(0.975);
+  }
+}
+
+[data-combobox-feedback="selected"] {
+  animation: md-combobox-confirm 320ms var(--md-ease-out, ease-out);
+}
+
+[data-combobox-feedback="same"] {
+  animation: md-combobox-nudge 260ms var(--md-ease-out, ease-out);
+}
+
+@keyframes md-progress-indeterminate {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(320%); }
+}
+
+.animate-progress-indeterminate {
+  animation: md-progress-indeterminate 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *:not(.animate-spin),
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,0 +1,21 @@
+.task
+.playwright-mcp
+bin
+frontend/dist
+frontend/node_modules
+
+# Local runtime state and credentials
+mod-downloader.toml
+mod-downloader.log
+mod-metadata.tmp
+mod-favs.sqlite
+mods.db
+mods.db-shm
+mods.db-wal
+build/linux/appimage/build
+build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
+# Mobile generated (per-machine; overlays hold absolute paths)
+build/ios/xcode/overlay.json
+build/ios/xcode/gen/
+build/android/overlay.json
+build/android/gen/
