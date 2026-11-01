@@ -20,10 +20,14 @@ import (
 	"github.com/link-fgfgui/mod-downloader/core/networking"
 )
 
+// StdlibBackend downloads over net/http using ranged requests when the server
+// supports them.
 type StdlibBackend struct {
 	client *http.Client
 }
 
+// NewStdlibBackend returns a stdlib backend using client, or a default client
+// when client is nil.
 func NewStdlibBackend(client *http.Client) *StdlibBackend {
 	if client == nil {
 		client = networking.NewClientWithUserAgent(0, "mod-downloader/dev")
@@ -31,8 +35,11 @@ func NewStdlibBackend(client *http.Client) *StdlibBackend {
 	return &StdlibBackend{client: client}
 }
 
+// Kind reports the backend kind.
 func (*StdlibBackend) Kind() BackendKind { return BackendStdlib }
 
+// Download transfers request to its destination with optional adaptive
+// concurrency and progress reporting.
 func (b *StdlibBackend) Download(ctx context.Context, request Request, tracker *ProgressTracker) (Result, error) {
 	if ctx == nil {
 		ctx = context.Background()

@@ -9,6 +9,7 @@ import (
 	"go/parser"
 	"go/token"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -108,7 +109,7 @@ func TestRootRejectsWhenReceiverUnavailable(t *testing.T) {
 }
 
 func TestRootRejectsMismatchedResultCount(t *testing.T) {
-	s := New("", Options{Accept: func(payloads []appstructs.ExtensionProjectPayload) []appstructs.ModDownloadResult {
+	s := New("", Options{Accept: func(_ []appstructs.ExtensionProjectPayload) []appstructs.ModDownloadResult {
 		return nil
 	}})
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`[{"p":"mr","slug":"sodium","file":""}]`))
@@ -147,8 +148,36 @@ func TestStartStopLifecycle(t *testing.T) {
 	s.Stop()
 }
 
+// TestStartUsesProvidedListener proves the single-instance guard socket is
+// reused instead of binding Addr a second time.
+func TestStartUsesProvidedListener(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("bind listener: %v", err)
+	}
+	// Addr is deliberately invalid: Start must rely solely on the listener.
+	s := New("127.0.0.1:1", Options{Listener: ln})
+	if err := s.Start(); err != nil {
+		t.Fatalf("start failed: %v", err)
+	}
+	if got, want := s.Addr(), ln.Addr().String(); got != want {
+		t.Fatalf("Addr() = %q, want listener address %q", got, want)
+	}
+
+	client := &http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Get("http://" + s.Addr() + "/health")
+	if err != nil {
+		t.Fatalf("health request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("health status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+	s.Stop()
+}
+
 func TestRootAcceptsEmptyArray(t *testing.T) {
-	s := New("", Options{Accept: func(payloads []appstructs.ExtensionProjectPayload) []appstructs.ModDownloadResult {
+	s := New("", Options{Accept: func(_ []appstructs.ExtensionProjectPayload) []appstructs.ModDownloadResult {
 		return []appstructs.ModDownloadResult{}
 	}})
 	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader([]byte("[]")))

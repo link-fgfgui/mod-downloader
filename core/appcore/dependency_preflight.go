@@ -72,7 +72,7 @@ func buildPreflightEntries(
 		if !modbridge.IsDependencyType(dep, "required") {
 			continue
 		}
-		depReq, ok := modbridge.DependencyDownloadRequest(target.Platform, dep, parent)
+		depReq, ok := modbridge.BuildDependencyDownloadRequest(target.Platform, dep, parent)
 		if !ok {
 			continue
 		}

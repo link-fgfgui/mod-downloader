@@ -11,11 +11,11 @@ vi.mock("@/services/app", () => ({
     SaveSimpleModeSettings: vi.fn(),
     SaveUnusedDependencyCleanupSettings: vi.fn(),
     SaveMCIMSettings: vi.fn(),
-    SaveJijDetectionSettings: vi.fn(),
+    SaveJIJDetectionSettings: vi.fn(),
     SaveHardwareAccelerationSettings: vi.fn(),
     SavePreferredReleaseTypeSettings: vi.fn(),
     SaveNetworkSettings: vi.fn(),
-    SaveApiKeys: vi.fn(),
+    SaveAPIKeys: vi.fn(),
     ChooseCacheDir: vi.fn(),
     SaveCacheDirPreference: vi.fn(),
   },
@@ -101,10 +101,10 @@ describe("settings store", () => {
   });
 
   it("keeps existing API keys with the sentinel", async () => {
-    vi.mocked(api.SaveApiKeys).mockResolvedValue(view);
+    vi.mocked(api.SaveAPIKeys).mockResolvedValue(view);
     useSettingsStore.setState({ settings: view, draftCurseforgeKey: "", draftModrinthKey: "new-key" });
     await useSettingsStore.getState().saveApiKeys();
-    expect(api.SaveApiKeys).toHaveBeenCalledWith({
+    expect(api.SaveAPIKeys).toHaveBeenCalledWith({
       curseforgeApiKey: apiKeyKeepSentinel,
       modrinthApiKey: "new-key",
     });

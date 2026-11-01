@@ -13,7 +13,7 @@ import (
 	mcstructs "github.com/link-fgfgui/mod-downloader/core/structs/minecraft"
 )
 
-func TestAnalyzeLocalModDisableImpactFindsLostJijProvider(t *testing.T) {
+func TestAnalyzeLocalModDisableImpactFindsLostJIJProvider(t *testing.T) {
 	mods := []mcstructs.ModInfo{
 		{
 			ID:      "dependent",
@@ -30,7 +30,7 @@ func TestAnalyzeLocalModDisableImpactFindsLostJijProvider(t *testing.T) {
 			Name:    "JIJ Host",
 			Path:    "host.jar",
 			Enabled: true,
-			JijMods: []mcstructs.JijModInfo{{ID: "architectury"}},
+			JIJMods: []mcstructs.JIJModInfo{{ID: "architectury"}},
 		},
 	}
 
@@ -65,7 +65,7 @@ func TestAnalyzeLocalModDisableImpactUsesProjectedBatchState(t *testing.T) {
 			ID:      "host",
 			Path:    "host.jar",
 			Enabled: true,
-			JijMods: []mcstructs.JijModInfo{{ID: "architectury"}},
+			JIJMods: []mcstructs.JIJModInfo{{ID: "architectury"}},
 		},
 	}
 
@@ -122,7 +122,7 @@ func TestCachedDependencyCandidatesDeduplicatesAssociations(t *testing.T) {
 		{Platform: "Modrinth", ProjectID: "unrelated", Title: "Unrelated Provider"},
 	}
 	for _, project := range projects {
-		if err := storage.UpsertModPlatform(project); err != nil {
+		if err := storage.UpsertModProject(project); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -165,7 +165,7 @@ func TestRestoreCachedDependencyRevalidatesCandidateBeforeQueue(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(storage.Close)
-	if err := storage.UpsertModPlatform(models.ModProject{
+	if err := storage.UpsertModProject(models.ModProject{
 		Platform: "Modrinth", ProjectID: "architectury-api", Title: "Architectury API",
 	}); err != nil {
 		t.Fatal(err)

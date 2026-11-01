@@ -11,16 +11,18 @@ import (
 	structs "github.com/link-fgfgui/mod-downloader/core/structs/minecraft"
 )
 
+// LocalModFile is the metadata parsed from one JAR, keyed by SHA1.
 type LocalModFile struct {
-	SHA1           string `json:"sha1"`
-	FileName       string `json:"fileName"`
-	CfFingerprint  int64  `json:"cfFingerprint,omitempty"`
-	ModID          string `json:"modId,omitempty"`
-	ModName        string `json:"modName,omitempty"`
-	ModVersion     string `json:"modVersion,omitempty"`
-	ModDescription string `json:"modDescription,omitempty"`
+	SHA1                  string `json:"sha1"`
+	FileName              string `json:"fileName"`
+	CurseForgeFingerprint int64  `json:"cfFingerprint,omitempty"`
+	ModID                 string `json:"modId,omitempty"`
+	ModName               string `json:"modName,omitempty"`
+	ModVersion            string `json:"modVersion,omitempty"`
+	ModDescription        string `json:"modDescription,omitempty"`
 }
 
+// LocalModFilePath records where one JAR lives and which instance owns it.
 type LocalModFilePath struct {
 	ID               string `json:"id"`
 	FileSHA1         string `json:"fileSha1"`
@@ -37,7 +39,8 @@ var (
 	localModFilePaths = make(map[string]LocalModFilePath)
 )
 
-func UpsertLocalMod(info structs.ModInfo, instanceID, mcVersion, modLoader string) {
+// UpsertLocalMod records the metadata and location of one scanned JAR.
+func UpsertLocalMod(info structs.ModInfo, instanceID, minecraftVersion, modLoader string) {
 	sha1 := strings.TrimSpace(info.SHA1)
 	path := strings.TrimSpace(info.Path)
 	if sha1 == "" || path == "" {
@@ -46,20 +49,20 @@ func UpsertLocalMod(info structs.ModInfo, instanceID, mcVersion, modLoader strin
 	}
 
 	file := LocalModFile{
-		SHA1:           sha1,
-		FileName:       info.FileName,
-		CfFingerprint:  int64(info.CfFingerprint),
-		ModID:          info.ID,
-		ModName:        info.Name,
-		ModVersion:     info.Version,
-		ModDescription: info.Description,
+		SHA1:                  sha1,
+		FileName:              info.FileName,
+		CurseForgeFingerprint: int64(info.CurseForgeFingerprint),
+		ModID:                 info.ID,
+		ModName:               info.Name,
+		ModVersion:            info.Version,
+		ModDescription:        info.Description,
 	}
 	filePath := LocalModFilePath{
 		ID:               path,
 		FileSHA1:         sha1,
 		Path:             path,
 		InstanceID:       strings.TrimSpace(instanceID),
-		MinecraftVersion: strings.TrimSpace(mcVersion),
+		MinecraftVersion: strings.TrimSpace(minecraftVersion),
 		ModLoader:        strings.ToLower(strings.TrimSpace(modLoader)),
 		Enabled:          info.Enabled,
 	}
@@ -71,6 +74,7 @@ func UpsertLocalMod(info structs.ModInfo, instanceID, mcVersion, modLoader strin
 	logging.Debug("local mod upserted", "sha1", sha1, "path", path, "modID", file.ModID, "instanceID", filePath.InstanceID, "minecraftVersion", filePath.MinecraftVersion, "modLoader", filePath.ModLoader)
 }
 
+// GetLocalModFileBySHA1 returns the first metadata record for sha1.
 func GetLocalModFileBySHA1(sha1 string) (LocalModFile, bool) {
 	localModsMu.RLock()
 	defer localModsMu.RUnlock()
@@ -84,6 +88,7 @@ func GetLocalModFileBySHA1(sha1 string) (LocalModFile, bool) {
 	return files[0], true
 }
 
+// GetLocalModFilePathsBySHA1 returns every path record that references sha1.
 func GetLocalModFilePathsBySHA1(sha1 string) []LocalModFilePath {
 	sha1 = strings.TrimSpace(sha1)
 	localModsMu.RLock()
@@ -99,22 +104,25 @@ func GetLocalModFilePathsBySHA1(sha1 string) []LocalModFilePath {
 	return paths
 }
 
-func GetLocalModFilePathsByVersionLoader(mcVersion, modLoader string) []LocalModFilePath {
-	mcVersion = strings.TrimSpace(mcVersion)
+// GetLocalModFilePathsByVersionLoader returns path records for one
+// Minecraft version and loader scope.
+func GetLocalModFilePathsByVersionLoader(minecraftVersion, modLoader string) []LocalModFilePath {
+	minecraftVersion = strings.TrimSpace(minecraftVersion)
 	modLoader = strings.ToLower(strings.TrimSpace(modLoader))
 	localModsMu.RLock()
 	defer localModsMu.RUnlock()
 
 	paths := make([]LocalModFilePath, 0)
 	for _, path := range localModFilePaths {
-		if path.MinecraftVersion == mcVersion && path.ModLoader == modLoader {
+		if path.MinecraftVersion == minecraftVersion && path.ModLoader == modLoader {
 			paths = append(paths, path)
 		}
 	}
-	logging.Debug("local mod paths read by version loader", "minecraftVersion", mcVersion, "modLoader", modLoader, "pathCount", len(paths))
+	logging.Debug("local mod paths read by version loader", "minecraftVersion", minecraftVersion, "modLoader", modLoader, "pathCount", len(paths))
 	return paths
 }
 
+// HasLocalModPathsInInstance reports whether instanceID has any scanned JARs.
 func HasLocalModPathsInInstance(instanceID string) bool {
 	instanceID = strings.TrimSpace(instanceID)
 	if instanceID == "" {
@@ -131,6 +139,7 @@ func HasLocalModPathsInInstance(instanceID string) bool {
 	return false
 }
 
+// LocalModPathsInInstance returns every scanned JAR path owned by instanceID.
 func LocalModPathsInInstance(instanceID string) []LocalModFilePath {
 	instanceID = strings.TrimSpace(instanceID)
 	if instanceID == "" {
@@ -209,6 +218,7 @@ func RemoveLocalModByPath(path string) {
 	}
 }
 
+// ClearLocalModsByInstance forgets every JAR path owned by instanceID.
 func ClearLocalModsByInstance(instanceID string) {
 	instanceID = strings.TrimSpace(instanceID)
 	if instanceID == "" {
@@ -227,6 +237,7 @@ func ClearLocalModsByInstance(instanceID string) {
 	logging.Debug("local mods cleared by instance", "instanceID", instanceID, "deletedPathCount", deleted)
 }
 
+// ClearLocalMods drops the entire in-memory local mod index.
 func ClearLocalMods() {
 	localModsMu.Lock()
 	defer localModsMu.Unlock()
@@ -237,20 +248,22 @@ func ClearLocalMods() {
 	logging.Info("local mods cleared", "fileCount", fileCount, "pathCount", pathCount)
 }
 
-func ClearLocalModsByVersionLoader(mcVersion, modLoader string) {
-	mcVersion = strings.TrimSpace(mcVersion)
+// ClearLocalModsByVersionLoader forgets JAR path records for one Minecraft
+// version and loader scope.
+func ClearLocalModsByVersionLoader(minecraftVersion, modLoader string) {
+	minecraftVersion = strings.TrimSpace(minecraftVersion)
 	modLoader = strings.ToLower(strings.TrimSpace(modLoader))
 
 	localModsMu.Lock()
 	defer localModsMu.Unlock()
 	deleted := 0
 	for path, modPath := range localModFilePaths {
-		if modPath.MinecraftVersion == mcVersion && modPath.ModLoader == modLoader {
+		if modPath.MinecraftVersion == minecraftVersion && modPath.ModLoader == modLoader {
 			delete(localModFilePaths, path)
 			deleted++
 		}
 	}
-	logging.Info("local mods cleared by version loader", "minecraftVersion", mcVersion, "modLoader", modLoader, "deletedPathCount", deleted)
+	logging.Info("local mods cleared by version loader", "minecraftVersion", minecraftVersion, "modLoader", modLoader, "deletedPathCount", deleted)
 }
 
 func upsertLocalModFile(files []LocalModFile, file LocalModFile) []LocalModFile {

@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 link-fgfgui
 // SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
 
+// Package packwiz builds packwiz-compatible modpack archives from the
+// favorite lists exported by the core.
 package packwiz
 
 import (
@@ -19,11 +21,13 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
+// Packwiz metadata constants.
 const (
 	PackFormat = "packwiz:1.1.0"
 	SideBoth   = "both"
 )
 
+// Pack is the adapter-neutral input for a packwiz export.
 type Pack struct {
 	Name             string
 	MinecraftVersion string
@@ -31,6 +35,7 @@ type Pack struct {
 	Mods             []Mod
 }
 
+// Mod is one mod entry to write into a packwiz archive.
 type Mod struct {
 	Name        string
 	FileName    string
@@ -98,11 +103,13 @@ type curseForgeUpdate struct {
 	FileID    int `toml:"file-id"`
 }
 
+// File is one generated archive entry.
 type File struct {
 	Path string
 	Data []byte
 }
 
+// WriteZip generates the packwiz archive and writes it to w.
 func WriteZip(w io.Writer, pack Pack) error {
 	files, err := BuildFiles(pack)
 	if err != nil {
@@ -124,6 +131,7 @@ func WriteZip(w io.Writer, pack Pack) error {
 	return zw.Close()
 }
 
+// BuildFiles returns the generated packwiz files without writing an archive.
 func BuildFiles(pack Pack) ([]File, error) {
 	pack.Name = strings.TrimSpace(pack.Name)
 	pack.MinecraftVersion = strings.TrimSpace(pack.MinecraftVersion)
@@ -267,6 +275,7 @@ func uniqueMetaPath(mod Mod, used map[string]int) string {
 	return path.Join("mods", base+".pw.toml")
 }
 
+// SafeArchiveName converts name into a path- and archive-safe file name.
 func SafeArchiveName(name string) string {
 	name = safePathSegment(name)
 	if name == "" {

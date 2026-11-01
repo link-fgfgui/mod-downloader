@@ -14,17 +14,20 @@ import type * as structs$0 from "../../../../link-fgfgui/mod-downloader/core/str
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import type * as structs$1 from "../../../../link-fgfgui/mod-downloader/core/structs/minecraft/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import type * as view$0 from "../../../../link-fgfgui/mod-downloader/core/structs/view/models.js";
 
 declare module "@wailsio/runtime" {
     namespace Events {
         interface CustomEvents {
             "download-completed": void;
             "download-failed": structs$0.DownloadFailedEvent;
-            "download-queue-updated": structs$0.DownloadQueueState;
+            "download-queue-updated": view$0.DownloadQueueState;
             "download-states-updated": void;
-            "extension-mods-accepted": structs$0.SearchModsUpdate;
+            "extension-mods-accepted": view$0.SearchModsUpdate;
             "minecraft-dir-changed": string;
-            "search-mods-updated": structs$0.SearchModsUpdate;
+            "search-mods-updated": view$0.SearchModsUpdate;
             "selected-version-changed": structs$1.VersionInfo;
             "usage-stats-updated": storage$0.UsageStats;
         }

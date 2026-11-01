@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 link-fgfgui
 // SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
 
+// Package networking builds HTTP transports and clients that honor the
+// process proxy environment and default user agent.
 package networking
 
 import (
@@ -21,6 +23,7 @@ func NewTransport() *http.Transport {
 	return &http.Transport{Proxy: proxyFromEnvironment}
 }
 
+// NewClient returns an HTTP client with the default user agent and timeout.
 func NewClient(timeout time.Duration) *http.Client {
 	return NewClientWithUserAgent(timeout, "")
 }

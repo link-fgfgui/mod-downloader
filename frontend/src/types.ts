@@ -8,17 +8,12 @@ export type {
   PinnedMod,
   UsageStats,
 } from "../bindings/github.com/link-fgfgui/mod-downloader/core/storage/models";
-export type { VersionInfo, ModInfo, LocalModDependency, JijModInfo } from "../bindings/github.com/link-fgfgui/mod-downloader/core/structs/minecraft/models";
+export type { VersionInfo, ModInfo, LocalModDependency, JIJModInfo } from "../bindings/github.com/link-fgfgui/mod-downloader/core/structs/minecraft/models";
 export type {
   AppPreferences,
-  SettingsView,
   StartupStatus,
   SearchModsRequest,
-  SearchModsUpdate,
-  DownloadQueueState,
-  DownloadQueueItem,
   DownloadFailedEvent,
-  ModDownloadButtonState,
   ModDownloadRequest,
   ModDownloadResult,
   DependencyPreflightEntry,
@@ -33,9 +28,18 @@ export type {
   LocalModDependencyImpact,
   LocalModDependencyMod,
   CachedDependencyCandidate,
+} from "../bindings/github.com/link-fgfgui/mod-downloader/core/structs/models";
+export type {
+  FavoriteOverview,
+  LocalModGroup,
+  SettingsView,
+  SearchModsUpdate,
+  DownloadQueueState,
+  DownloadQueueItem,
+  ModDownloadButtonState,
   OptionalDependencyCandidate,
   OptionalDependencyReminder,
-} from "../bindings/github.com/link-fgfgui/mod-downloader/core/structs/models";
+} from "../bindings/github.com/link-fgfgui/mod-downloader/core/structs/view/models";
 export type {
   FavoriteBulkAddRequest,
   FavoriteBulkOperationResult,

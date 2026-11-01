@@ -185,7 +185,7 @@ func TestEnsureZipPathAppendsExtension(t *testing.T) {
 func storeFavoritePackwizVersion(t *testing.T, platform, projectID, versionID, minecraftVersion, modLoader, fileName string) {
 	t.Helper()
 	now := time.Now().Unix()
-	if err := storage.UpsertModPlatform(models.ModProject{
+	if err := storage.UpsertModProject(models.ModProject{
 		ID:        models.ProjectKey(platform, projectID),
 		Platform:  platform,
 		ProjectID: projectID,
@@ -206,7 +206,7 @@ func storeFavoritePackwizVersion(t *testing.T, platform, projectID, versionID, m
 		SHA1:         "abc123",
 		GameVersions: []string{minecraftVersion},
 		Loaders:      []string{modLoader},
-	}}, now, []storage.ModPlatformVersionScope{{
+	}}, now, []storage.PlatformVersionScope{{
 		MinecraftVersion: minecraftVersion,
 		ModLoader:        modLoader,
 	}}); err != nil {

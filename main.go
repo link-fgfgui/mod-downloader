@@ -3,12 +3,15 @@
 
 //go:build !server
 
+// Package main is the Wails desktop entry point for the mod downloader.
 package main
 
 import (
+	"errors"
 	"log"
 
 	"github.com/link-fgfgui/mod-downloader/core/configs"
+	"github.com/link-fgfgui/mod-downloader/core/instance"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -49,6 +52,11 @@ func main() {
 	})
 
 	if err := app.Run(); err != nil {
+		if errors.Is(err, instance.ErrAlreadyRunning) {
+			// A second launch exits quietly; the first instance keeps running.
+			log.Print(err)
+			return
+		}
 		log.Fatal(err)
 	}
 }

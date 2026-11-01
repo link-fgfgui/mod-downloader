@@ -6,6 +6,8 @@ package main
 import (
 	"reflect"
 	"testing"
+
+	"github.com/link-fgfgui/mod-downloader/core/appcore"
 )
 
 var expectedAppMethods = []string{
@@ -14,28 +16,29 @@ var expectedAppMethods = []string{
 	"GetPinnedModVersion", "PinModVersion", "ListPinnedMods", "UnpinMod",
 	"ListFavoriteLists", "CreateFavoriteList", "RenameFavoriteList", "DeleteFavoriteList",
 	"UpdateFavoriteListMetadata", "ReorderFavoriteLists", "ListFavoriteMods", "ListFavoriteContents",
+	"ListFavoriteOverview", "ListFavoriteContentsForScope",
 	"AddFavoriteMod", "AddFavoriteModsToLists", "CopyFavoriteListToList",
 	"PreviewFavoriteListCrossVersionCopy", "ApplyFavoriteListCrossVersionCopy",
 	"AddFavoriteListReference", "RemoveFavoriteListReference", "ListFavoriteListRefs",
 	"RemoveFavoriteMod", "ExportFavoriteListPackwizZip",
 	"GetMinecraftReleaseVersions", "GetPreferences", "GetSettings", "ChooseCacheDir",
 	"SaveTheme", "SaveLanguage", "SaveAnimationSettings", "SaveSimpleModeSettings",
-	"SaveUnusedDependencyCleanupSettings", "SaveMCIMSettings", "SaveJijDetectionSettings",
+	"SaveUnusedDependencyCleanupSettings", "SaveMCIMSettings", "SaveJIJDetectionSettings",
 	"SavePreferredReleaseTypeSettings", "SaveHardwareAccelerationSettings", "SaveNetworkSettings",
-	"SaveCacheDirPreference", "SaveApiKeys",
+	"SaveCacheDirPreference", "SaveAPIKeys",
 	"QueueModDownload", "CheckDependencyFulfillment", "RestoreCachedDependency",
 	"GetDownloadQueueState", "GetUsageStats", "CancelDownload", "RetryDownload", "RemoveDownload",
 	"DismissOptionalDependencyReminder", "ClearOptionalDependencyReminders", "InstallOptionalDependencies",
 	"AnalyzeBatchIncompatibleConflicts", "GetDownloadStates",
 	"ChooseMinecraftDir", "GetMinecraftDir", "ValidateMinecraftDir", "GetVersions",
-	"GetSelectedVersion", "RefreshVersions", "RefreshSelectedVersionMods", "SelectVersion",
+	"GetSelectedVersion", "RefreshVersions", "RefreshSelectedVersionMods", "GetLocalModGroups", "SelectVersion",
 	"ToggleConnectorLoader", "ApplyLocalModBatchOperation", "AnalyzeLocalModDisableImpact",
 	"OpenLocalModLocation", "ScanUnusedDependencies",
 }
 
 func TestAppBindingContract(t *testing.T) {
-	if len(expectedAppMethods) != 70 {
-		t.Fatalf("contract contains %d business methods, want 70", len(expectedAppMethods))
+	if len(expectedAppMethods) != 73 {
+		t.Fatalf("contract contains %d business methods, want 73", len(expectedAppMethods))
 	}
 	expected := make(map[string]bool, len(expectedAppMethods)+2)
 	for _, name := range expectedAppMethods {
@@ -62,15 +65,15 @@ func TestAppBindingContract(t *testing.T) {
 
 func TestAppEventContract(t *testing.T) {
 	events := []string{
-		minecraftDirChangedEvent,
-		selectedVersionChangedEvent,
-		searchModsUpdatedEvent,
-		extensionModsAcceptedEvent,
-		downloadStatesUpdatedEvent,
-		downloadQueueUpdatedEvent,
-		downloadFailedEvent,
-		downloadCompletedEvent,
-		usageStatsUpdatedEvent,
+		appcore.EventMinecraftDirChanged.Name(),
+		appcore.EventSelectedVersionChanged.Name(),
+		appcore.EventSearchModsUpdated.Name(),
+		appcore.EventExtensionModsAccepted.Name(),
+		appcore.EventDownloadStatesUpdated.Name(),
+		appcore.EventDownloadQueueUpdated.Name(),
+		appcore.EventDownloadFailed.Name(),
+		appcore.EventDownloadCompleted.Name(),
+		appcore.EventUsageStatsUpdated.Name(),
 	}
 	if len(events) != 9 {
 		t.Fatalf("event contract contains %d events, want 9", len(events))

@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 link-fgfgui
 // SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
 
+// Package storage owns the gob+zstd metadata cache and the SQLite user
+// database (favorites, pins and usage stats).
 package storage
 
 import (
@@ -19,6 +21,7 @@ import (
 	"github.com/klauspost/compress/zstd"
 )
 
+// Cache and user database file names plus the on-disk cache schema version.
 const (
 	CacheFileName         = "mod-metadata.tmp"
 	UserDataFileName      = "mod-favs.sqlite"
@@ -112,6 +115,7 @@ func (p *stringPool) Intern(s string) string {
 	return s
 }
 
+// Open opens the metadata cache and user database at the default cache path.
 func Open() error {
 	targetPath, err := DefaultCachePath()
 	if err != nil {
@@ -120,6 +124,7 @@ func Open() error {
 	return OpenAt(targetPath)
 }
 
+// DefaultCachePath returns the per-user temporary cache file path.
 func DefaultCachePath() (string, error) {
 	dir := os.TempDir()
 	if strings.TrimSpace(dir) == "" {
@@ -128,10 +133,14 @@ func DefaultCachePath() (string, error) {
 	return filepath.Join(dir, "mod-downloader", metadataCacheFileName), nil
 }
 
+// UserDataPathForCachePath returns the SQLite path that lives beside the
+// metadata cache file.
 func UserDataPathForCachePath(cachePath string) string {
 	return filepath.Join(filepath.Dir(cachePath), UserDataFileName)
 }
 
+// OpenAt opens the metadata cache and user database at an explicit path,
+// closing any store that was already open.
 func OpenAt(path string) error {
 	targetPath := strings.TrimSpace(path)
 	if targetPath == "" {
@@ -179,6 +188,7 @@ func OpenAt(path string) error {
 	return nil
 }
 
+// Close persists the metadata cache and closes both databases.
 func Close() {
 	if db != nil {
 		logging.Info("closing cache", "path", dbPath)
@@ -214,6 +224,7 @@ func readyUserDB() (*userStore, error) {
 	return userDB, nil
 }
 
+// NewID returns a random RFC 4122 version 4 UUID string.
 func NewID() string {
 	var buf [16]byte
 	_, _ = rand.Read(buf[:])
@@ -321,7 +332,7 @@ func (s *cacheState) normalizeKeys() {
 
 	scopes := make(map[versionScopeKey]storedVersionScope, len(s.PlatformVersionScopes))
 	for key, scope := range s.PlatformVersionScopes {
-		key = makeVersionScopeKey(key.Platform, key.ProjectID, ModPlatformVersionScope{
+		key = makeVersionScopeKey(key.Platform, key.ProjectID, PlatformVersionScope{
 			MinecraftVersion: key.MinecraftVersion,
 			ModLoader:        key.ModLoader,
 		})

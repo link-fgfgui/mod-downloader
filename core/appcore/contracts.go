@@ -12,15 +12,33 @@ import (
 	"github.com/link-fgfgui/mod-downloader/core/models"
 	"github.com/link-fgfgui/mod-downloader/core/storage"
 	appstructs "github.com/link-fgfgui/mod-downloader/core/structs"
+	appview "github.com/link-fgfgui/mod-downloader/core/structs/view"
 )
 
 // EventKind is the adapter-neutral event taxonomy emitted by Service.
 type EventKind string
 
+// Wire names are constants because Wails' binding generator evaluates
+// RegisterEvent arguments at build time. EventKind.Name is the only reader.
 const (
+	EventNameSearchModsUpdated      = "search-mods-updated"
+	EventNameExtensionModsAccepted  = "extension-mods-accepted"
+	EventNameDownloadStatesUpdated  = "download-states-updated"
+	EventNameDownloadQueueUpdated   = "download-queue-updated"
+	EventNameDownloadFailed         = "download-failed"
+	EventNameDownloadCompleted      = "download-completed"
+	EventNameMinecraftDirChanged    = "minecraft-dir-changed"
+	EventNameSelectedVersionChanged = "selected-version-changed"
+	EventNameUsageStatsUpdated      = "usage-stats-updated"
+)
+
+// Event constants are the internal kinds; Name maps them to the kebab-case
+// wire names in EventName*.
+const (
+	// EventSearchModsUpdated carries a streamed search page.
 	EventSearchModsUpdated EventKind = "searchModsUpdated"
 	// EventExtensionModsAccepted carries projects accepted from the browser
-	// extension as a structs.SearchModsUpdate payload.
+	// extension as a view.SearchModsUpdate payload.
 	EventExtensionModsAccepted  EventKind = "extensionModsAccepted"
 	EventDownloadStatesUpdated  EventKind = "downloadStatesUpdated"
 	EventDownloadQueueUpdated   EventKind = "downloadQueueUpdated"
@@ -31,9 +49,37 @@ const (
 	EventUsageStatsUpdated      EventKind = "usageStatsUpdated"
 )
 
+// Event is one typed core notification delivered to adapters.
 type Event struct {
 	Kind    EventKind
 	Payload any
+}
+
+// Name returns the stable wire name for the event. Adapters use it as the
+// frontend event name, so the kebab-case spelling is part of the contract.
+func (k EventKind) Name() string {
+	switch k {
+	case EventSearchModsUpdated:
+		return EventNameSearchModsUpdated
+	case EventExtensionModsAccepted:
+		return EventNameExtensionModsAccepted
+	case EventDownloadStatesUpdated:
+		return EventNameDownloadStatesUpdated
+	case EventDownloadQueueUpdated:
+		return EventNameDownloadQueueUpdated
+	case EventDownloadFailed:
+		return EventNameDownloadFailed
+	case EventDownloadCompleted:
+		return EventNameDownloadCompleted
+	case EventMinecraftDirChanged:
+		return EventNameMinecraftDirChanged
+	case EventSelectedVersionChanged:
+		return EventNameSelectedVersionChanged
+	case EventUsageStatsUpdated:
+		return EventNameUsageStatsUpdated
+	default:
+		return string(k)
+	}
 }
 
 // StartupError identifies which startup stage failed so adapters can present a
@@ -51,6 +97,8 @@ func (e *StartupError) Unwrap() error {
 	return e.Err
 }
 
+// Options configures New. Config may be nil, in which case the core loads it
+// from disk or environment.
 type Options struct {
 	Config                *configs.Config
 	ConfigOverrides       ConfigOverrides
@@ -65,6 +113,7 @@ type Options struct {
 	LogToFileOnly bool
 }
 
+// RuntimeOptions overrides paths and the initially selected instance.
 type RuntimeOptions struct {
 	WorkDir          string
 	TargetModsDir    string
@@ -76,6 +125,8 @@ type RuntimeOptions struct {
 	NoConfigFile     bool
 }
 
+// ConfigOverrides lists adapter-supplied values that win over the config file.
+// The Has* flags distinguish "override with empty" from "no override".
 type ConfigOverrides struct {
 	MinecraftDir        string
 	CurseForgeAPIKey    string
@@ -85,16 +136,19 @@ type ConfigOverrides struct {
 	HasModrinthAPIKey   bool
 }
 
+// FavoriteBulkAddRequest adds the same mods to several favorite lists.
 type FavoriteBulkAddRequest struct {
 	TargetListIDs []string              `json:"targetListIds"`
 	Mods          []storage.FavoriteMod `json:"mods"`
 }
 
+// FavoriteListCopyRequest copies one favorite list into another.
 type FavoriteListCopyRequest struct {
 	SourceListID string `json:"sourceListId"`
 	TargetListID string `json:"targetListId"`
 }
 
+// FavoriteBulkOperationResult summarizes a bulk favorite operation.
 type FavoriteBulkOperationResult struct {
 	Added   int      `json:"added"`
 	Updated int      `json:"updated"`
@@ -102,6 +156,8 @@ type FavoriteBulkOperationResult struct {
 	Errors  []string `json:"errors,omitempty"`
 }
 
+// FavoriteCrossVersionCopyRequest copies a list into the scope described by
+// MinecraftVersion and ModLoader.
 type FavoriteCrossVersionCopyRequest struct {
 	SourceListID     string `json:"sourceListId"`
 	MinecraftVersion string `json:"minecraftVersion"`
@@ -109,6 +165,8 @@ type FavoriteCrossVersionCopyRequest struct {
 	IgnoreConflicts  bool   `json:"ignoreConflicts,omitempty"`
 }
 
+// FavoriteCrossVersionCopyPreview is the dry-run result of a cross-version
+// copy, listing matched versions and conflicts before anything is written.
 type FavoriteCrossVersionCopyPreview struct {
 	SourceListID     string                             `json:"sourceListId"`
 	TargetListName   string                             `json:"targetListName"`
@@ -120,6 +178,8 @@ type FavoriteCrossVersionCopyPreview struct {
 	Errors           []string                           `json:"errors,omitempty"`
 }
 
+// FavoriteCrossVersionCopyMatch pairs a source favorite with the target
+// version that satisfies the new scope.
 type FavoriteCrossVersionCopyMatch struct {
 	Source  storage.FavoriteModEntry `json:"source"`
 	Target  storage.FavoriteMod      `json:"target"`
@@ -127,11 +187,15 @@ type FavoriteCrossVersionCopyMatch struct {
 	Version models.ModVersion        `json:"version"`
 }
 
+// FavoriteCrossVersionCopyConflict is a source favorite that has no compatible
+// version in the target scope.
 type FavoriteCrossVersionCopyConflict struct {
 	Source storage.FavoriteModEntry `json:"source"`
 	Reason string                   `json:"reason"`
 }
 
+// FavoriteCrossVersionCopyApplyResult reports the applied copy and the preview
+// it was based on.
 type FavoriteCrossVersionCopyApplyResult struct {
 	Applied    bool                            `json:"applied"`
 	TargetList storage.FavoriteList            `json:"targetList"`
@@ -139,12 +203,15 @@ type FavoriteCrossVersionCopyApplyResult struct {
 	Result     FavoriteBulkOperationResult     `json:"result"`
 }
 
+// InstallWaitResult is the terminal result of an install-and-wait call.
 type InstallWaitResult struct {
 	Result appstructs.ModDownloadResult     `json:"result"`
-	State  appstructs.DownloadQueueState    `json:"state"`
+	State  appview.DownloadQueueState       `json:"state"`
 	Errors []appstructs.DownloadFailedEvent `json:"errors,omitempty"`
 }
 
+// InstallToDirRequest installs one project directly into an arbitrary mods
+// directory instead of the selected instance.
 type InstallToDirRequest struct {
 	ProjectID        string            `json:"projectId"`
 	Project          models.ModProject `json:"project"`

@@ -28,10 +28,9 @@ import {
   providedIdsOf,
   type ReverseDependencyMatch,
 } from "@/lib/modDependencyGraph";
-import { displayModName, modCategories, type ModGroup } from "@/lib/modGroups";
 import { hasMajorVersionChange, isVersionDowngrade } from "@/utils/versionCompare";
 import { useMinecraftStore } from "@/stores/minecraft";
-import type { DependencyPreflightResult, ModInfo, ModProject, ModVersion } from "@/types";
+import type { DependencyPreflightResult, LocalModGroup, ModInfo, ModProject, ModVersion } from "@/types";
 
 type DependencyPreflightEntry = NonNullable<DependencyPreflightResult["entries"]>[number];
 
@@ -39,14 +38,14 @@ const EMPTY_MODS: ModInfo[] = [];
 
 interface ManageVersionDialogProps {
   open: boolean;
-  group: ModGroup | null;
+  group: LocalModGroup | null;
   onOpenChange: (open: boolean) => void;
   onQueued: () => void;
   onError: (error: unknown) => void;
   onNotify: (key: string, color?: "success" | "error") => void;
 }
 
-const onlineProjectFromGroup = (group: ModGroup): ModProject => {
+const onlineProjectFromGroup = (group: LocalModGroup): ModProject => {
   const mod = group.primary;
   const platform = mod.onlinePlatform || "";
   const projectId = mod.onlineProjectId || "";
@@ -55,12 +54,12 @@ const onlineProjectFromGroup = (group: ModGroup): ModProject => {
     platform,
     projectId,
     slug: mod.onlineSlug || "",
-    title: displayModName(group),
+    title: group.displayName,
     icon: "",
     iconUrl: mod.iconUrl || "",
     description: mod.description || "",
     downloads: 0,
-    categories: modCategories(group),
+    categories: group.categories ?? [],
     updatedAt: 0,
     cachedAt: 0,
   };
@@ -124,8 +123,8 @@ export function ManageVersionDialog({
   const dependents: ReverseDependencyMatch[] = useMemo(() => {
     if (!group) return [];
     const providedIds: string[] = [];
-    for (const mod of group.strong) providedIds.push(...providedIdsOf(mod));
-    const groupPaths = new Set(group.strong.map((mod) => mod.path));
+    for (const mod of group.strong || []) providedIds.push(...providedIdsOf(mod));
+    const groupPaths = new Set((group.strong || []).map((mod) => mod.path));
     return findReverseDependents(mods, providedIds, { excludePaths: groupPaths, requireEnabled: true });
   }, [group, mods]);
 
@@ -262,7 +261,7 @@ export function ManageVersionDialog({
         <DialogContent className="max-w-2xl gap-0 p-0" showCloseButton>
           <DialogHeader className="border-b px-4 py-3 pr-12">
             <DialogTitle>
-              {group ? t("manage.version.title", { name: displayModName(group) }) : ""}
+              {group ? t("manage.version.title", { name: group.displayName }) : ""}
             </DialogTitle>
           </DialogHeader>
           <div className="min-h-48">

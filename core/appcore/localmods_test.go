@@ -278,7 +278,7 @@ func TestEnrichModMetadataPrefersOnlineDisplayFields(t *testing.T) {
 		IconURL:    "https://example.com/icon.png",
 		Categories: []string{"library", "magic"},
 	}
-	if err := storage.UpsertModPlatform(project); err != nil {
+	if err := storage.UpsertModProject(project); err != nil {
 		t.Fatal(err)
 	}
 	if err := storage.SetPlatformVersions("Modrinth", "project-1", []models.ModVersion{{
@@ -298,7 +298,7 @@ func TestEnrichModMetadataPrefersOnlineDisplayFields(t *testing.T) {
 		Name:    "Jar Name",
 		Version: "1.0.0",
 		SHA1:    "abc123",
-		JijMods: []structs.JijModInfo{{ID: "nested", Name: "Nested"}},
+		JIJMods: []structs.JIJModInfo{{ID: "nested", Name: "Nested"}},
 	}})
 	if len(misses) != 0 {
 		t.Fatalf("misses = %#v, want none", misses)
@@ -307,7 +307,7 @@ func TestEnrichModMetadataPrefersOnlineDisplayFields(t *testing.T) {
 		t.Fatalf("enriched count = %d, want 1", len(enriched))
 	}
 	got := enriched[0]
-	if got.ID != "jar-id" || got.Name != "Jar Name" || got.Version != "1.0.0" || len(got.JijMods) != 1 {
+	if got.ID != "jar-id" || got.Name != "Jar Name" || got.Version != "1.0.0" || len(got.JIJMods) != 1 {
 		t.Fatalf("jar-derived fields changed: %#v", got)
 	}
 	if got.OnlineName != "Online Project" || got.IconURL != "https://example.com/icon.png" || got.OnlinePlatform != "Modrinth" || got.OnlineProjectID != "project-1" || got.OnlineSlug != "online-project" {

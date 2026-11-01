@@ -60,8 +60,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useDownloadSearchStore } from "@/stores/downloadSearch";
 import {
   hasFavoriteScope,
-  listMatchesScope,
-  listOrder,
   favoriteModKey,
   useFavoritesStore,
 } from "@/stores/favorites";
@@ -169,12 +167,10 @@ export function FavoritesPage() {
     setSelectedKeys(new Set());
   }, [selectedListId]);
 
-  const scopedLists = useMemo(
-    () => lists.filter((list) => listMatchesScope(list, displayMinecraftVersion, displayModLoader)),
-    [displayMinecraftVersion, displayModLoader, lists],
-  );
-  const pinnedLists = useMemo(() => scopedLists.filter((list) => list.pinned).sort(listOrder), [scopedLists]);
-  const ungroupedLists = useMemo(() => scopedLists.filter((list) => !list.pinned).sort(listOrder), [scopedLists]);
+  // Core owns scope filtering and section ordering.
+  const overview = useFavoritesStore((state) => state.overview);
+  const pinnedLists = overview.pinned ?? [];
+  const ungroupedLists = overview.ungrouped ?? [];
   const selectedList = useMemo(
     () => lists.find((list) => list.id === selectedListId) ?? null,
     [lists, selectedListId],

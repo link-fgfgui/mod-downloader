@@ -9,6 +9,7 @@ import (
 	"github.com/link-fgfgui/mod-downloader/core/logging"
 )
 
+// UpsertPinnedMod stores or replaces a pinned mod version.
 func UpsertPinnedMod(p PinnedMod) error {
 	d, err := readyUserDB()
 	if err != nil {
@@ -27,12 +28,13 @@ func UpsertPinnedMod(p PinnedMod) error {
 	return nil
 }
 
-func GetPinnedMod(platform, modID, mcVersion, modLoader string) (PinnedMod, bool) {
+// GetPinnedMod returns the pinned version for a mod in one scope.
+func GetPinnedMod(platform, modID, minecraftVersion, modLoader string) (PinnedMod, bool) {
 	d, err := readyUserDB()
 	if err != nil {
 		return PinnedMod{}, false
 	}
-	key := makePinnedModKey(platform, modID, mcVersion, modLoader)
+	key := makePinnedModKey(platform, modID, minecraftVersion, modLoader)
 	if key.Platform == "" || key.ModID == "" || key.MinecraftVersion == "" || key.ModLoader == "" {
 		return PinnedMod{}, false
 	}
@@ -46,12 +48,13 @@ func GetPinnedMod(platform, modID, mcVersion, modLoader string) (PinnedMod, bool
 	return p, true
 }
 
-func DeletePinnedMod(platform, modID, mcVersion, modLoader string) error {
+// DeletePinnedMod removes the pin for a mod in one scope.
+func DeletePinnedMod(platform, modID, minecraftVersion, modLoader string) error {
 	d, err := readyUserDB()
 	if err != nil {
 		return err
 	}
-	key := makePinnedModKey(platform, modID, mcVersion, modLoader)
+	key := makePinnedModKey(platform, modID, minecraftVersion, modLoader)
 	if key.Platform == "" || key.ModID == "" || key.MinecraftVersion == "" || key.ModLoader == "" {
 		return nil
 	}
@@ -82,10 +85,13 @@ func ListPinnedMods() []PinnedMod {
 
 // --- favorite lists ---
 
+// CreateFavoriteList creates an unscoped favorite list.
 func CreateFavoriteList(name string) (FavoriteList, error) {
 	return CreateFavoriteListForScope(name, "", "")
 }
 
+// CreateFavoriteListForScope creates a favorite list scoped to one Minecraft
+// version and loader.
 func CreateFavoriteListForScope(name, minecraftVersion, modLoader string) (FavoriteList, error) {
 	d, err := readyUserDB()
 	if err != nil {
@@ -105,6 +111,8 @@ func CreateFavoriteListForScope(name, minecraftVersion, modLoader string) (Favor
 	return list, nil
 }
 
+// GetFavoriteListByNameAndScope looks up a list by its unique name within a
+// scope.
 func GetFavoriteListByNameAndScope(name, minecraftVersion, modLoader string) (FavoriteList, bool) {
 	d, err := readyUserDB()
 	if err != nil {
@@ -118,6 +126,8 @@ func GetFavoriteListByNameAndScope(name, minecraftVersion, modLoader string) (Fa
 	return list, found
 }
 
+// CreateFavoriteListWithModsForScope creates a scoped list and inserts mods in
+// one transaction.
 func CreateFavoriteListWithModsForScope(name, minecraftVersion, modLoader string, mods []FavoriteMod) (FavoriteList, []FavoriteMod, error) {
 	d, err := readyUserDB()
 	if err != nil {
@@ -132,6 +142,8 @@ func CreateFavoriteListWithModsForScope(name, minecraftVersion, modLoader string
 	return list, saved, nil
 }
 
+// UpdateFavoriteListName renames a list, preserving its group, scope and
+// ordering.
 func UpdateFavoriteListName(id, name string) (FavoriteList, bool, error) {
 	d, err := readyUserDB()
 	if err != nil {
@@ -154,6 +166,7 @@ func UpdateFavoriteListName(id, name string) (FavoriteList, bool, error) {
 	return list, found, nil
 }
 
+// DeleteFavoriteList removes a list and reports whether it existed.
 func DeleteFavoriteList(id string) (bool, error) {
 	d, err := readyUserDB()
 	if err != nil {
@@ -175,6 +188,7 @@ func DeleteFavoriteList(id string) (bool, error) {
 	return deleted, nil
 }
 
+// GetFavoriteList returns one list by ID.
 func GetFavoriteList(id string) (FavoriteList, bool) {
 	d, err := readyUserDB()
 	if err != nil {
@@ -193,6 +207,7 @@ func GetFavoriteList(id string) (FavoriteList, bool) {
 	return list, true
 }
 
+// ListFavoriteLists returns every favorite list.
 func ListFavoriteLists() []FavoriteList {
 	d, err := readyUserDB()
 	if err != nil {
@@ -207,6 +222,8 @@ func ListFavoriteLists() []FavoriteList {
 	return lists
 }
 
+// UpdateFavoriteListMetadata updates a list's group, icon, pin and scope
+// metadata.
 func UpdateFavoriteListMetadata(list FavoriteList) (FavoriteList, bool, error) {
 	d, err := readyUserDB()
 	if err != nil {
@@ -228,6 +245,7 @@ func UpdateFavoriteListMetadata(list FavoriteList) (FavoriteList, bool, error) {
 	return updated, found, nil
 }
 
+// ReorderFavoriteLists persists the display order of lists.
 func ReorderFavoriteLists(ids []string) error {
 	d, err := readyUserDB()
 	if err != nil {
@@ -240,6 +258,7 @@ func ReorderFavoriteLists(ids []string) error {
 	return nil
 }
 
+// CreateFavoriteGroup creates a favorite list group.
 func CreateFavoriteGroup(name string) (FavoriteGroup, error) {
 	d, err := readyUserDB()
 	if err != nil {
@@ -259,6 +278,7 @@ func CreateFavoriteGroup(name string) (FavoriteGroup, error) {
 	return group, nil
 }
 
+// UpdateFavoriteGroupName renames a group.
 func UpdateFavoriteGroupName(id, name string) (FavoriteGroup, bool, error) {
 	d, err := readyUserDB()
 	if err != nil {
@@ -281,6 +301,7 @@ func UpdateFavoriteGroupName(id, name string) (FavoriteGroup, bool, error) {
 	return group, found, nil
 }
 
+// DeleteFavoriteGroup removes a group and reports whether it existed.
 func DeleteFavoriteGroup(id string) (bool, error) {
 	d, err := readyUserDB()
 	if err != nil {
@@ -302,6 +323,7 @@ func DeleteFavoriteGroup(id string) (bool, error) {
 	return deleted, nil
 }
 
+// ListFavoriteGroups returns every favorite list group.
 func ListFavoriteGroups() []FavoriteGroup {
 	d, err := readyUserDB()
 	if err != nil {
@@ -315,6 +337,7 @@ func ListFavoriteGroups() []FavoriteGroup {
 	return groups
 }
 
+// ReorderFavoriteGroups persists the display order of groups.
 func ReorderFavoriteGroups(ids []string) error {
 	d, err := readyUserDB()
 	if err != nil {
@@ -327,6 +350,7 @@ func ReorderFavoriteGroups(ids []string) error {
 	return nil
 }
 
+// UpsertFavoriteMod inserts or updates a mod in a favorite list.
 func UpsertFavoriteMod(mod FavoriteMod) (FavoriteMod, bool, error) {
 	d, err := readyUserDB()
 	if err != nil {
@@ -348,12 +372,13 @@ func UpsertFavoriteMod(mod FavoriteMod) (FavoriteMod, bool, error) {
 	return copyFavoriteMod(saved), ok, nil
 }
 
-func DeleteFavoriteMod(listID, platform, modID, mcVersion, modLoader string) (bool, error) {
+// DeleteFavoriteMod removes a mod from a list in one scope.
+func DeleteFavoriteMod(listID, platform, modID, minecraftVersion, modLoader string) (bool, error) {
 	d, err := readyUserDB()
 	if err != nil {
 		return false, err
 	}
-	key := makeFavoriteModKey(listID, platform, modID, mcVersion, modLoader)
+	key := makeFavoriteModKey(listID, platform, modID, minecraftVersion, modLoader)
 	if key.ListID == "" || key.Platform == "" || key.ModID == "" {
 		return false, nil
 	}
@@ -369,6 +394,7 @@ func DeleteFavoriteMod(listID, platform, modID, mcVersion, modLoader string) (bo
 	return deleted, nil
 }
 
+// IncrementUsageStat atomically adds delta to a usage counter.
 func IncrementUsageStat(key UsageStatKey, delta int64) error {
 	if delta <= 0 || !validUsageStatKey(key) {
 		return nil
@@ -384,6 +410,7 @@ func IncrementUsageStat(key UsageStatKey, delta int64) error {
 	return nil
 }
 
+// GetUsageStats returns a snapshot of all usage counters.
 func GetUsageStats() UsageStats {
 	d, err := readyUserDB()
 	if err != nil {
@@ -418,6 +445,7 @@ func validUsageStatKey(key UsageStatKey) bool {
 	}
 }
 
+// ListFavoriteMods returns the mods stored directly in one list.
 func ListFavoriteMods(listID string) []FavoriteMod {
 	d, err := readyUserDB()
 	if err != nil {
@@ -436,6 +464,8 @@ func ListFavoriteMods(listID string) []FavoriteMod {
 	return mods
 }
 
+// CreateFavoriteListRef adds a parent-to-child list reference, rejecting
+// cycles.
 func CreateFavoriteListRef(parentListID, childListID string) (FavoriteListRef, bool, error) {
 	d, err := readyUserDB()
 	if err != nil {
@@ -458,6 +488,7 @@ func CreateFavoriteListRef(parentListID, childListID string) (FavoriteListRef, b
 	return ref, ok, nil
 }
 
+// DeleteFavoriteListRef removes a parent-to-child list reference.
 func DeleteFavoriteListRef(parentListID, childListID string) (bool, error) {
 	d, err := readyUserDB()
 	if err != nil {
@@ -480,6 +511,7 @@ func DeleteFavoriteListRef(parentListID, childListID string) (bool, error) {
 	return deleted, nil
 }
 
+// ListFavoriteListRefs returns the direct child references of a list.
 func ListFavoriteListRefs(parentListID string) []FavoriteListRef {
 	d, err := readyUserDB()
 	if err != nil {
@@ -498,6 +530,8 @@ func ListFavoriteListRefs(parentListID string) []FavoriteListRef {
 	return refs
 }
 
+// ListFavoriteContents resolves one list, including inherited mods from
+// referenced lists.
 func ListFavoriteContents(listID string) FavoriteListContents {
 	d, err := readyUserDB()
 	if err != nil {

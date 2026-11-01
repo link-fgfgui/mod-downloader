@@ -674,19 +674,19 @@ func isFilteredProjectVersionRequest(filter projectVersionFilter) bool {
 	return filter.MinecraftVersion != "" || filter.ModLoader != ""
 }
 
-func projectVersionSnapshotScope(filter projectVersionFilter) storage.ModPlatformVersionScope {
+func projectVersionSnapshotScope(filter projectVersionFilter) storage.PlatformVersionScope {
 	filter = normalizeProjectVersionFilter(filter)
-	return storage.ModPlatformVersionScope{
+	return storage.PlatformVersionScope{
 		MinecraftVersion: filter.MinecraftVersion,
 		ModLoader:        filter.ModLoader,
 	}
 }
 
-func projectVersionSnapshotScopes(filter projectVersionFilter) []storage.ModPlatformVersionScope {
+func projectVersionSnapshotScopes(filter projectVersionFilter) []storage.PlatformVersionScope {
 	if !isFilteredProjectVersionRequest(filter) {
 		return nil
 	}
-	return []storage.ModPlatformVersionScope{projectVersionSnapshotScope(filter)}
+	return []storage.PlatformVersionScope{projectVersionSnapshotScope(filter)}
 }
 
 func filterProjectVersionsForFilter(versions []models.ModVersion, filter projectVersionFilter) []models.ModVersion {
@@ -740,7 +740,7 @@ func refreshProjectMetadataIfStale(provider modProvider, platform, projectIDOrSl
 		return
 	}
 	for _, r := range results {
-		if err := storage.UpsertModPlatform(r); err != nil {
+		if err := storage.UpsertModProject(r); err != nil {
 			logging.Error("refresh project metadata failed", "platform", platform, "projectID", projectIDOrSlug, "error", err)
 		}
 	}
@@ -772,7 +772,7 @@ func listProjectVersionsWithFilter(provider modProvider, projectIDOrSlug string,
 	versions, err := provider.ListVersions(projectIDOrSlug, filter)
 	if err != nil || len(versions) == 0 {
 		logging.Error("list project versions failed", "provider", provider.Name(), "projectIDOrSlug", projectIDOrSlug, "minecraftVersion", filter.MinecraftVersion, "modLoader", filter.ModLoader, "error", err)
-		if versions, ok := getProjectVersionsSnapshot(platform, projectIDOrSlug, filter); ok {
+		if versions, ok := getProjectVersionsSnapshot(platform, projectIDOrSlug); ok {
 			versions = filterProjectVersionsForFilter(versions, filter)
 			versions = sortModVersions(versions)
 			return versions
@@ -851,7 +851,7 @@ func getFreshProjectVersionsSnapshot(platform, projectID string, filter projectV
 	return versions, true
 }
 
-func getProjectVersionsSnapshot(platform, projectID string, filter projectVersionFilter) ([]models.ModVersion, bool) {
+func getProjectVersionsSnapshot(platform, projectID string) ([]models.ModVersion, bool) {
 	record, ok := getProjectSnapshotPlatform(platform, projectID)
 	if !ok {
 		return nil, false
@@ -871,10 +871,10 @@ func getProjectSnapshotPlatform(platform, projectIDOrSlug string) (models.ModPro
 	if projectIDOrSlug == "" {
 		return models.ModProject{}, false
 	}
-	if record, ok := storage.GetModPlatform(platform, projectIDOrSlug); ok {
+	if record, ok := storage.GetModProject(platform, projectIDOrSlug); ok {
 		return record, true
 	}
-	return storage.GetModPlatformBySlug(platform, projectIDOrSlug)
+	return storage.GetModProjectBySlug(platform, projectIDOrSlug)
 }
 
 func saveProjectVersionsSnapshot(platform, requestedProject string, projectID string, versions []models.ModVersion, filter projectVersionFilter) error {
@@ -890,7 +890,7 @@ func saveProjectVersionsSnapshot(platform, requestedProject string, projectID st
 	if requestedProject != "" && !strings.EqualFold(requestedProject, projectID) {
 		meta.Slug = requestedProject
 	}
-	if err := storage.UpsertModPlatform(meta); err != nil {
+	if err := storage.UpsertModProject(meta); err != nil {
 		return err
 	}
 	return storage.SetPlatformVersionSnapshot(platform, projectID, versions, time.Now().Unix(), projectVersionSnapshotScopes(filter))

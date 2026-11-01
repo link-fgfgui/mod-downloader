@@ -15,6 +15,7 @@ import (
 	"github.com/link-fgfgui/mod-downloader/core/models"
 	"github.com/link-fgfgui/mod-downloader/core/storage"
 	appstructs "github.com/link-fgfgui/mod-downloader/core/structs"
+	appview "github.com/link-fgfgui/mod-downloader/core/structs/view"
 )
 
 const localMetadataMissTTL = 24 * time.Hour
@@ -29,7 +30,10 @@ var providerBackground = struct {
 	wg        sync.WaitGroup
 }{accepting: true}
 
-func SearchMods(req appstructs.SearchModsRequest, emitUpdate func(appstructs.SearchModsUpdate)) {
+// SearchMods queries every provider, preferring exact title matches and
+// falling back to broad text results. emitUpdate receives intermediate and
+// final pages.
+func SearchMods(req appstructs.SearchModsRequest, emitUpdate func(appview.SearchModsUpdate)) {
 	req = normalizeSearchModsRequest(req)
 
 	var wg sync.WaitGroup
@@ -49,7 +53,7 @@ func SearchMods(req appstructs.SearchModsRequest, emitUpdate func(appstructs.Sea
 			results = mergeProviderSearchResults(providerResults)
 		}
 		if emitUpdate != nil {
-			emitUpdate(appstructs.SearchModsUpdate{
+			emitUpdate(appview.SearchModsUpdate{
 				RequestID: req.RequestID,
 				Results:   results,
 				Loading:   remaining > 0,
@@ -112,7 +116,9 @@ func SearchMods(req appstructs.SearchModsRequest, emitUpdate func(appstructs.Sea
 	go cacheSearchResults(finalResults)
 }
 
-func SearchModsText(req appstructs.SearchModsRequest, emitUpdate func(appstructs.SearchModsUpdate)) {
+// SearchModsText runs the broad text search only, without the extra exact
+// title probes used by SearchMods.
+func SearchModsText(req appstructs.SearchModsRequest, emitUpdate func(appview.SearchModsUpdate)) {
 	req = normalizeSearchModsRequest(req)
 
 	var wg sync.WaitGroup
@@ -122,7 +128,7 @@ func SearchModsText(req appstructs.SearchModsRequest, emitUpdate func(appstructs
 
 	emit := func() {
 		if emitUpdate != nil {
-			emitUpdate(appstructs.SearchModsUpdate{
+			emitUpdate(appview.SearchModsUpdate{
 				RequestID: req.RequestID,
 				Results:   mergeProviderSearchResults(providerResults),
 				Loading:   remaining > 0,
@@ -171,6 +177,8 @@ func normalizeSearchModsRequest(req appstructs.SearchModsRequest) appstructs.Sea
 	return req
 }
 
+// ResolveMetadataByHashes resolves file hashes to platform projects and
+// versions.
 func ResolveMetadataByHashes(hashes []string) (map[string]models.ModProject, map[string]models.ModVersion) {
 	files := make(map[string]uint32, len(hashes))
 	for _, hash := range hashes {
@@ -289,7 +297,7 @@ func cacheResolvedMetadata(projects map[string]models.ModProject, versions map[s
 		if strings.TrimSpace(project.Title) == "" {
 			continue
 		}
-		if err := storage.UpsertModPlatform(project); err != nil {
+		if err := storage.UpsertModProject(project); err != nil {
 			logging.Error("cache resolved project failed", "platform", project.Platform, "projectID", project.ProjectID, "error", err)
 		}
 	}
@@ -321,12 +329,14 @@ func cacheSearchResults(results []models.ModProject) {
 		if strings.TrimSpace(r.Title) == "" {
 			continue
 		}
-		if err := storage.UpsertModPlatform(r); err != nil {
+		if err := storage.UpsertModProject(r); err != nil {
 			logging.Error("cache search result failed", "platform", r.Platform, "projectID", r.ProjectID, "error", err)
 		}
 	}
 }
 
+// ListMatchingProjectVersions filters a project's cached versions to those
+// matching the requested Minecraft version and loader.
 func ListMatchingProjectVersions(result models.ModProject, minecraftVersion string, modLoader string) []models.ModVersion {
 	provider, projectIDOrSlug, ok := providerAndProjectFromSearchResult(result)
 	if !ok {
@@ -344,6 +354,8 @@ func ListMatchingProjectVersions(result models.ModProject, minecraftVersion stri
 	return filterProjectVersionsForSearch(versions, req)
 }
 
+// RefreshMatchingProjectVersions re-fetches a project's versions and returns
+// those matching the requested Minecraft version and loader.
 func RefreshMatchingProjectVersions(result models.ModProject, minecraftVersion string, modLoader string) []models.ModVersion {
 	provider, projectIDOrSlug, ok := providerAndProjectFromSearchResult(result)
 	if !ok {
@@ -434,14 +446,16 @@ func startBackgroundTask(task func()) {
 	providerBackground.mu.Unlock()
 }
 
-func LookupProjectByPlatform(platform, idOrSlug, mcVersion, modLoader string) (models.ModProject, bool) {
+// LookupProjectByPlatform resolves a project ID-or-slug using the provider's
+// exact search.
+func LookupProjectByPlatform(platform, idOrSlug, minecraftVersion, modLoader string) (models.ModProject, bool) {
 	provider := providerByPlatform(platform)
 	if provider == nil {
 		return models.ModProject{}, false
 	}
 	results, err := provider.ExactSearch(appstructs.SearchModsRequest{
 		Query:     idOrSlug,
-		Version:   strings.TrimSpace(mcVersion),
+		Version:   strings.TrimSpace(minecraftVersion),
 		ModLoader: strings.ToLower(strings.TrimSpace(modLoader)),
 	})
 	if err != nil || len(results) == 0 {
@@ -450,24 +464,27 @@ func LookupProjectByPlatform(platform, idOrSlug, mcVersion, modLoader string) (m
 	return results[0], true
 }
 
-func LookupProjectByPlatformSlug(platform, slug, mcVersion, modLoader string) (models.ModProject, bool) {
-	return lookupProjectByPlatformMatching(platform, slug, mcVersion, modLoader, func(project models.ModProject, expected string) bool {
+// LookupProjectByPlatformSlug resolves a project by slug and verifies its slug.
+func LookupProjectByPlatformSlug(platform, slug, minecraftVersion, modLoader string) (models.ModProject, bool) {
+	return lookupProjectByPlatformMatching(platform, slug, minecraftVersion, modLoader, func(project models.ModProject, expected string) bool {
 		return strings.EqualFold(strings.TrimSpace(project.Slug), expected)
 	})
 }
 
-func LookupProjectByPlatformID(platform, projectID, mcVersion, modLoader string) (models.ModProject, bool) {
-	return lookupProjectByPlatformMatching(platform, projectID, mcVersion, modLoader, func(project models.ModProject, expected string) bool {
+// LookupProjectByPlatformID resolves a project by platform project ID and
+// verifies the returned project ID.
+func LookupProjectByPlatformID(platform, projectID, minecraftVersion, modLoader string) (models.ModProject, bool) {
+	return lookupProjectByPlatformMatching(platform, projectID, minecraftVersion, modLoader, func(project models.ModProject, expected string) bool {
 		return strings.EqualFold(strings.TrimSpace(project.ProjectID), expected)
 	})
 }
 
-func lookupProjectByPlatformMatching(platform, idOrSlug, mcVersion, modLoader string, match func(models.ModProject, string) bool) (models.ModProject, bool) {
+func lookupProjectByPlatformMatching(platform, idOrSlug, minecraftVersion, modLoader string, match func(models.ModProject, string) bool) (models.ModProject, bool) {
 	expected := strings.TrimSpace(idOrSlug)
 	if expected == "" {
 		return models.ModProject{}, false
 	}
-	project, ok := LookupProjectByPlatform(platform, expected, mcVersion, modLoader)
+	project, ok := LookupProjectByPlatform(platform, expected, minecraftVersion, modLoader)
 	if !ok || !match(project, expected) {
 		return models.ModProject{}, false
 	}
@@ -484,6 +501,8 @@ func providerByPlatform(platform string) modProvider {
 	return nil
 }
 
+// ProjectReferenceFromSearchResult returns the stable "platform:slug" (or
+// composite ID) reference used by favorites and downloads.
 func ProjectReferenceFromSearchResult(result models.ModProject) string {
 	if result.ID != "" {
 		return result.ID
@@ -494,10 +513,14 @@ func ProjectReferenceFromSearchResult(result models.ModProject) string {
 	return result.Slug
 }
 
+// SplitProjectReference splits a "platform:project" reference into platform
+// and project ID.
 func SplitProjectReference(projectIDOrSlug string) (string, string) {
 	return splitProjectReference(projectIDOrSlug)
 }
 
+// ProjectVersionSHA1Set returns every file hash of a project's versions,
+// including its equivalent project on the other platform.
 func ProjectVersionSHA1Set(result models.ModProject) map[string]bool {
 	set := make(map[string]bool)
 	provider, project, ok := providerAndProjectFromSearchResult(result)

@@ -57,7 +57,7 @@ func TestHTTPRangeReaderResolvesRedirectBeforeRangeProbe(t *testing.T) {
 }
 
 func TestHTTPRangeReaderConstructorHonorsTimeout(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		time.Sleep(200 * time.Millisecond)
 		w.Header().Set("Content-Range", "bytes 0-0/10")
 		w.WriteHeader(http.StatusPartialContent)

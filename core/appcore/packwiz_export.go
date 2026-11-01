@@ -17,6 +17,7 @@ import (
 	appstructs "github.com/link-fgfgui/mod-downloader/core/structs"
 )
 
+// ExportFavoriteListPackwizResult is the path of a written packwiz archive.
 type ExportFavoriteListPackwizResult struct {
 	Path string `json:"path"`
 }
@@ -26,6 +27,7 @@ type favoriteExportScope struct {
 	ModLoader        string
 }
 
+// FavoriteListPackwizDefaultFilename returns a safe archive name for a list.
 func (s *Service) FavoriteListPackwizDefaultFilename(listID string) string {
 	if list, ok := storage.GetFavoriteList(listID); ok {
 		return packwiz.SafeArchiveName(list.Name)
@@ -33,10 +35,13 @@ func (s *Service) FavoriteListPackwizDefaultFilename(listID string) string {
 	return packwiz.SafeArchiveName("packwiz-export")
 }
 
+// ExportFavoriteListPackwizZip exports a favorite list using its own scope.
 func (s *Service) ExportFavoriteListPackwizZip(listID, destinationPath string) (ExportFavoriteListPackwizResult, error) {
 	return s.ExportFavoriteListPackwizZipForScope(listID, destinationPath, "", "")
 }
 
+// ExportFavoriteListPackwizZipForScope exports the list's mods resolved for an
+// explicit Minecraft version and loader.
 func (s *Service) ExportFavoriteListPackwizZipForScope(listID, destinationPath, minecraftVersion, modLoader string) (ExportFavoriteListPackwizResult, error) {
 	listID = strings.TrimSpace(listID)
 	if listID == "" {
@@ -114,15 +119,15 @@ func favoritePackwizItemsForScope(items []storage.FavoriteMod, minecraftVersion,
 func favoritePackwizScope(items []storage.FavoriteMod) (favoriteExportScope, error) {
 	var scope favoriteExportScope
 	for _, item := range items {
-		mcVersion := strings.TrimSpace(item.MinecraftVersion)
+		minecraftVersion := strings.TrimSpace(item.MinecraftVersion)
 		modLoader := strings.ToLower(strings.TrimSpace(item.ModLoader))
 		name := favoriteDisplayName(item)
-		if mcVersion == "" || modLoader == "" {
+		if minecraftVersion == "" || modLoader == "" {
 			return favoriteExportScope{}, fmt.Errorf("%s: missing minecraft version or mod loader", name)
 		}
 		if scope.MinecraftVersion == "" {
-			scope.MinecraftVersion = mcVersion
-		} else if scope.MinecraftVersion != mcVersion {
+			scope.MinecraftVersion = minecraftVersion
+		} else if scope.MinecraftVersion != minecraftVersion {
 			return favoriteExportScope{}, fmt.Errorf("favorite list contains multiple minecraft versions")
 		}
 		if scope.ModLoader == "" {

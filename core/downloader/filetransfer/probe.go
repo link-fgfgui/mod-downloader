@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 link-fgfgui
 // SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
 
+// Package filetransfer downloads files with ranged requests, resume support
+// and adaptive concurrency, independent of the calling adapter.
 package filetransfer
 
 import (

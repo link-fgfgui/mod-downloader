@@ -175,7 +175,7 @@ func TestMinecraftReleaseVersionsNormalizeAndPersist(t *testing.T) {
 func TestCachePlatformVersionsAndDependencies(t *testing.T) {
 	path := openTestDB(t)
 
-	if err := UpsertModPlatform(models.ModProject{
+	if err := UpsertModProject(models.ModProject{
 		Platform:  "Modrinth",
 		ProjectID: "sodium",
 		Slug:      "sodium-slug",
@@ -196,7 +196,7 @@ func TestCachePlatformVersionsAndDependencies(t *testing.T) {
 				DependencyType:      "required",
 			}},
 		},
-	}, 100, []ModPlatformVersionScope{{
+	}, 100, []PlatformVersionScope{{
 		MinecraftVersion: "1.21.1",
 		ModLoader:        "NeoForge",
 	}}); err != nil {
@@ -209,10 +209,10 @@ func TestCachePlatformVersionsAndDependencies(t *testing.T) {
 
 	reopenTestDB(t, path)
 
-	if p, ok := GetModPlatformBySlug("Modrinth", "sodium-slug"); !ok || p.ProjectID != "sodium" {
+	if p, ok := GetModProjectBySlug("Modrinth", "sodium-slug"); !ok || p.ProjectID != "sodium" {
 		t.Fatalf("slug lookup = %#v, %v", p, ok)
 	}
-	if ts, ok := GetPlatformVersionScopeUpdatedAt("Modrinth", "sodium", ModPlatformVersionScope{MinecraftVersion: "1.21.1", ModLoader: "neoforge"}); !ok || ts != 100 {
+	if ts, ok := GetPlatformVersionScopeUpdatedAt("Modrinth", "sodium", PlatformVersionScope{MinecraftVersion: "1.21.1", ModLoader: "neoforge"}); !ok || ts != 100 {
 		t.Fatalf("scope timestamp = %d, %v", ts, ok)
 	}
 
@@ -239,7 +239,7 @@ func TestCachePlatformVersionsAndDependencies(t *testing.T) {
 func TestPlatformCacheKeysAreCaseInsensitive(t *testing.T) {
 	openTestDB(t)
 
-	if err := UpsertModPlatform(models.ModProject{
+	if err := UpsertModProject(models.ModProject{
 		Platform:  "Modrinth",
 		ProjectID: "sodium",
 		Slug:      "sodium-slug",
@@ -253,23 +253,23 @@ func TestPlatformCacheKeysAreCaseInsensitive(t *testing.T) {
 			SHA1:        "abc",
 			PublishedAt: 10,
 		},
-	}, 100, []ModPlatformVersionScope{{
+	}, 100, []PlatformVersionScope{{
 		MinecraftVersion: "1.21.1",
 		ModLoader:        "NeoForge",
 	}}); err != nil {
 		t.Fatal(err)
 	}
 
-	if p, ok := GetModPlatform("modrinth", "sodium"); !ok || p.Title != "Sodium" || p.Platform != "Modrinth" {
-		t.Fatalf("GetModPlatform lower-case = %#v, %v", p, ok)
+	if p, ok := GetModProject("modrinth", "sodium"); !ok || p.Title != "Sodium" || p.Platform != "Modrinth" {
+		t.Fatalf("GetModProject lower-case = %#v, %v", p, ok)
 	}
-	if p, ok := GetModPlatformBySlug("modrinth", "sodium-slug"); !ok || p.ProjectID != "sodium" {
-		t.Fatalf("GetModPlatformBySlug lower-case = %#v, %v", p, ok)
+	if p, ok := GetModProjectBySlug("modrinth", "sodium-slug"); !ok || p.ProjectID != "sodium" {
+		t.Fatalf("GetModProjectBySlug lower-case = %#v, %v", p, ok)
 	}
 	if versions, err := GetPlatformVersions("modrinth", "sodium"); err != nil || len(versions) != 1 || versions[0].VersionID != "v1" {
 		t.Fatalf("GetPlatformVersions lower-case = %#v, %v", versions, err)
 	}
-	if ts, ok := GetPlatformVersionScopeUpdatedAt("modrinth", "sodium", ModPlatformVersionScope{MinecraftVersion: "1.21.1", ModLoader: "neoforge"}); !ok || ts != 100 {
+	if ts, ok := GetPlatformVersionScopeUpdatedAt("modrinth", "sodium", PlatformVersionScope{MinecraftVersion: "1.21.1", ModLoader: "neoforge"}); !ok || ts != 100 {
 		t.Fatalf("GetPlatformVersionScopeUpdatedAt lower-case = %d, %v", ts, ok)
 	}
 	if version, ok := GetLatestProjectBySHA1("modrinth", "abc"); !ok || version.VersionID != "v1" || version.Platform != "Modrinth" {
@@ -820,7 +820,7 @@ func TestCreateFavoriteListWithModsForScopeIsAtomic(t *testing.T) {
 func TestCacheVersionModIDs(t *testing.T) {
 	path := openTestDB(t)
 
-	if err := UpsertModPlatform(models.ModProject{
+	if err := UpsertModProject(models.ModProject{
 		Platform:  "Modrinth",
 		ProjectID: "sodium",
 		Slug:      "sodium-slug",
@@ -837,7 +837,7 @@ func TestCacheVersionModIDs(t *testing.T) {
 			GameVersions: []string{"1.21.1"},
 			Loaders:      []string{"neoforge"},
 		},
-	}, 100, []ModPlatformVersionScope{{
+	}, 100, []PlatformVersionScope{{
 		MinecraftVersion: "1.21.1",
 		ModLoader:        "NeoForge",
 	}}); err != nil {
@@ -895,7 +895,7 @@ func TestFindCachedModVersionsByModIDFiltersAndSurvivesReopen(t *testing.T) {
 		{Platform: "Modrinth", ProjectID: "architectury", Title: "Architectury API"},
 		{Platform: "CurseForge", ProjectID: "419699", Title: "Architectury API CF"},
 	} {
-		if err := UpsertModPlatform(project); err != nil {
+		if err := UpsertModProject(project); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -5,6 +5,8 @@ package structs
 
 import "github.com/link-fgfgui/mod-downloader/core/models"
 
+// SearchModsRequest is the adapter-independent search input. Empty Version or
+// ModLoader means "any".
 type SearchModsRequest struct {
 	RequestID string `json:"requestId"`
 	Query     string `json:"query"`
@@ -14,13 +16,8 @@ type SearchModsRequest struct {
 	Limit     int    `json:"limit"`
 }
 
-type SearchModsUpdate struct {
-	RequestID string              `json:"requestId"`
-	Results   []models.ModProject `json:"results"`
-	Loading   bool                `json:"loading"`
-	Append    bool                `json:"append"`
-}
-
+// ModVersionPinRequest pins one platform version for a mod in a specific
+// Minecraft version/loader scope.
 type ModVersionPinRequest struct {
 	Platform         string `json:"platform"`
 	ModID            string `json:"modId"`
@@ -29,6 +26,9 @@ type ModVersionPinRequest struct {
 	ModLoader        string `json:"modLoader"`
 }
 
+// ModDownloadRequest queues one mod (and its required dependencies) for
+// install into TargetDir, or into the selected instance when TargetDir is
+// empty.
 type ModDownloadRequest struct {
 	ProjectID        string            `json:"projectId"`
 	Result           models.ModProject `json:"result"`
@@ -39,6 +39,8 @@ type ModDownloadRequest struct {
 	InstanceID       string            `json:"instanceId,omitempty"`
 }
 
+// ModDownloadResult reports whether a queue request was accepted, skipped or
+// rejected, and identifies the created queue entry.
 type ModDownloadResult struct {
 	Queued    bool   `json:"queued"`
 	Skipped   bool   `json:"skipped"`
@@ -50,68 +52,23 @@ type ModDownloadResult struct {
 	QueueID string `json:"queueId,omitempty"`
 }
 
-type DownloadQueueState struct {
-	Active            bool                         `json:"active"`
-	Pending           int                          `json:"pending"`
-	Running           int                          `json:"running"`
-	MessageCount      int                          `json:"messageCount"`
-	BytesComplete     int64                        `json:"bytesComplete"`
-	TotalBytes        int64                        `json:"totalBytes"`
-	BytesPerSecond    int64                        `json:"bytesPerSecond"`
-	Items             []DownloadQueueItem          `json:"items,omitempty"`
-	OptionalReminders []OptionalDependencyReminder `json:"optionalReminders,omitempty"`
-}
-
-type DownloadQueueItem struct {
-	ID               string `json:"id"`
-	ProjectID        string `json:"projectId,omitempty"`
-	Status           string `json:"status"`
-	Title            string `json:"title"`
-	FileName         string `json:"fileName"`
-	VersionID        string `json:"versionId"`
-	Platform         string `json:"platform"`
-	MinecraftVersion string `json:"minecraftVersion"`
-	ModLoader        string `json:"modLoader"`
-	Cancelable       bool   `json:"cancelable"`
-	Retryable        bool   `json:"retryable"`
-	Reason           string `json:"reason,omitempty"`
-	BytesComplete    int64  `json:"bytesComplete"`
-	TotalBytes       int64  `json:"totalBytes"`
-}
-
+// DownloadFailedEvent is emitted when one queue entry fails permanently.
 type DownloadFailedEvent struct {
 	FileName  string `json:"fileName"`
 	VersionID string `json:"versionId"`
 	Reason    string `json:"reason"`
 }
 
-type OptionalDependencyReminder struct {
-	ID               string                        `json:"id"`
-	MainProjectKey   string                        `json:"mainProjectKey"`
-	MainTitle        string                        `json:"mainTitle"`
-	MainVersionID    string                        `json:"mainVersionId"`
-	MinecraftVersion string                        `json:"minecraftVersion"`
-	ModLoader        string                        `json:"modLoader"`
-	Dependencies     []OptionalDependencyCandidate `json:"dependencies,omitempty"`
-}
-
-type OptionalDependencyCandidate struct {
-	ProjectKey string `json:"projectKey"`
-	Platform   string `json:"platform"`
-	ProjectID  string `json:"projectId"`
-	Title      string `json:"title"`
-	VersionID  string `json:"versionId,omitempty"`
-	Status     string `json:"status"`
-	Disabled   bool   `json:"disabled"`
-	Reason     string `json:"reason,omitempty"`
-}
-
+// IncompatibleLocalMod identifies a local JAR that declares a conflict with a
+// project about to be installed.
 type IncompatibleLocalMod struct {
 	Path     string `json:"path"`
 	FileName string `json:"fileName"`
 	SHA1     string `json:"sha1"`
 }
 
+// IncompatibleConflict pairs a requested project with the local mods that
+// declare it incompatible.
 type IncompatibleConflict struct {
 	ProjectKey             string                 `json:"projectKey"`
 	ProjectTitle           string                 `json:"projectTitle"`
@@ -138,6 +95,7 @@ const (
 	DependencyPreflightConflict  = "conflict"
 )
 
+// DependencyPreflightEntry is one dependency row in a preflight result.
 type DependencyPreflightEntry struct {
 	ProjectID       string `json:"projectId"`
 	Title           string `json:"title"`
@@ -147,6 +105,8 @@ type DependencyPreflightEntry struct {
 	LocalVersion    string `json:"localVersion,omitempty"`
 }
 
+// DependencyPreflightResult summarizes how many required dependencies are
+// already fulfilled, missing, or blocked by a conflict.
 type DependencyPreflightResult struct {
 	Entries   []DependencyPreflightEntry `json:"entries"`
 	Fulfilled int                        `json:"fulfilled"`
@@ -154,6 +114,7 @@ type DependencyPreflightResult struct {
 	Conflicts int                        `json:"conflicts"`
 }
 
+// BatchDownloadRequest queues several projects for the same instance.
 type BatchDownloadRequest struct {
 	Results          []models.ModProject `json:"results"`
 	MinecraftVersion string              `json:"minecraftVersion"`
@@ -162,6 +123,8 @@ type BatchDownloadRequest struct {
 	InstanceID       string              `json:"instanceId,omitempty"`
 }
 
+// BatchIncompatibleConflict groups the conflicts found for one requested
+// project in a batch.
 type BatchIncompatibleConflict struct {
 	Key       string                 `json:"key"`
 	Title     string                 `json:"title"`
@@ -169,24 +132,18 @@ type BatchIncompatibleConflict struct {
 	Conflicts []IncompatibleConflict `json:"conflicts,omitempty"`
 }
 
+// BatchIncompatibleAnalysis is the result of checking every project in a batch
+// for local incompatibilities.
 type BatchIncompatibleAnalysis struct {
 	Conflicts []BatchIncompatibleConflict `json:"conflicts,omitempty"`
 }
 
+// DownloadStatesRequest asks for the per-project download button states of a
+// result list.
 type DownloadStatesRequest struct {
 	Results          []models.ModProject `json:"results"`
 	MinecraftVersion string              `json:"minecraftVersion"`
 	ModLoader        string              `json:"modLoader"`
 	TargetDir        string              `json:"targetDir,omitempty"`
 	InstanceID       string              `json:"instanceId,omitempty"`
-}
-
-type ModDownloadButtonState struct {
-	Key              string `json:"key"`
-	Status           string `json:"status"`
-	ConflictFileName string `json:"conflictFileName,omitempty"`
-	Disabled         bool   `json:"disabled"`
-	Loading          bool   `json:"loading"`
-	Icon             string `json:"icon"`
-	Color            string `json:"color"`
 }

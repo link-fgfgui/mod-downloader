@@ -26,20 +26,22 @@ import (
 	"github.com/link-fgfgui/mod-downloader/core/models"
 	"github.com/link-fgfgui/mod-downloader/core/providers"
 	appstructs "github.com/link-fgfgui/mod-downloader/core/structs"
+	appview "github.com/link-fgfgui/mod-downloader/core/structs/view"
 )
 
+// Events carries the download queue callbacks. Any callback may be nil.
 type Events struct {
-	OnQueueState        func(appstructs.DownloadQueueState)
+	OnQueueState        func(appview.DownloadQueueState)
 	OnDownloadFailed    func(appstructs.DownloadFailedEvent)
 	OnDownloadCompleted func()
 }
 
 type downloadJob struct {
 	ID string
-	// WaitID groups the main job with the dependencies queued by the same
+	// QueueID groups the main job with the dependencies queued by the same
 	// request. It stays stable across internal requeues so a caller can wait on
 	// one queue entry instead of the whole active queue.
-	WaitID            string
+	QueueID           string
 	ProjectID         string
 	Version           models.ModVersion
 	Result            models.ModProject
@@ -57,6 +59,7 @@ type downloadJob struct {
 	cancel            context.CancelFunc
 }
 
+// Config holds the queue and file-transfer limits applied at startup.
 type Config struct {
 	FileConcurrency         int
 	ConcurrentDownloads     int
@@ -78,7 +81,7 @@ type downloadProgress struct {
 }
 
 type optionalDependencyReminderState struct {
-	Snapshot appstructs.OptionalDependencyReminder
+	Snapshot appview.OptionalDependencyReminder
 	Requests []appstructs.ModDownloadRequest
 }
 
@@ -104,7 +107,7 @@ var (
 )
 
 type downloadGroup struct {
-	waitID   string
+	queueID  string
 	members  map[string]struct{}
 	done     chan struct{}
 	status   string
@@ -251,7 +254,7 @@ func downloadGroupResultLocked(group *downloadGroup) DownloadWaitResult {
 
 // CancelDownloadGroup cancels every active queue entry that belongs to the
 // same install request (the main job and its required dependencies).
-func CancelDownloadGroup(ctx context.Context, queueID string, events ...Events) bool {
+func CancelDownloadGroup(queueID string, events ...Events) bool {
 	id := strings.TrimSpace(queueID)
 	if id == "" {
 		return false
@@ -305,38 +308,38 @@ func CancelDownloadGroup(ctx context.Context, queueID string, events ...Events) 
 	return true
 }
 
-func ensureDownloadGroupLocked(waitID string) *downloadGroup {
+func ensureDownloadGroupLocked(queueID string) *downloadGroup {
 	if downloadQueue.groups == nil {
 		downloadQueue.groups = make(map[string]*downloadGroup)
 	}
-	if group, ok := downloadQueue.groups[waitID]; ok && !group.finished {
+	if group, ok := downloadQueue.groups[queueID]; ok && !group.finished {
 		return group
 	}
 	group := &downloadGroup{
-		waitID:  waitID,
+		queueID: queueID,
 		members: make(map[string]struct{}),
 		done:    make(chan struct{}),
 	}
-	downloadQueue.groups[waitID] = group
+	downloadQueue.groups[queueID] = group
 	return group
 }
 
 func registerDownloadJobLocked(job *downloadJob) {
 	assignDownloadIDLocked(job)
-	if strings.TrimSpace(job.WaitID) == "" {
-		job.WaitID = job.ID
+	if strings.TrimSpace(job.QueueID) == "" {
+		job.QueueID = job.ID
 	}
-	ensureDownloadGroupLocked(job.WaitID).members[job.ID] = struct{}{}
+	ensureDownloadGroupLocked(job.QueueID).members[job.ID] = struct{}{}
 	registerDownloadProgressLocked(*job)
 }
 
 func finishDownloadLocked(job downloadJob, status, reason string) {
-	group := downloadQueue.groups[job.WaitID]
+	group := downloadQueue.groups[job.QueueID]
 	if group == nil {
 		return
 	}
 	delete(group.members, job.ID)
-	if job.ID != job.WaitID || group.finished {
+	if job.ID != job.QueueID || group.finished {
 		return
 	}
 	finishDownloadGroupLocked(group, status, reason)
@@ -350,13 +353,14 @@ func finishDownloadGroupLocked(group *downloadGroup, status, reason string) {
 	group.status = strings.TrimSpace(status)
 	group.reason = strings.TrimSpace(reason)
 	close(group.done)
-	downloadQueue.finishedGroups = append(downloadQueue.finishedGroups, group.waitID)
+	downloadQueue.finishedGroups = append(downloadQueue.finishedGroups, group.queueID)
 	for len(downloadQueue.finishedGroups) > maxRetryableDownloadHistory {
 		delete(downloadQueue.groups, downloadQueue.finishedGroups[0])
 		downloadQueue.finishedGroups = downloadQueue.finishedGroups[1:]
 	}
 }
 
+// Configure applies download concurrency, rate and verification settings.
 func Configure(config Config) {
 	fileConcurrency := config.FileConcurrency
 	if fileConcurrency <= 0 {
@@ -404,10 +408,13 @@ func configuredVerifySHA1() bool {
 	return downloadVerifySHA1.Load()
 }
 
+// QueueModDownload queues a mod and its required dependencies using the
+// default user agent.
 func QueueModDownload(ctx context.Context, req appstructs.ModDownloadRequest, curseForgeAPIKey string, events ...Events) appstructs.ModDownloadResult {
 	return QueueModDownloadWithUserAgent(ctx, req, curseForgeAPIKey, "", events...)
 }
 
+// QueueModDownloadWithUserAgent queues a mod with an explicit HTTP user agent.
 func QueueModDownloadWithUserAgent(ctx context.Context, req appstructs.ModDownloadRequest, curseForgeAPIKey string, userAgent string, events ...Events) appstructs.ModDownloadResult {
 	return queueModDownload(ctx, req, curseForgeAPIKey, userAgent, make(map[string]bool), firstEvents(events))
 }
@@ -480,11 +487,13 @@ func buildDownloadJob(req appstructs.ModDownloadRequest, curseForgeAPIKey string
 		}, true
 }
 
-func GetDownloadQueueState() appstructs.DownloadQueueState {
+// GetDownloadQueueState returns the current queue snapshot.
+func GetDownloadQueueState() appview.DownloadQueueState {
 	return currentDownloadQueueState()
 }
 
-func CancelDownload(ctx context.Context, id string, events ...Events) bool {
+// CancelDownload cancels a pending or running queue entry.
+func CancelDownload(id string, events ...Events) bool {
 	id = strings.TrimSpace(id)
 	if id == "" {
 		return false
@@ -529,6 +538,7 @@ func CancelDownload(ctx context.Context, id string, events ...Events) bool {
 	return true
 }
 
+// RetryDownload retries a failed or canceled queue entry.
 func RetryDownload(ctx context.Context, id string, events ...Events) bool {
 	id = strings.TrimSpace(id)
 	if id == "" {
@@ -553,7 +563,7 @@ func RetryDownload(ctx context.Context, id string, events ...Events) bool {
 		downloadQueue.Unlock()
 
 		job.ID = ""
-		job.WaitID = ""
+		job.QueueID = ""
 		job.cancel = nil
 		job.AutoAttempt = 0
 		enqueueDownload(ctx, job, eventSink)
@@ -580,6 +590,8 @@ func RetryDownload(ctx context.Context, id string, events ...Events) bool {
 	return true
 }
 
+// RemoveDownload removes a finished, canceled or pending queue entry without
+// retrying it.
 func RemoveDownload(id string, events ...Events) bool {
 	id = strings.TrimSpace(id)
 	if id == "" {
@@ -620,6 +632,7 @@ func RemoveDownload(id string, events ...Events) bool {
 	return true
 }
 
+// DismissOptionalDependencyReminder removes one optional-dependency reminder.
 func DismissOptionalDependencyReminder(id string, events ...Events) bool {
 	id = strings.TrimSpace(id)
 	if id == "" {
@@ -644,6 +657,8 @@ func DismissOptionalDependencyReminder(id string, events ...Events) bool {
 	return true
 }
 
+// ClearOptionalDependencyReminders removes every optional-dependency reminder
+// and reports whether anything changed.
 func ClearOptionalDependencyReminders(events ...Events) bool {
 	eventSink := firstEvents(events)
 	downloadQueue.Lock()
@@ -657,10 +672,14 @@ func ClearOptionalDependencyReminders(events ...Events) bool {
 	return true
 }
 
+// InstallOptionalDependencies queues the selected optional dependencies of a
+// reminder using the default user agent.
 func InstallOptionalDependencies(ctx context.Context, id string, curseForgeAPIKey string, events ...Events) []appstructs.ModDownloadResult {
 	return InstallOptionalDependenciesWithUserAgent(ctx, id, curseForgeAPIKey, "", events...)
 }
 
+// InstallOptionalDependenciesWithUserAgent queues optional dependencies with an
+// explicit HTTP user agent.
 func InstallOptionalDependenciesWithUserAgent(ctx context.Context, id string, curseForgeAPIKey string, userAgent string, events ...Events) []appstructs.ModDownloadResult {
 	if modbridge.SimpleModeEnabled() {
 		return nil
@@ -699,11 +718,16 @@ func InstallOptionalDependenciesWithUserAgent(ctx context.Context, id string, cu
 	return results
 }
 
+// AnalyzeBatchIncompatibleConflicts checks a batch of results for local
+// incompatible mods before queuing.
 func AnalyzeBatchIncompatibleConflicts(req appstructs.BatchDownloadRequest) appstructs.BatchIncompatibleAnalysis {
 	return modbridge.AnalyzeBatchIncompatibleConflicts(req)
 }
 
-func GetDownloadStates(req appstructs.DownloadStatesRequest, onBackfillComplete func()) []appstructs.ModDownloadButtonState {
+// GetDownloadStates returns the projected download button state for each
+// requested result, invoking onBackfillComplete when remote metadata backfill
+// finishes.
+func GetDownloadStates(req appstructs.DownloadStatesRequest, onBackfillComplete func()) []appview.ModDownloadButtonState {
 	states := modbridge.DownloadStates(req, onBackfillComplete)
 	queued := queuedProjectKeys()
 	for i := range states {
@@ -948,7 +972,7 @@ func runDownloadQueue(ctx context.Context, events Events) {
 				logging.Error("download mod failed", "fileName", job.Version.FileName, "versionID", job.Version.ID, "targetDir", job.TargetDir, "error", err)
 				appendRetryableDownload(job, "failed", err.Error())
 				downloadQueue.Lock()
-				if group := downloadQueue.groups[job.WaitID]; group != nil {
+				if group := downloadQueue.groups[job.QueueID]; group != nil {
 					group.errors = append(group.errors, appstructs.DownloadFailedEvent{
 						FileName:  job.Version.FileName,
 						VersionID: job.Version.ID,
@@ -1224,7 +1248,7 @@ func prepareDownloadDependencies(ctx context.Context, job downloadJob, events Ev
 	// Required dependencies belong to the same install request, so waiting on
 	// the main queue ID waits for the dependency work as well.
 	for i := range dependencies {
-		dependencies[i].WaitID = job.WaitID
+		dependencies[i].QueueID = job.QueueID
 	}
 	return dependencies, job, nil
 }
@@ -1254,7 +1278,7 @@ func missingRequiredDependencyJobs(ctx context.Context, req appstructs.ModDownlo
 			continue
 		}
 
-		depReq, ok := modbridge.DependencyDownloadRequest(version.Platform, dep, req)
+		depReq, ok := modbridge.BuildDependencyDownloadRequest(version.Platform, dep, req)
 		if !ok {
 			logging.Warn("required dependency cannot be queued", "platform", version.Platform, "projectID", dep.DependencyProjectID, "versionID", dep.DependencyVersionID, "type", dep.DependencyType)
 			continue
@@ -1288,13 +1312,13 @@ func appendOptionalDependencyReminder(parent appstructs.ModDownloadRequest, vers
 	if modbridge.SimpleModeEnabled() {
 		return
 	}
-	candidates := make([]appstructs.OptionalDependencyCandidate, 0)
+	candidates := make([]appview.OptionalDependencyCandidate, 0)
 	requests := make([]appstructs.ModDownloadRequest, 0)
 	for _, dep := range version.Dependencies {
 		if !isOptionalDependency(dep) {
 			continue
 		}
-		depReq, ok := modbridge.DependencyDownloadRequest(version.Platform, dep, parent)
+		depReq, ok := modbridge.BuildDependencyDownloadRequest(version.Platform, dep, parent)
 		if !ok {
 			logging.Warn("optional dependency cannot be resolved", "platform", version.Platform, "projectID", dep.DependencyProjectID, "versionID", dep.DependencyVersionID, "type", dep.DependencyType)
 			continue
@@ -1313,7 +1337,7 @@ func appendOptionalDependencyReminder(parent appstructs.ModDownloadRequest, vers
 	if mainKey == "" {
 		mainKey = strings.TrimSpace(parent.ProjectID)
 	}
-	snapshot := appstructs.OptionalDependencyReminder{
+	snapshot := appview.OptionalDependencyReminder{
 		MainProjectKey:   mainKey,
 		MainTitle:        displayProjectTitle(parent.Result, mainKey),
 		MainVersionID:    version.ID,
@@ -1339,7 +1363,7 @@ func appendOptionalDependencyReminder(parent appstructs.ModDownloadRequest, vers
 	emitDownloadQueueState(events)
 }
 
-func optionalDependencyCandidate(req appstructs.ModDownloadRequest) appstructs.OptionalDependencyCandidate {
+func optionalDependencyCandidate(req appstructs.ModDownloadRequest) appview.OptionalDependencyCandidate {
 	status := installStatusPrecise(req)
 	disabled := status == modbridge.BtnStatusInstalled
 	reason := ""
@@ -1347,7 +1371,7 @@ func optionalDependencyCandidate(req appstructs.ModDownloadRequest) appstructs.O
 		disabled = true
 		reason = "no matching version"
 	}
-	return appstructs.OptionalDependencyCandidate{
+	return appview.OptionalDependencyCandidate{
 		ProjectKey: req.ProjectID,
 		Platform:   req.Result.Platform,
 		ProjectID:  req.Result.ProjectID,
@@ -1672,18 +1696,18 @@ func upsertDownloadedMod(path string, job downloadJob) {
 		mods[i].FileName = fileName
 		mods[i].Path = relPath
 		mods[i].SHA1 = sha1
-		mods[i].CfFingerprint = fingerprint
+		mods[i].CurseForgeFingerprint = fingerprint
 		mods[i].Enabled = true
 		global.UpsertLocalMod(mods[i], job.InstanceID, job.MinecraftVersion, job.ModLoader)
 	}
 }
 
-func currentDownloadQueueState() appstructs.DownloadQueueState {
+func currentDownloadQueueState() appview.DownloadQueueState {
 	downloadQueue.Lock()
 	defer downloadQueue.Unlock()
 	running := len(downloadQueue.current)
 	bytesComplete, totalBytes, bytesPerSecond := aggregateDownloadProgressLocked()
-	items := make([]appstructs.DownloadQueueItem, 0, running+len(downloadQueue.pending)+len(downloadQueue.retryable))
+	items := make([]appview.DownloadQueueItem, 0, running+len(downloadQueue.pending)+len(downloadQueue.retryable))
 	currentIDs := make([]string, 0, len(downloadQueue.current))
 	for id := range downloadQueue.current {
 		currentIDs = append(currentIDs, id)
@@ -1706,11 +1730,11 @@ func currentDownloadQueueState() appstructs.DownloadQueueState {
 		queueItem.Reason = item.Reason
 		items = append(items, queueItem)
 	}
-	reminders := make([]appstructs.OptionalDependencyReminder, 0, len(downloadQueue.optionalReminders))
+	reminders := make([]appview.OptionalDependencyReminder, 0, len(downloadQueue.optionalReminders))
 	for _, reminder := range downloadQueue.optionalReminders {
 		reminders = append(reminders, reminder.Snapshot)
 	}
-	return appstructs.DownloadQueueState{
+	return appview.DownloadQueueState{
 		Active:            running > 0 || len(downloadQueue.pending) > 0 || len(downloadQueue.retryable) > 0,
 		Pending:           len(downloadQueue.pending),
 		Running:           running,
@@ -1723,7 +1747,7 @@ func currentDownloadQueueState() appstructs.DownloadQueueState {
 	}
 }
 
-func applyDownloadProgressLocked(item *appstructs.DownloadQueueItem, id string) {
+func applyDownloadProgressLocked(item *appview.DownloadQueueItem, id string) {
 	progress, ok := downloadQueue.progress[id]
 	if !ok {
 		return
@@ -1777,12 +1801,12 @@ func addDownloadBytes(left, right int64) int64 {
 	return left + right
 }
 
-func downloadQueueItemFromJob(job downloadJob, status string, cancelable bool) appstructs.DownloadQueueItem {
+func downloadQueueItemFromJob(job downloadJob, status string, cancelable bool) appview.DownloadQueueItem {
 	title := strings.TrimSpace(job.Result.Title)
 	if title == "" {
 		title = firstNonEmpty(job.Version.Name, job.Version.FileName, job.Version.Version, job.Version.ID)
 	}
-	return appstructs.DownloadQueueItem{
+	return appview.DownloadQueueItem{
 		ID:               job.ID,
 		ProjectID:        job.ProjectID,
 		Status:           status,

@@ -136,7 +136,7 @@ func TestScanUnusedDependenciesIgnoresDisabledDependentsAndOrdinaryMods(t *testi
 	}
 }
 
-func TestScanUnusedDependenciesTreatsEnabledJijAsProvider(t *testing.T) {
+func TestScanUnusedDependenciesTreatsEnabledJIJAsProvider(t *testing.T) {
 	mods := []structs.ModInfo{
 		{
 			ID:      "main",
@@ -158,7 +158,7 @@ func TestScanUnusedDependenciesTreatsEnabledJijAsProvider(t *testing.T) {
 			ID:      "host",
 			Path:    "host.jar",
 			Enabled: true,
-			JijMods: []structs.JijModInfo{{ID: "Architectury", Name: "Architectury API"}},
+			JIJMods: []structs.JIJModInfo{{ID: "Architectury", Name: "Architectury API"}},
 		},
 	}
 
@@ -174,7 +174,7 @@ func TestScanUnusedDependenciesTreatsEnabledJijAsProvider(t *testing.T) {
 	}
 }
 
-func TestScanUnusedDependenciesFailsClosedWhenJijDetectionDisabled(t *testing.T) {
+func TestScanUnusedDependenciesFailsClosedWhenJIJDetectionDisabled(t *testing.T) {
 	setSelectedVersionForScanTest(t, structs.VersionInfo{
 		ID:   "jij-off",
 		Name: "jij-off",
@@ -188,8 +188,8 @@ func TestScanUnusedDependenciesFailsClosedWhenJijDetectionDisabled(t *testing.T)
 		},
 	})
 
-	minecraft.SetJijDetectionEnabled(false)
-	t.Cleanup(func() { minecraft.SetJijDetectionEnabled(true) })
+	minecraft.SetJIJDetectionEnabled(false)
+	t.Cleanup(func() { minecraft.SetJIJDetectionEnabled(true) })
 
 	result, err := New(Options{}).ScanUnusedDependencies(appstructs.UnusedDependencyScanRequest{})
 	if err != nil {

@@ -6,11 +6,13 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"os"
 	"strconv"
 	"time"
 
+	"github.com/link-fgfgui/mod-downloader/core/instance"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -49,16 +51,18 @@ func main() {
 			time.Sleep(2 * time.Second)
 			os.Exit(0)
 		}()
-		if appService.server != nil {
-			appService.server.Stop()
-		}
-		if appService.core != nil {
-			appService.core.Shutdown()
+		if appService.host != nil {
+			appService.host.Shutdown()
 		}
 		app.Quit()
 	}
 
 	if err := app.Run(); err != nil {
+		if errors.Is(err, instance.ErrAlreadyRunning) {
+			// A second launch exits quietly; the first instance keeps running.
+			log.Print(err)
+			return
+		}
 		log.Fatal(err)
 	}
 }

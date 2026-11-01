@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 link-fgfgui
 // SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
 
+// Package logging provides the process-wide structured logger, file rotation
+// and the adapter-neutral log configuration options.
 package logging
 
 import (
@@ -12,8 +14,10 @@ import (
 	"sync"
 )
 
+// DefaultFileName is the file name used inside the per-user log directory.
 const DefaultFileName = "mod-downloader.log"
 
+// Options configures the process-wide logger.
 type Options struct {
 	Disabled bool
 	// ForceFile mirrors the config's force_file setting: write to the file and
@@ -61,13 +65,15 @@ func init() {
 	slog.SetDefault(logger)
 }
 
+// Configure replaces the process-wide logger using options. It returns an
+// error only when the configured log file cannot be opened.
 func Configure(options Options) error {
 	usable := !options.NoStderr && stderrAvailable(os.Stderr)
 	return configure(options, os.Stderr, usable)
 }
 
 func configure(options Options, stderr io.Writer, stderrUsable bool) error {
-	var output io.Writer = io.Discard
+	output := io.Discard
 	var nextFile io.Closer
 	configuredPath := ""
 	if !options.Disabled {
@@ -132,6 +138,7 @@ func effectiveMaxBackups(backups int) int {
 	return backups
 }
 
+// Close flushes and closes the active log file, then discards further output.
 func Close() {
 	loggerMu.Lock()
 	previousFile := logFile
@@ -156,24 +163,28 @@ func stderrAvailable(stderr *os.File) bool {
 	return err == nil
 }
 
+// Debug logs a debug-level message with structured attributes.
 func Debug(msg string, args ...any) {
 	loggerMu.RLock()
 	defer loggerMu.RUnlock()
 	logger.Debug(msg, args...)
 }
 
+// Info logs an info-level message with structured attributes.
 func Info(msg string, args ...any) {
 	loggerMu.RLock()
 	defer loggerMu.RUnlock()
 	logger.Info(msg, args...)
 }
 
+// Warn logs a warning-level message with structured attributes.
 func Warn(msg string, args ...any) {
 	loggerMu.RLock()
 	defer loggerMu.RUnlock()
 	logger.Warn(msg, args...)
 }
 
+// Error logs an error-level message with structured attributes.
 func Error(msg string, args ...any) {
 	loggerMu.RLock()
 	defer loggerMu.RUnlock()

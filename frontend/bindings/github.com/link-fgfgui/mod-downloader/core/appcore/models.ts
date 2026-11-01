@@ -8,11 +8,17 @@ import * as models$0 from "../models/models.js";
 // @ts-ignore: Unused imports
 import * as storage$0 from "../storage/models.js";
 
+/**
+ * FavoriteBulkAddRequest adds the same mods to several favorite lists.
+ */
 export interface FavoriteBulkAddRequest {
     "targetListIds": string[] | null;
     "mods": storage$0.FavoriteMod[] | null;
 }
 
+/**
+ * FavoriteBulkOperationResult summarizes a bulk favorite operation.
+ */
 export interface FavoriteBulkOperationResult {
     "added": number;
     "updated": number;
@@ -20,6 +26,10 @@ export interface FavoriteBulkOperationResult {
     "errors"?: string[] | null;
 }
 
+/**
+ * FavoriteCrossVersionCopyApplyResult reports the applied copy and the preview
+ * it was based on.
+ */
 export interface FavoriteCrossVersionCopyApplyResult {
     "applied": boolean;
     "targetList": storage$0.FavoriteList;
@@ -27,11 +37,19 @@ export interface FavoriteCrossVersionCopyApplyResult {
     "result": FavoriteBulkOperationResult;
 }
 
+/**
+ * FavoriteCrossVersionCopyConflict is a source favorite that has no compatible
+ * version in the target scope.
+ */
 export interface FavoriteCrossVersionCopyConflict {
     "source": storage$0.FavoriteModEntry;
     "reason": string;
 }
 
+/**
+ * FavoriteCrossVersionCopyMatch pairs a source favorite with the target
+ * version that satisfies the new scope.
+ */
 export interface FavoriteCrossVersionCopyMatch {
     "source": storage$0.FavoriteModEntry;
     "target": storage$0.FavoriteMod;
@@ -39,6 +57,10 @@ export interface FavoriteCrossVersionCopyMatch {
     "version": models$0.ModVersion;
 }
 
+/**
+ * FavoriteCrossVersionCopyPreview is the dry-run result of a cross-version
+ * copy, listing matched versions and conflicts before anything is written.
+ */
 export interface FavoriteCrossVersionCopyPreview {
     "sourceListId": string;
     "targetListName": string;
@@ -50,6 +72,10 @@ export interface FavoriteCrossVersionCopyPreview {
     "errors"?: string[] | null;
 }
 
+/**
+ * FavoriteCrossVersionCopyRequest copies a list into the scope described by
+ * MinecraftVersion and ModLoader.
+ */
 export interface FavoriteCrossVersionCopyRequest {
     "sourceListId": string;
     "minecraftVersion": string;
@@ -57,6 +83,9 @@ export interface FavoriteCrossVersionCopyRequest {
     "ignoreConflicts"?: boolean;
 }
 
+/**
+ * FavoriteListCopyRequest copies one favorite list into another.
+ */
 export interface FavoriteListCopyRequest {
     "sourceListId": string;
     "targetListId": string;

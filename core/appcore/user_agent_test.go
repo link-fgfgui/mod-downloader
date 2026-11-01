@@ -26,7 +26,7 @@ func TestRateLimitedTransportHonorsCanceledWait(t *testing.T) {
 	calls := 0
 	transport := rateLimitedTransport{
 		limiter: newRequestRateLimiter(1),
-		base: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		base: roundTripFunc(func(*http.Request) (*http.Response, error) {
 			calls++
 			return &http.Response{
 				Status:     "200 OK",
@@ -159,7 +159,7 @@ func TestConfigureProviderClientsUsesVersionedUserAgent(t *testing.T) {
 }
 
 func TestConfigureProviderClientsUsesMCIMWithoutCurseForgeKey(t *testing.T) {
-	svc := New(Options{Config: &configs.Config{Prefers: configs.Preferences{MCIMEnabled: true}}, Version: "v1.2.3"})
+	svc := New(Options{Config: &configs.Config{Preferences: configs.Preferences{MCIMEnabled: true}}, Version: "v1.2.3"})
 	svc.configureProviderClients()
 	t.Cleanup(func() {
 		global.SetModrinthClient(nil)

@@ -101,12 +101,12 @@ func TestToggleConnectorLoaderPreservesPhysicalInstance(t *testing.T) {
 		t.Fatalf("toggle changed physical identity: base=%#v virtual=%#v", base, virtual)
 	}
 
-	real, err := svc.ToggleConnectorLoader()
+	physical, err := svc.ToggleConnectorLoader()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if real.ModLoader != "neoforge" || real.ConnectorVirtual {
-		t.Fatalf("real version = %#v", real)
+	if physical.ModLoader != "neoforge" || physical.ConnectorVirtual {
+		t.Fatalf("physical version = %#v", physical)
 	}
 	if len(events) != 2 || events[0].Kind != EventSelectedVersionChanged || events[1].Kind != EventSelectedVersionChanged {
 		t.Fatalf("events = %#v, want two selected-version events", events)

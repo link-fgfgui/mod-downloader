@@ -19,6 +19,8 @@ var queueRestoredCachedDependency = func(s *Service, req appstructs.ModDownloadR
 	return s.QueueModDownload(req)
 }
 
+// AnalyzeLocalModDisableImpact reports which selected mods can be disabled
+// without leaving another enabled mod's dependencies unsatisfied.
 func (s *Service) AnalyzeLocalModDisableImpact(req appstructs.LocalModDisableImpactRequest) (appstructs.LocalModDisableImpactResult, error) {
 	selected := global.GetSelectedVersion()
 	if selected.ID == "" && selected.Name == "" {
@@ -27,6 +29,8 @@ func (s *Service) AnalyzeLocalModDisableImpact(req appstructs.LocalModDisableImp
 	return analyzeLocalModDisableImpact(selected.Mods, req, selected.MinecraftVersion, selected.ModLoader), nil
 }
 
+// RestoreCachedDependency queues a previously removed dependency from cached
+// metadata when it still matches the selected instance scope.
 func (s *Service) RestoreCachedDependency(req appstructs.RestoreCachedDependencyRequest) appstructs.ModDownloadResult {
 	selected := global.GetSelectedVersion()
 	modID := strings.ToLower(strings.TrimSpace(req.ModID))
@@ -48,7 +52,7 @@ func (s *Service) RestoreCachedDependency(req appstructs.RestoreCachedDependency
 		return appstructs.ModDownloadResult{Skipped: true, Reason: "cached dependency unavailable"}
 	}
 
-	project, ok := storage.GetModPlatform(platform, projectID)
+	project, ok := storage.GetModProject(platform, projectID)
 	if !ok {
 		project = models.ModProject{Platform: platform, ProjectID: projectID}
 	}

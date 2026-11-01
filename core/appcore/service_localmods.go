@@ -19,6 +19,8 @@ import (
 	structs "github.com/link-fgfgui/mod-downloader/core/structs/minecraft"
 )
 
+// SetMinecraftDir switches the game directory, reloads versions and rolls the
+// change back when the new directory contains no instances.
 func (s *Service) SetMinecraftDir(dir string) string {
 	dir = strings.TrimSpace(dir)
 	if dir == "" {
@@ -45,17 +47,19 @@ func (s *Service) SetMinecraftDir(dir string) string {
 		return ""
 	}
 	if s.config != nil {
-		s.config.Prefers.MinecraftDir = dir
+		s.config.Preferences.MinecraftDir = dir
 	}
 	s.emit(EventMinecraftDirChanged, simplified)
 	s.emit(EventSelectedVersionChanged, global.GetSelectedVersion())
 	return simplified
 }
 
+// GetMinecraftDir returns the effective Minecraft directory.
 func (s *Service) GetMinecraftDir() string {
 	return global.GetMinecraftDir()
 }
 
+// ValidateMinecraftDir reports whether the effective directory exists.
 func (s *Service) ValidateMinecraftDir() bool {
 	resolvedDir := global.GetMinecraftDir()
 	if resolvedDir == "" {
@@ -65,6 +69,7 @@ func (s *Service) ValidateMinecraftDir() bool {
 	return err == nil && info.IsDir()
 }
 
+// GetVersions returns the discovered instances, loading them on first access.
 func (s *Service) GetVersions() []structs.VersionInfo {
 	mcDir := global.GetMinecraftDir()
 	if versions, ok := global.GetVersionsForDir(mcDir); ok {
@@ -75,14 +80,17 @@ func (s *Service) GetVersions() []structs.VersionInfo {
 	return s.LoadVersionsFromDisk(mcDir)
 }
 
+// GetSelectedVersion returns the currently selected instance.
 func (s *Service) GetSelectedVersion() structs.VersionInfo {
 	return global.GetSelectedVersion()
 }
 
+// RefreshVersions rescans the Minecraft directory for instances.
 func (s *Service) RefreshVersions() []structs.VersionInfo {
 	return s.LoadVersionsFromDisk(global.GetMinecraftDir())
 }
 
+// RefreshSelectedVersionMods rescans the mods of the selected instance.
 func (s *Service) RefreshSelectedVersionMods() structs.VersionInfo {
 	selected := global.GetSelectedVersion()
 	if selected.ID == "" && selected.Name == "" {
@@ -93,6 +101,7 @@ func (s *Service) RefreshSelectedVersionMods() structs.VersionInfo {
 	return refreshed
 }
 
+// SelectVersion validates and selects an instance by directory name or ID.
 func (s *Service) SelectVersion(versionKey string) (structs.VersionInfo, error) {
 	versionKey = strings.TrimSpace(versionKey)
 	if versionKey == "" {
@@ -117,6 +126,8 @@ func (s *Service) SelectVersion(versionKey string) (structs.VersionInfo, error) 
 	return structs.VersionInfo{}, fmt.Errorf("version not found: %s", versionKey)
 }
 
+// LocalMods returns the mods of the given instance, or of the selected one
+// when versionKey is empty.
 func (s *Service) LocalMods(versionKey string) ([]structs.ModInfo, error) {
 	if strings.TrimSpace(versionKey) != "" {
 		if _, err := s.SelectVersion(versionKey); err != nil {
@@ -127,6 +138,8 @@ func (s *Service) LocalMods(versionKey string) ([]structs.ModInfo, error) {
 	return selected.Mods, nil
 }
 
+// LocalModsInDir scans an arbitrary mods directory for the given version and
+// loader scope.
 func (s *Service) LocalModsInDir(dir, minecraftVersion, modLoader string) ([]structs.ModInfo, error) {
 	dir = s.resolveRuntimePath(dir)
 	if strings.TrimSpace(dir) == "" {
@@ -154,6 +167,8 @@ func (s *Service) LocalModsInDir(dir, minecraftVersion, modLoader string) ([]str
 	return enriched, nil
 }
 
+// ApplyLocalModBatchOperation enables, disables, inverts or deletes the
+// selected mod files and returns the refreshed instance.
 func (s *Service) ApplyLocalModBatchOperation(req appstructs.LocalModBatchOperationRequest) (structs.VersionInfo, error) {
 	action := strings.ToLower(strings.TrimSpace(req.Action))
 	selected := global.GetSelectedVersion()
@@ -183,7 +198,7 @@ func (s *Service) refreshChangedLocalMods(ops []localModFileOperation) structs.V
 	if selected.ID == "" && selected.Name == "" {
 		return selected
 	}
-	instanceID := versionInstanceDir(selected)
+	instanceID := versionInstanceKey(selected)
 	mcDir := global.GetMinecraftDir()
 	changed := make(map[string]bool)
 	for _, op := range ops {
@@ -229,7 +244,7 @@ func (s *Service) refreshChangedPaths(paths []string) {
 	if selected.ID == "" && selected.Name == "" {
 		return
 	}
-	instanceID := versionInstanceDir(selected)
+	instanceID := versionInstanceKey(selected)
 	mcDir := global.GetMinecraftDir()
 	changed := make(map[string]bool)
 	for _, path := range paths {
@@ -470,6 +485,8 @@ func pathInsideDir(path string, dir string) bool {
 	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
+// LoadVersionsFromDisk discovers instances in mcDir, refreshes the version
+// cache and starts the hardlink index scan.
 func (s *Service) LoadVersionsFromDisk(mcDir string) []structs.VersionInfo {
 	if strings.TrimSpace(mcDir) == "" {
 		global.SetVersionsForDir(mcDir, nil)
@@ -488,7 +505,7 @@ func (s *Service) LoadVersionsFromDisk(mcDir string) []structs.VersionInfo {
 }
 
 func (s *Service) refreshVersionMods(version structs.VersionInfo, mcDir string) structs.VersionInfo {
-	versionDirName := versionInstanceDir(version)
+	versionDirName := versionInstanceKey(version)
 	global.ClearLocalModsByInstance(versionDirName)
 	refreshed := ScanVersionMods(version, mcDir)
 	if versions, ok := global.GetVersionsForDir(mcDir); ok {

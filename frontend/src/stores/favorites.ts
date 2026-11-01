@@ -11,6 +11,7 @@ import type {
   FavoriteListContents,
   FavoriteMod,
   FavoriteModEntry,
+  FavoriteOverview,
 } from "@/types";
 
 export type FavoriteModDraft = {
@@ -51,45 +52,17 @@ const favoriteKey = (
 const hasFavoriteScope = (minecraftVersion: string, modLoader: string) =>
   Boolean(minecraftVersion && modLoader);
 
-const favoriteMatchesScope = (
-  mod: Pick<FavoriteMod, "minecraftVersion" | "modLoader">,
-  minecraftVersion: string,
-  modLoader: string,
-) =>
-  hasFavoriteScope(minecraftVersion, modLoader) &&
-  normalizeMinecraftVersion(mod.minecraftVersion) === minecraftVersion &&
-  normalizeKeyPart(mod.modLoader) === modLoader;
+const emptyOverview = (): FavoriteOverview => ({ pinned: [], ungrouped: [] });
 
-const favoriteContentsForScope = (
-  contents: FavoriteListContents | null,
-  minecraftVersion: string,
-  modLoader: string,
-): FavoriteListContents | null => {
-  if (!contents) return null;
-  return {
-    ...contents,
-    mods: (contents.mods || []).filter((mod) => favoriteMatchesScope(mod, minecraftVersion, modLoader)),
-  } as FavoriteListContents;
-};
-
-export const listOrder = (a: FavoriteList, b: FavoriteList) =>
-  Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) ||
-  a.sortOrder - b.sortOrder ||
-  a.name.localeCompare(b.name);
-
-export const listMatchesScope = (list: FavoriteList, minecraftVersion: string, modLoader: string) => {
-  const listVersion = normalizeMinecraftVersion(list.minecraftVersion);
-  const listLoader = normalizeKeyPart(list.modLoader);
-  if (!listVersion && !listLoader) return true;
-  return (
-    hasFavoriteScope(minecraftVersion, modLoader) &&
-    listVersion === minecraftVersion &&
-    listLoader === modLoader
-  );
-};
+// Core returns both sections already scope-filtered and ordered.
+const flattenOverview = (overview: FavoriteOverview) => [
+  ...(overview.pinned ?? []),
+  ...(overview.ungrouped ?? []),
+];
 
 interface FavoritesState {
   lists: FavoriteList[];
+  overview: FavoriteOverview;
   selectedListId: string;
   displayMinecraftVersion: string;
   displayModLoader: string;
@@ -102,6 +75,7 @@ interface FavoritesState {
   error: string;
   setDisplayScope: (minecraftVersion: string, modLoader: string) => boolean;
   closeSelectedList: () => void;
+  refreshOverview: () => Promise<FavoriteList[]>;
   loadLists: () => Promise<void>;
   loadItems: (listId?: string) => Promise<void>;
   selectList: (listId: string) => Promise<void>;
@@ -141,6 +115,7 @@ let itemsRequestId = 0;
 
 export const useFavoritesStore = create<FavoritesState>((set, get) => ({
   lists: [],
+  overview: emptyOverview(),
   selectedListId: "",
   displayMinecraftVersion: "",
   displayModLoader: "",
@@ -162,12 +137,7 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
       return false;
     }
     set({ displayMinecraftVersion: nextMinecraftVersion, displayModLoader: nextModLoader });
-    const selected = get().lists.find(
-      (list) =>
-        list.id === get().selectedListId &&
-        listMatchesScope(list, nextMinecraftVersion, nextModLoader),
-    );
-    if (!selected) get().closeSelectedList();
+    // loadLists() re-checks the selection against the new scope.
     return true;
   },
 
@@ -175,16 +145,20 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
     set({ selectedListId: "", contents: null, items: [] });
   },
 
+  async refreshOverview() {
+    const overview =
+      (await api.ListFavoriteOverview(get().displayMinecraftVersion, get().displayModLoader)) ??
+      emptyOverview();
+    const lists = flattenOverview(overview);
+    set({ lists, overview });
+    return lists;
+  },
+
   async loadLists() {
     set({ loadingLists: true, error: "" });
     try {
-      const lists = ((await api.ListFavoriteLists()) ?? []).sort(listOrder);
-      const selected = lists.find(
-        (list) =>
-          list.id === get().selectedListId &&
-          listMatchesScope(list, get().displayMinecraftVersion, get().displayModLoader),
-      );
-      set({ lists });
+      const lists = await get().refreshOverview();
+      const selected = lists.find((list) => list.id === get().selectedListId);
       if (!selected) get().closeSelectedList();
       else await get().loadItems(selected.id);
     } catch (error) {
@@ -204,8 +178,8 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
     const requestId = ++itemsRequestId;
     set({ loadingItems: true, error: "" });
     try {
-      const contents = favoriteContentsForScope(
-        (await api.ListFavoriteContents(targetListId)) ?? null,
+      const contents = await api.ListFavoriteContentsForScope(
+        targetListId,
         get().displayMinecraftVersion,
         get().displayModLoader,
       );
@@ -233,38 +207,30 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
     if (!hasFavoriteScope(scopedMinecraftVersion, scopedModLoader)) return null;
     const list = await api.CreateFavoriteList(name, scopedMinecraftVersion, scopedModLoader);
     if (!list?.id) return null;
-    set((state) => ({
-      lists: [...state.lists, list].sort(listOrder),
-      selectedListId: list.id,
-      contents: null,
-      items: [],
-    }));
+    set({ selectedListId: list.id, contents: null, items: [] });
+    await get().refreshOverview();
     return list;
   },
 
   async renameList(listId, name) {
     const list = await api.RenameFavoriteList(listId, name);
     if (!list?.id) return null;
-    set((state) => ({
-      lists: state.lists.map((item) => (item.id === list.id ? list : item)).sort(listOrder),
-    }));
+    await get().refreshOverview();
     return list;
   },
 
   async deleteList(listId) {
     const ok = await api.DeleteFavoriteList(listId);
     if (!ok) return false;
-    set((state) => ({ lists: state.lists.filter((list) => list.id !== listId) }));
     if (get().selectedListId === listId) get().closeSelectedList();
+    await get().refreshOverview();
     return true;
   },
 
   async updateListMetadata(list, patch) {
     const updated = await api.UpdateFavoriteListMetadata({ ...list, ...patch } as FavoriteList);
     if (!updated?.id) return null;
-    set((state) => ({
-      lists: state.lists.map((item) => (item.id === updated.id ? updated : item)).sort(listOrder),
-    }));
+    await get().refreshOverview();
     return updated;
   },
 
@@ -407,4 +373,4 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
 }));
 
 export const favoriteModKey = favoriteKey;
-export { favoriteMatchesScope, hasFavoriteScope };
+export { hasFavoriteScope };

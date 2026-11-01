@@ -1,8 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 
 import { api } from "@/services/app";
-import type { ModGroup } from "@/lib/modGroups";
-import type { LocalModDependencyImpact, ModInfo, VersionInfo } from "@/types";
+import type { LocalModDependencyImpact, LocalModGroup, ModInfo, VersionInfo } from "@/types";
 
 export type ManageSelectionActionIcon =
   | "copy"
@@ -35,7 +34,7 @@ interface UseLocalModSelectionOptions {
   onReplacementQueued: () => void;
 }
 
-const selectedGroupPaths = (groups: ModGroup[]) => {
+const selectedGroupPaths = (groups: LocalModGroup[]) => {
   const seen = new Set<string>();
   const paths: string[] = [];
   for (const group of groups) {
@@ -47,7 +46,7 @@ const selectedGroupPaths = (groups: ModGroup[]) => {
   return paths;
 };
 
-const primaryBatchAction = (groups: ModGroup[]) =>
+const primaryBatchAction = (groups: LocalModGroup[]) =>
   groups.some((group) => group.primary?.enabled) ? "disable" : "enable";
 
 export function useLocalModSelection(options: UseLocalModSelectionOptions) {
@@ -59,10 +58,10 @@ export function useLocalModSelection(options: UseLocalModSelectionOptions) {
   const [restoringDependencyId, setRestoringDependencyId] = useState("");
   const [restoredDependencies, setRestoredDependencies] = useState<RestoredDependencies>({});
   const [pendingDeleteCount, setPendingDeleteCount] = useState(0);
-  const pendingDeleteGroups = useRef<ModGroup[]>([]);
+  const pendingDeleteGroups = useRef<LocalModGroup[]>([]);
   const pendingDeleteClearSelection = useRef<(() => void) | null>(null);
   const pendingDisableOperation = useRef<{
-    groups: ModGroup[];
+    groups: LocalModGroup[];
     action: string;
     clearSelection?: (() => void) | null;
   } | null>(null);
@@ -79,7 +78,7 @@ export function useLocalModSelection(options: UseLocalModSelectionOptions) {
   }, []);
 
   const copyModNames = useCallback(
-    (groups: ModGroup[]) => {
+    (groups: LocalModGroup[]) => {
       const names = groups
         .flatMap((group) => (group.strong || []).map((mod) => mod.name || mod.id))
         .filter(Boolean)
@@ -90,7 +89,7 @@ export function useLocalModSelection(options: UseLocalModSelectionOptions) {
   );
 
   const copyModIds = useCallback(
-    (groups: ModGroup[]) => {
+    (groups: LocalModGroup[]) => {
       const ids = groups
         .flatMap((group) => (group.strong || []).map((mod) => mod.id))
         .filter(Boolean)
@@ -100,7 +99,7 @@ export function useLocalModSelection(options: UseLocalModSelectionOptions) {
     [copyText, options],
   );
 
-  const openDeleteDialog = useCallback((groups: ModGroup[], clearSelection?: (() => void) | null) => {
+  const openDeleteDialog = useCallback((groups: LocalModGroup[], clearSelection?: (() => void) | null) => {
     pendingDeleteGroups.current = [...groups];
     setPendingDeleteCount(selectedGroupPaths(groups).length);
     pendingDeleteClearSelection.current = clearSelection ?? null;
@@ -108,7 +107,7 @@ export function useLocalModSelection(options: UseLocalModSelectionOptions) {
   }, []);
 
   const executeBatchOperation = useCallback(
-    async (groups: ModGroup[], action: string, clearSelection?: (() => void) | null) => {
+    async (groups: LocalModGroup[], action: string, clearSelection?: (() => void) | null) => {
       const paths = selectedGroupPaths(groups);
       if (!paths.length || batchOperation) return false;
       setBatchOperation(action);
@@ -130,7 +129,7 @@ export function useLocalModSelection(options: UseLocalModSelectionOptions) {
   );
 
   const applyBatchOperation = useCallback(
-    async (groups: ModGroup[], action: string, clearSelection?: (() => void) | null) => {
+    async (groups: LocalModGroup[], action: string, clearSelection?: (() => void) | null) => {
       const paths = selectedGroupPaths(groups);
       if (!paths.length || batchOperation) return false;
       if (action !== "disable" && action !== "invert") {
@@ -162,7 +161,7 @@ export function useLocalModSelection(options: UseLocalModSelectionOptions) {
   );
 
   const manageSelectionActions = useCallback(
-    (groups: ModGroup[], clearSelection: () => void): ManageSelectionAction[] => {
+    (groups: LocalModGroup[], clearSelection: () => void): ManageSelectionAction[] => {
       const primaryAction = primaryBatchAction(groups);
       return [
         {
@@ -255,7 +254,7 @@ export function useLocalModSelection(options: UseLocalModSelectionOptions) {
   }, []);
 
   const toggleGroup = useCallback(
-    async (group: ModGroup) => {
+    async (group: LocalModGroup) => {
       const path = (group.primary?.path || "").trim();
       if (!path || isBatchBusy) return;
       setPendingTogglePath(path);

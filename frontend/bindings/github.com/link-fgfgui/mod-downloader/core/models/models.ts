@@ -46,7 +46,7 @@ export interface ModProject {
     "platform": string;
 
     /**
-     * Numeric ID for CF, slug for MR
+     * Platform-native project ID
      */
     "projectId": string;
 
@@ -116,7 +116,7 @@ export interface ModVersion {
     "projectId": string;
 
     /**
-     * Alias for ID (frontend compatibility)
+     * Alias for ID kept for adapter compatibility
      */
     "versionId": string;
 

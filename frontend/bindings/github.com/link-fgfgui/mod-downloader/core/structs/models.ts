@@ -14,6 +14,9 @@ export interface AppPreferences {
     "animationDurationMultiplier": number;
 }
 
+/**
+ * BatchDownloadRequest queues several projects for the same instance.
+ */
 export interface BatchDownloadRequest {
     "results": models$0.ModProject[] | null;
     "minecraftVersion": string;
@@ -22,10 +25,18 @@ export interface BatchDownloadRequest {
     "instanceId"?: string;
 }
 
+/**
+ * BatchIncompatibleAnalysis is the result of checking every project in a batch
+ * for local incompatibilities.
+ */
 export interface BatchIncompatibleAnalysis {
     "conflicts"?: BatchIncompatibleConflict[] | null;
 }
 
+/**
+ * BatchIncompatibleConflict groups the conflicts found for one requested
+ * project in a batch.
+ */
 export interface BatchIncompatibleConflict {
     "key": string;
     "title": string;
@@ -33,6 +44,10 @@ export interface BatchIncompatibleConflict {
     "conflicts"?: IncompatibleConflict[] | null;
 }
 
+/**
+ * CachedDependencyCandidate is a download-cache version that can restore a
+ * dependency without another network request.
+ */
 export interface CachedDependencyCandidate {
     "modId": string;
     "platform": string;
@@ -41,6 +56,9 @@ export interface CachedDependencyCandidate {
     "title"?: string;
 }
 
+/**
+ * DependencyPreflightEntry is one dependency row in a preflight result.
+ */
 export interface DependencyPreflightEntry {
     "projectId": string;
     "title": string;
@@ -62,6 +80,10 @@ export interface DependencyPreflightRequest {
     "versionId"?: string;
 }
 
+/**
+ * DependencyPreflightResult summarizes how many required dependencies are
+ * already fulfilled, missing, or blocked by a conflict.
+ */
 export interface DependencyPreflightResult {
     "entries": DependencyPreflightEntry[] | null;
     "fulfilled": number;
@@ -69,41 +91,19 @@ export interface DependencyPreflightResult {
     "conflicts": number;
 }
 
+/**
+ * DownloadFailedEvent is emitted when one queue entry fails permanently.
+ */
 export interface DownloadFailedEvent {
     "fileName": string;
     "versionId": string;
     "reason": string;
 }
 
-export interface DownloadQueueItem {
-    "id": string;
-    "projectId"?: string;
-    "status": string;
-    "title": string;
-    "fileName": string;
-    "versionId": string;
-    "platform": string;
-    "minecraftVersion": string;
-    "modLoader": string;
-    "cancelable": boolean;
-    "retryable": boolean;
-    "reason"?: string;
-    "bytesComplete": number;
-    "totalBytes": number;
-}
-
-export interface DownloadQueueState {
-    "active": boolean;
-    "pending": number;
-    "running": number;
-    "messageCount": number;
-    "bytesComplete": number;
-    "totalBytes": number;
-    "bytesPerSecond": number;
-    "items"?: DownloadQueueItem[] | null;
-    "optionalReminders"?: OptionalDependencyReminder[] | null;
-}
-
+/**
+ * DownloadStatesRequest asks for the per-project download button states of a
+ * result list.
+ */
 export interface DownloadStatesRequest {
     "results": models$0.ModProject[] | null;
     "minecraftVersion": string;
@@ -112,6 +112,10 @@ export interface DownloadStatesRequest {
     "instanceId"?: string;
 }
 
+/**
+ * IncompatibleConflict pairs a requested project with the local mods that
+ * declare it incompatible.
+ */
 export interface IncompatibleConflict {
     "projectKey": string;
     "projectTitle": string;
@@ -121,17 +125,29 @@ export interface IncompatibleConflict {
     "paths"?: IncompatibleLocalMod[] | null;
 }
 
+/**
+ * IncompatibleLocalMod identifies a local JAR that declares a conflict with a
+ * project about to be installed.
+ */
 export interface IncompatibleLocalMod {
     "path": string;
     "fileName": string;
     "sha1": string;
 }
 
+/**
+ * LocalModBatchOperationRequest asks the core to enable, disable, delete or
+ * rename the local JARs at Paths.
+ */
 export interface LocalModBatchOperationRequest {
     "paths": string[] | null;
     "action": string;
 }
 
+/**
+ * LocalModDependencyImpact describes what disabling one dependency provider
+ * would break and which cached versions could restore it.
+ */
 export interface LocalModDependencyImpact {
     "modId": string;
     "affectedMods": LocalModDependencyMod[] | null;
@@ -139,6 +155,10 @@ export interface LocalModDependencyImpact {
     "candidates"?: CachedDependencyCandidate[] | null;
 }
 
+/**
+ * LocalModDependencyMod identifies a local mod affected by disabling a
+ * dependency provider.
+ */
 export interface LocalModDependencyMod {
     "path": string;
     "fileName"?: string;
@@ -146,25 +166,28 @@ export interface LocalModDependencyMod {
     "modIds"?: string[] | null;
 }
 
+/**
+ * LocalModDisableImpactRequest asks which mods would lose a dependency if the
+ * given JARs were disabled or deleted.
+ */
 export interface LocalModDisableImpactRequest {
     "paths": string[] | null;
     "action": string;
 }
 
+/**
+ * LocalModDisableImpactResult lists the dependency impacts of a batch
+ * disable/delete operation.
+ */
 export interface LocalModDisableImpactResult {
     "impacts": LocalModDependencyImpact[] | null;
 }
 
-export interface ModDownloadButtonState {
-    "key": string;
-    "status": string;
-    "conflictFileName"?: string;
-    "disabled": boolean;
-    "loading": boolean;
-    "icon": string;
-    "color": string;
-}
-
+/**
+ * ModDownloadRequest queues one mod (and its required dependencies) for
+ * install into TargetDir, or into the selected instance when TargetDir is
+ * empty.
+ */
 export interface ModDownloadRequest {
     "projectId": string;
     "result": models$0.ModProject;
@@ -179,6 +202,10 @@ export interface ModDownloadRequest {
     "instanceId"?: string;
 }
 
+/**
+ * ModDownloadResult reports whether a queue request was accepted, skipped or
+ * rejected, and identifies the created queue entry.
+ */
 export interface ModDownloadResult {
     "queued": boolean;
     "skipped": boolean;
@@ -193,6 +220,10 @@ export interface ModDownloadResult {
     "queueId"?: string;
 }
 
+/**
+ * ModVersionPinRequest pins one platform version for a mod in a specific
+ * Minecraft version/loader scope.
+ */
 export interface ModVersionPinRequest {
     "platform": string;
     "modId": string;
@@ -201,27 +232,10 @@ export interface ModVersionPinRequest {
     "modLoader": string;
 }
 
-export interface OptionalDependencyCandidate {
-    "projectKey": string;
-    "platform": string;
-    "projectId": string;
-    "title": string;
-    "versionId"?: string;
-    "status": string;
-    "disabled": boolean;
-    "reason"?: string;
-}
-
-export interface OptionalDependencyReminder {
-    "id": string;
-    "mainProjectKey": string;
-    "mainTitle": string;
-    "mainVersionId": string;
-    "minecraftVersion": string;
-    "modLoader": string;
-    "dependencies"?: OptionalDependencyCandidate[] | null;
-}
-
+/**
+ * RestoreCachedDependencyRequest restores one dependency version from the
+ * local download cache.
+ */
 export interface RestoreCachedDependencyRequest {
     "modId": string;
     "platform": string;
@@ -229,27 +243,48 @@ export interface RestoreCachedDependencyRequest {
     "versionId": string;
 }
 
-export interface SaveAnimationSettingsRequest {
-    "animationDurationMultiplier": number;
-}
-
-export interface SaveApiKeysRequest {
+/**
+ * SaveAPIKeysRequest carries the API keys to persist. An empty key clears the
+ * stored value; the keep sentinel leaves it untouched.
+ */
+export interface SaveAPIKeysRequest {
     "curseforgeApiKey": string;
     "modrinthApiKey": string;
 }
 
+/**
+ * SaveAnimationSettingsRequest updates the UI animation speed multiplier.
+ */
+export interface SaveAnimationSettingsRequest {
+    "animationDurationMultiplier": number;
+}
+
+/**
+ * SaveHardwareAccelerationSettingsRequest toggles GPU rendering. The change
+ * takes effect on the next launch.
+ */
 export interface SaveHardwareAccelerationSettingsRequest {
     "hardwareAcceleration": boolean;
 }
 
-export interface SaveJijDetectionSettingsRequest {
+/**
+ * SaveJIJDetectionSettingsRequest toggles Jar-in-Jar detection.
+ */
+export interface SaveJIJDetectionSettingsRequest {
     "enableJijDetection": boolean;
 }
 
+/**
+ * SaveMCIMSettingsRequest toggles the MCIM CurseForge mirror.
+ */
 export interface SaveMCIMSettingsRequest {
     "mcimEnabled": boolean;
 }
 
+/**
+ * SaveNetworkSettingsRequest updates download concurrency, rate limiting and
+ * API request pacing; the core clamps every field to its documented range.
+ */
 export interface SaveNetworkSettingsRequest {
     "fileConcurrency": number;
     "concurrentDownloads": number;
@@ -259,18 +294,33 @@ export interface SaveNetworkSettingsRequest {
     "requestsPerSecond": number;
 }
 
+/**
+ * SavePreferredReleaseTypeSettingsRequest sets the preferred release channel
+ * ("latest", "release", "beta" or "alpha").
+ */
 export interface SavePreferredReleaseTypeSettingsRequest {
     "preferredReleaseType": string;
 }
 
+/**
+ * SaveSimpleModeSettingsRequest toggles simple mode.
+ */
 export interface SaveSimpleModeSettingsRequest {
     "simpleMode": boolean;
 }
 
+/**
+ * SaveUnusedDependencyCleanupSettingsRequest toggles automatic unused
+ * dependency scans.
+ */
 export interface SaveUnusedDependencyCleanupSettingsRequest {
     "autoScanUnusedDependencies": boolean;
 }
 
+/**
+ * SearchModsRequest is the adapter-independent search input. Empty Version or
+ * ModLoader means "any".
+ */
 export interface SearchModsRequest {
     "requestId": string;
     "query": string;
@@ -278,49 +328,6 @@ export interface SearchModsRequest {
     "modLoader": string;
     "offset": number;
     "limit": number;
-}
-
-export interface SearchModsUpdate {
-    "requestId": string;
-    "results": models$0.ModProject[] | null;
-    "loading": boolean;
-    "append": boolean;
-}
-
-/**
- * SettingsView is a client-safe settings snapshot. API keys are represented
- * by existence and masks; plaintext keys never cross the Wails boundary.
- */
-export interface SettingsView {
-    "theme": string;
-    "language": string;
-    "simpleMode": boolean;
-    "animationDurationMultiplier": number;
-    "autoScanUnusedDependencies": boolean;
-    "mcimEnabled": boolean;
-    "enableJijDetection": boolean;
-    "hardwareAcceleration": boolean;
-    "requireCtrlForMultiSelect": boolean;
-    "preferredReleaseType": string;
-    "minecraftDir": string;
-    "cacheDir": string;
-    "cachePath": string;
-    "hasCurseforgeKey": boolean;
-    "curseforgeKeyMask": string;
-    "hasModrinthKey": boolean;
-    "modrinthKeyMask": string;
-    "fileConcurrency": number;
-    "concurrentDownloads": number;
-    "adaptiveFileConcurrency": boolean;
-    "targetDownloadRateMiB": number;
-    "verifySha1": boolean;
-    "requestsPerSecond": number;
-
-    /**
-     * SaveError carries the last failed config write. Empty means the last
-     * persist attempt succeeded.
-     */
-    "saveError"?: string;
 }
 
 /**
@@ -335,6 +342,10 @@ export interface StartupStatus {
     "extensionServerError"?: string;
 }
 
+/**
+ * UnusedDependencyCandidate is a local JAR that appears to exist only to
+ * satisfy other mods and can be removed.
+ */
 export interface UnusedDependencyCandidate {
     "path": string;
     "fileName": string;
@@ -344,10 +355,17 @@ export interface UnusedDependencyCandidate {
     "evidence"?: string[] | null;
 }
 
+/**
+ * UnusedDependencyScanRequest scopes an unused-dependency scan. Paths that are
+ * still enabled should be passed in ExcludedPaths so they are never reported.
+ */
 export interface UnusedDependencyScanRequest {
     "excludedPaths"?: string[] | null;
 }
 
+/**
+ * UnusedDependencyScanResult lists every candidate found by a scan.
+ */
 export interface UnusedDependencyScanResult {
     "candidates": UnusedDependencyCandidate[] | null;
 }

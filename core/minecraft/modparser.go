@@ -16,6 +16,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync/atomic"
 
@@ -36,17 +37,18 @@ func init() {
 	jijDetectionEnabled.Store(true)
 }
 
-// SetJijDetectionEnabled toggles recursive Jar-in-Jar scanning for subsequent
+// SetJIJDetectionEnabled toggles recursive Jar-in-Jar scanning for subsequent
 // parses.
-func SetJijDetectionEnabled(enabled bool) {
+func SetJIJDetectionEnabled(enabled bool) {
 	jijDetectionEnabled.Store(enabled)
 }
 
-// JijDetectionEnabled reports whether nested Jar-in-Jar scanning is active.
-func JijDetectionEnabled() bool {
+// JIJDetectionEnabled reports whether nested Jar-in-Jar scanning is active.
+func JIJDetectionEnabled() bool {
 	return jijDetectionEnabled.Load()
 }
 
+// ModMetadataParser recognizes and parses one mod-loader metadata format.
 type ModMetadataParser interface {
 	Name() string
 	CanParse(r *zip.Reader) bool
@@ -79,7 +81,14 @@ func (fabricModParser) Parse(r *zip.Reader) (parsedModMetadata, error) {
 		Name        string                     `json:"name"`
 		Version     string                     `json:"version"`
 		Description string                     `json:"description"`
-		Depends     map[string]json.RawMessage `json:"depends"`
+		License     string                     `json:"license"`
+		Environment string                     `json:"environment"`
+		Authors     flexibleStrings            `json:"authors"`
+		Provides    flexibleStrings            `json:"provides"`
+		Depends     map[string]flexibleStrings `json:"depends"`
+		Recommends  map[string]flexibleStrings `json:"recommends"`
+		Breaks      map[string]flexibleStrings `json:"breaks"`
+		Conflicts   map[string]flexibleStrings `json:"conflicts"`
 		Jars        []struct {
 			File string `json:"file"`
 		} `json:"jars"`
@@ -92,12 +101,20 @@ func (fabricModParser) Parse(r *zip.Reader) (parsedModMetadata, error) {
 		NestedJars: make([]string, 0, len(meta.Jars)),
 	}
 	if id := declaredModID(meta.ID); id != "" {
+		breaks := append(fabricDependencies(meta.Breaks, "breaks"), fabricDependencies(meta.Conflicts, "breaks")...)
 		result.Mods = append(result.Mods, structs.ModInfo{
-			ID:           id,
-			Name:         meta.Name,
-			Version:      meta.Version,
-			Description:  meta.Description,
-			Dependencies: localModDependenciesFromIDs(requiredFabricDependencyIDs(meta.Depends)),
+			ID:               id,
+			Name:             strings.TrimSpace(meta.Name),
+			Version:          strings.TrimSpace(meta.Version),
+			Description:      strings.TrimSpace(meta.Description),
+			License:          strings.TrimSpace(meta.License),
+			Environment:      strings.TrimSpace(meta.Environment),
+			Authors:          meta.Authors.strings(),
+			Provides:         normalizeIDs(meta.Provides.strings()),
+			MinecraftVersion: mapValue(meta.Depends, "minecraft"),
+			Dependencies:     fabricDependencies(meta.Depends, "required"),
+			Recommends:       fabricDependencies(meta.Recommends, "optional"),
+			Breaks:           breaks,
 		})
 	}
 	for _, jar := range meta.Jars {
@@ -106,6 +123,133 @@ func (fabricModParser) Parse(r *zip.Reader) (parsedModMetadata, error) {
 		}
 	}
 	return result, nil
+}
+
+// fabricDependencies converts a Fabric dependency map into typed dependencies,
+// dropping loader-provided ids (minecraft, fabricloader, …) that the analyzer
+// treats as always present.
+func fabricDependencies(values map[string]flexibleStrings, depType string) []structs.LocalModDependency {
+	if len(values) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	deps := make([]structs.LocalModDependency, 0, len(keys))
+	for _, key := range keys {
+		id := cleanupDependencyModID(key)
+		if id == "" {
+			continue
+		}
+		deps = append(deps, structs.LocalModDependency{
+			ModID:   id,
+			Type:    depType,
+			Version: joinVersionConstraints(values[key]),
+		})
+	}
+	return deps
+}
+
+// --- Quilt ---
+
+type quiltModParser struct{}
+
+func (quiltModParser) Name() string { return "quilt" }
+
+func (quiltModParser) CanParse(r *zip.Reader) bool {
+	return zipHasFile(r, "quilt.mod.json")
+}
+
+func (quiltModParser) Parse(r *zip.Reader) (parsedModMetadata, error) {
+	data, err := readZipFile(r, "quilt.mod.json")
+	if err != nil {
+		return parsedModMetadata{}, err
+	}
+	var meta struct {
+		QuiltLoader struct {
+			ID       string `json:"id"`
+			Version  string `json:"version"`
+			Provides []struct {
+				ID string `json:"id"`
+			} `json:"provides"`
+			Depends []struct {
+				ID       string `json:"id"`
+				Versions string `json:"versions"`
+				Optional bool   `json:"optional"`
+			} `json:"depends"`
+			Breaks []struct {
+				ID       string `json:"id"`
+				Versions string `json:"versions"`
+			} `json:"breaks"`
+			Metadata struct {
+				Name         string            `json:"name"`
+				Description  string            `json:"description"`
+				License      string            `json:"license"`
+				Contributors map[string]string `json:"contributors"`
+			} `json:"metadata"`
+		} `json:"quilt_loader"`
+	}
+	if err := unmarshalModMetadataJSON(data, &meta); err != nil {
+		return parsedModMetadata{}, fmt.Errorf("parse quilt.mod.json: %w", err)
+	}
+	ql := meta.QuiltLoader
+	id := declaredModID(ql.ID)
+	if id == "" {
+		return parsedModMetadata{}, nil
+	}
+
+	info := structs.ModInfo{
+		ID:          id,
+		Name:        strings.TrimSpace(ql.Metadata.Name),
+		Version:     strings.TrimSpace(ql.Version),
+		Description: strings.TrimSpace(ql.Metadata.Description),
+		License:     strings.TrimSpace(ql.Metadata.License),
+	}
+	for contributor, role := range ql.Metadata.Contributors {
+		info.Authors = append(info.Authors, fmt.Sprintf("%s (%s)", strings.TrimSpace(contributor), strings.TrimSpace(role)))
+	}
+	sort.Strings(info.Authors)
+	for _, provide := range ql.Provides {
+		if id := strings.TrimSpace(provide.ID); id != "" {
+			info.Provides = append(info.Provides, id)
+		}
+	}
+	info.Provides = normalizeIDs(info.Provides)
+	for _, dep := range ql.Depends {
+		depID := strings.TrimSpace(dep.ID)
+		if depID == "" {
+			continue
+		}
+		version := strings.TrimSpace(dep.Versions)
+		if strings.EqualFold(depID, "minecraft") {
+			info.MinecraftVersion = version
+		}
+		clean := cleanupDependencyModID(depID)
+		if clean == "" {
+			continue
+		}
+		entry := structs.LocalModDependency{ModID: clean, Type: "required", Version: version}
+		if dep.Optional {
+			entry.Type = "optional"
+			info.Recommends = append(info.Recommends, entry)
+		} else {
+			info.Dependencies = append(info.Dependencies, entry)
+		}
+	}
+	for _, broken := range ql.Breaks {
+		clean := cleanupDependencyModID(broken.ID)
+		if clean == "" {
+			continue
+		}
+		info.Breaks = append(info.Breaks, structs.LocalModDependency{
+			ModID:   clean,
+			Type:    "breaks",
+			Version: strings.TrimSpace(broken.Versions),
+		})
+	}
+	return parsedModMetadata{Mods: []structs.ModInfo{info}}, nil
 }
 
 // --- NeoForge ---
@@ -144,6 +288,92 @@ func (forgeModParser) Parse(r *zip.Reader) (parsedModMetadata, error) {
 	return parsedModMetadata{Mods: mods}, nil
 }
 
+// --- legacy mcmod.info ---
+
+type legacyMCModParser struct{}
+
+func (legacyMCModParser) Name() string { return loaderForge }
+
+func (legacyMCModParser) CanParse(r *zip.Reader) bool {
+	return zipHasFile(r, "mcmod.info")
+}
+
+func (legacyMCModParser) Parse(r *zip.Reader) (parsedModMetadata, error) {
+	data, err := readZipFile(r, "mcmod.info")
+	if err != nil {
+		return parsedModMetadata{}, err
+	}
+	type mcmodEntry struct {
+		ModID            string   `json:"modid"`
+		Name             string   `json:"name"`
+		Version          string   `json:"version"`
+		Description      string   `json:"description"`
+		AuthorList       []string `json:"authorList"`
+		License          string   `json:"license"`
+		MinecraftVersion string   `json:"mcversion"`
+		Dependencies     []string `json:"dependencies"`
+		RequiredMods     []string `json:"requiredMods"`
+	}
+	var entries []mcmodEntry
+	if err := unmarshalModMetadataJSONList(data, &entries); err != nil {
+		var wrapper struct {
+			ModList []mcmodEntry `json:"modList"`
+		}
+		if err := unmarshalModMetadataJSON(data, &wrapper); err != nil {
+			return parsedModMetadata{}, fmt.Errorf("parse mcmod.info: %w", err)
+		}
+		entries = wrapper.ModList
+	}
+	mods := make([]structs.ModInfo, 0, len(entries))
+	for _, entry := range entries {
+		id := declaredModID(entry.ModID)
+		if id == "" {
+			continue
+		}
+		info := structs.ModInfo{
+			ID:               id,
+			Name:             strings.TrimSpace(entry.Name),
+			Version:          strings.TrimSpace(entry.Version),
+			Description:      strings.TrimSpace(entry.Description),
+			License:          strings.TrimSpace(entry.License),
+			Authors:          normalizeIDs(entry.AuthorList),
+			MinecraftVersion: strings.TrimSpace(entry.MinecraftVersion),
+		}
+		if info.Name == "" {
+			info.Name = info.ID
+		}
+		for _, raw := range append(append([]string{}, entry.Dependencies...), entry.RequiredMods...) {
+			raw = strings.TrimSpace(raw)
+			if raw == "" {
+				continue
+			}
+			depID, version := parseLegacyDependency(raw)
+			clean := cleanupDependencyModID(depID)
+			if clean == "" {
+				continue
+			}
+			info.Dependencies = append(info.Dependencies, structs.LocalModDependency{
+				ModID:   clean,
+				Type:    "required",
+				Version: version,
+			})
+		}
+		mods = append(mods, info)
+	}
+	if len(mods) == 0 {
+		return parsedModMetadata{}, fmt.Errorf("mcmod.info declares no mods")
+	}
+	return parsedModMetadata{Mods: mods}, nil
+}
+
+func parseLegacyDependency(value string) (string, string) {
+	if idx := strings.IndexAny(value, "@[]()"); idx >= 0 {
+		version := strings.TrimPrefix(strings.TrimSpace(value[idx:]), "@")
+		return strings.TrimSpace(value[:idx]), version
+	}
+	return value, ""
+}
+
 // --- shared mods.toml parser ---
 
 func parseModsToml(r *zip.Reader, path string) ([]structs.ModInfo, error) {
@@ -154,16 +384,20 @@ func parseModsToml(r *zip.Reader, path string) ([]structs.ModInfo, error) {
 	properties := jarManifestProperties(r)
 
 	var meta struct {
-		Mods []struct {
+		License string `toml:"license"`
+		Mods    []struct {
 			ModID       string `toml:"modId"`
 			DisplayName string `toml:"displayName"`
 			Version     string `toml:"version"`
 			Description string `toml:"description"`
+			Authors     string `toml:"authors"`
 		} `toml:"mods"`
 		Dependencies map[string][]struct {
-			ModID     string `toml:"modId"`
-			Mandatory *bool  `toml:"mandatory"`
-			Type      string `toml:"type"`
+			ModID        string `toml:"modId"`
+			Mandatory    *bool  `toml:"mandatory"`
+			Type         string `toml:"type"`
+			VersionRange string `toml:"versionRange"`
+			Side         string `toml:"side"`
 		} `toml:"dependencies"`
 	}
 	if err := toml.Unmarshal(data, &meta); err != nil {
@@ -176,68 +410,164 @@ func parseModsToml(r *zip.Reader, path string) ([]structs.ModInfo, error) {
 		if id == "" {
 			continue
 		}
-		infos = append(infos, structs.ModInfo{
-			ID:           id,
-			Name:         resolveMetadataValue(m.DisplayName, properties),
-			Version:      resolveMetadataValue(m.Version, properties),
-			Description:  resolveMetadataValue(m.Description, properties),
-			Dependencies: localModDependenciesFromIDs(requiredForgeDependencyIDs(meta.Dependencies[id])),
-		})
+		info := structs.ModInfo{
+			ID:          id,
+			Name:        resolveMetadataValue(m.DisplayName, properties),
+			Version:     resolveMetadataValue(m.Version, properties),
+			Description: resolveMetadataValue(m.Description, properties),
+			License:     strings.TrimSpace(meta.License),
+			Authors:     splitAuthors(resolveMetadataValue(m.Authors, properties)),
+		}
+		for _, dep := range meta.Dependencies[id] {
+			version := strings.TrimSpace(dep.VersionRange)
+			if strings.EqualFold(strings.TrimSpace(dep.ModID), "minecraft") {
+				info.MinecraftVersion = version
+			}
+			clean := cleanupDependencyModID(dep.ModID)
+			if clean == "" {
+				continue
+			}
+			switch forgeDependencyKind(dep.Mandatory, dep.Type) {
+			case "required":
+				info.Dependencies = append(info.Dependencies, structs.LocalModDependency{ModID: clean, Type: "required", Version: version})
+			case "optional":
+				info.Recommends = append(info.Recommends, structs.LocalModDependency{ModID: clean, Type: "optional", Version: version})
+			case "breaks":
+				info.Breaks = append(info.Breaks, structs.LocalModDependency{ModID: clean, Type: "breaks", Version: version})
+			}
+		}
+		infos = append(infos, info)
 	}
 	return infos, nil
 }
 
-func requiredFabricDependencyIDs(depends map[string]json.RawMessage) []string {
-	if len(depends) == 0 {
+// forgeDependencyKind maps Forge's mandatory/type pair onto the shared
+// dependency taxonomy.
+func forgeDependencyKind(mandatory *bool, depType string) string {
+	switch strings.ToLower(strings.TrimSpace(depType)) {
+	case "required", "mandatory":
+		return "required"
+	case "optional":
+		return "optional"
+	case "incompatible", "discouraged":
+		return "breaks"
+	}
+	if mandatory != nil && *mandatory {
+		return "required"
+	}
+	return "optional"
+}
+
+func splitAuthors(value string) []string {
+	value = strings.TrimSpace(value)
+	if value == "" {
 		return nil
 	}
-	ids := make([]string, 0, len(depends))
-	for id := range depends {
-		id = cleanupDependencyModID(id)
-		if id == "" {
-			continue
+	out := make([]string, 0, 2)
+	for _, part := range strings.Split(value, ",") {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			out = append(out, trimmed)
 		}
-		ids = append(ids, id)
 	}
-	return uniqueDependencyIDs(ids)
+	return out
 }
 
-func requiredForgeDependencyIDs(deps []struct {
-	ModID     string `toml:"modId"`
-	Mandatory *bool  `toml:"mandatory"`
-	Type      string `toml:"type"`
-}) []string {
-	ids := make([]string, 0, len(deps))
-	for _, dep := range deps {
-		if !forgeDependencyRequired(dep.Mandatory, dep.Type) {
-			continue
-		}
-		id := cleanupDependencyModID(dep.ModID)
-		if id == "" {
-			continue
-		}
-		ids = append(ids, id)
-	}
-	return uniqueDependencyIDs(ids)
-}
+// flexibleStrings accepts the several shapes Fabric and Quilt use for
+// list-like fields: a bare string, an array of strings, or an array of objects
+// carrying the value under "name", "id", "versions", or "version".
+type flexibleStrings []string
 
-func forgeDependencyRequired(mandatory *bool, depType string) bool {
-	depType = strings.ToLower(strings.TrimSpace(depType))
-	if depType != "" {
-		return depType == "required" || depType == "mandatory"
-	}
-	return mandatory != nil && *mandatory
-}
-
-func localModDependenciesFromIDs(ids []string) []structs.LocalModDependency {
-	if len(ids) == 0 {
+func (f *flexibleStrings) UnmarshalJSON(data []byte) error {
+	trimmed := strings.TrimSpace(string(data))
+	if trimmed == "" || trimmed == "null" {
+		*f = nil
 		return nil
 	}
-	deps := make([]structs.LocalModDependency, 0, len(ids))
-	for _, id := range ids {
-		deps = append(deps, structs.LocalModDependency{ModID: id, Type: "required"})
+	if trimmed[0] == '"' {
+		var single string
+		if err := json.Unmarshal(data, &single); err != nil {
+			return err
+		}
+		*f = []string{single}
+		return nil
 	}
-	return deps
+	var list []json.RawMessage
+	if err := json.Unmarshal(data, &list); err != nil {
+		return err
+	}
+	out := make([]string, 0, len(list))
+	for _, item := range list {
+		var text string
+		if err := json.Unmarshal(item, &text); err == nil {
+			out = append(out, text)
+			continue
+		}
+		var obj map[string]json.RawMessage
+		if err := json.Unmarshal(item, &obj); err != nil {
+			continue
+		}
+		for _, key := range []string{"name", "id", "versions", "version"} {
+			raw, ok := obj[key]
+			if !ok {
+				continue
+			}
+			var value flexibleStrings
+			if err := value.UnmarshalJSON(raw); err != nil {
+				continue
+			}
+			out = append(out, value.strings()...)
+		}
+	}
+	*f = out
+	return nil
+}
+
+func (f flexibleStrings) strings() []string {
+	out := make([]string, 0, len(f))
+	for _, value := range f {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
+}
+
+// joinVersionConstraints flattens a dependency value declared as a list of
+// alternatives into a single range expression, keeping the bracketed form when
+// several constraints are present.
+func joinVersionConstraints(values flexibleStrings) string {
+	parts := values.strings()
+	switch len(parts) {
+	case 0:
+		return ""
+	case 1:
+		return parts[0]
+	default:
+		return "[" + strings.Join(parts, ",") + "]"
+	}
+}
+
+func mapValue(values map[string]flexibleStrings, key string) string {
+	for k, v := range values {
+		if strings.EqualFold(strings.TrimSpace(k), key) {
+			return joinVersionConstraints(v)
+		}
+	}
+	return ""
+}
+
+func normalizeIDs(values []string) []string {
+	out := make([]string, 0, len(values))
+	seen := make(map[string]bool, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" || seen[strings.ToLower(value)] {
+			continue
+		}
+		seen[strings.ToLower(value)] = true
+		out = append(out, value)
+	}
+	return out
 }
 
 func cleanupDependencyModID(id string) string {
@@ -338,14 +668,19 @@ func resolveMetadataValue(value string, properties map[string]string) string {
 
 // --- registry ---
 
+// modMetadataParsers is ordered: the first parser that yields a given mod id
+// wins, and later parsers only merge their loader name into that entry.
 var modMetadataParsers = []ModMetadataParser{
 	fabricModParser{},
+	quiltModParser{},
 	neoForgeModParser{},
 	forgeModParser{},
+	legacyMCModParser{},
 }
 
 const (
 	loaderFabric       = "fabric"
+	loaderQuilt        = "quilt"
 	loaderNeoForge     = "neoforge"
 	loaderForge        = "forge"
 	jarJarMetadataPath = "META-INF/jarjar/metadata.json"
@@ -359,6 +694,7 @@ func isModJar(name string) bool {
 	return strings.HasSuffix(lower, ".jar") || strings.HasSuffix(lower, ".jar.disabled")
 }
 
+// StripJarSuffix removes a trailing .jar or .jar.disabled extension.
 func StripJarSuffix(name string) string {
 	lower := strings.ToLower(name)
 	if strings.HasSuffix(lower, ".jar.disabled") {
@@ -374,6 +710,8 @@ func isJarEnabled(name string) bool {
 	return !strings.HasSuffix(strings.ToLower(name), ".jar.disabled")
 }
 
+// FileSHA1 returns the lowercase SHA1 of a file, or "" when it cannot be
+// read.
 func FileSHA1(path string) string {
 	f, err := os.Open(path)
 	if err != nil {
@@ -478,11 +816,15 @@ func curseForgeFingerprint(reader io.Reader, normalizedLength uint32) uint32 {
 	return hash
 }
 
+// ScanVersionMods scans the mods directory of one version folder.
 func ScanVersionMods(versionDir string, instanceID string, minecraftVersion string, modLoader string, minecraftDir string) []structs.ModInfo {
 	modsDir := filepath.Join(versionDir, "mods")
 	return ScanModsDir(modsDir, instanceID, minecraftVersion, modLoader, minecraftDir)
 }
 
+// ScanModsDir parses every mod JAR in modsDir, updates the local mod index and
+// returns the parsed metadata. pathRoot, when non-empty, makes returned paths
+// relative to it.
 func ScanModsDir(modsDir string, instanceID string, minecraftVersion string, modLoader string, pathRoot string) []structs.ModInfo {
 	modsDir = strings.TrimSpace(modsDir)
 	if modsDir == "" {
@@ -525,7 +867,7 @@ func ScanModsDir(modsDir string, instanceID string, minecraftVersion string, mod
 			mods[i].FileName = baseName
 			mods[i].Path = pathValue
 			mods[i].SHA1 = hash
-			mods[i].CfFingerprint = fingerprint
+			mods[i].CurseForgeFingerprint = fingerprint
 			mods[i].Enabled = enabled
 			global.UpsertLocalMod(mods[i], instanceID, minecraftVersion, modLoader)
 		}
@@ -555,7 +897,7 @@ func ScanModFile(jarPath, instanceID, minecraftVersion, modLoader, pathRoot stri
 	}
 	for i := range mods {
 		mods[i].FileName, mods[i].Path, mods[i].SHA1 = baseName, pathValue, hash
-		mods[i].CfFingerprint, mods[i].Enabled = fingerprint, isJarEnabled(filepath.Base(jarPath))
+		mods[i].CurseForgeFingerprint, mods[i].Enabled = fingerprint, isJarEnabled(filepath.Base(jarPath))
 		global.UpsertLocalMod(mods[i], instanceID, minecraftVersion, modLoader)
 	}
 	return mods
@@ -565,10 +907,13 @@ func parseModJar(jarPath string, modLoader string) []structs.ModInfo {
 	return ParseModJarWithSHA1(jarPath, FileSHA1(jarPath), modLoader)
 }
 
+// ParseModJarWithSHA1 parses a JAR for the specified loader and caches the
+// result under sha1. It is used for downloaded files, where only that loader's
+// metadata is relevant.
 func ParseModJarWithSHA1(jarPath string, sha1 string, modLoader string) []structs.ModInfo {
 	// Capture the toggle once: the cache key and the parse must observe the same
 	// value even if the setting flips while a background scan is running.
-	jijEnabled := JijDetectionEnabled()
+	jijEnabled := JIJDetectionEnabled()
 	scope := "loader:" + normalizeModLoader(modLoader) + ":jij=" + jijScopeFlag(jijEnabled)
 	if mods, ok := global.GetJarMetadata(sha1, scope); ok {
 		return mods
@@ -587,8 +932,11 @@ func ParseModJarWithSHA1(jarPath string, sha1 string, modLoader string) []struct
 	return mods
 }
 
+// ParseLocalModJarWithSHA1 parses a locally installed JAR, considering every
+// supported loader and preferring preferredLoader when metadata overlaps. The
+// result is cached under sha1 and the JIJ toggle state.
 func ParseLocalModJarWithSHA1(jarPath string, sha1 string, preferredLoader string) []structs.ModInfo {
-	jijEnabled := JijDetectionEnabled()
+	jijEnabled := JIJDetectionEnabled()
 	scope := "local:" + normalizeModLoader(preferredLoader) + ":jij=" + jijScopeFlag(jijEnabled)
 	if mods, ok := global.GetJarMetadata(sha1, scope); ok {
 		return mods
@@ -614,8 +962,9 @@ func jijScopeFlag(enabled bool) string {
 	return "0"
 }
 
+// ParseModZipReader parses an opened remote JAR for the specified loader.
 func ParseModZipReader(r *zip.Reader, sourceName string, modLoader string) []structs.ModInfo {
-	return parseModZipReader(r, sourceName, modLoader, JijDetectionEnabled())
+	return parseModZipReader(r, sourceName, modLoader, JIJDetectionEnabled())
 }
 
 func parseModZipReader(r *zip.Reader, sourceName string, modLoader string, jijEnabled bool) []structs.ModInfo {
@@ -627,8 +976,10 @@ func parseModZipReader(r *zip.Reader, sourceName string, modLoader string, jijEn
 	return uniqueModsByID(ctx.parseZipReader(r, sourceName, 0))
 }
 
+// ParseLocalModZipReader parses an opened local JAR across every supported
+// loader, preferring preferredLoader.
 func ParseLocalModZipReader(r *zip.Reader, sourceName string, preferredLoader string) []structs.ModInfo {
-	return parseLocalModZipReader(r, sourceName, preferredLoader, JijDetectionEnabled())
+	return parseLocalModZipReader(r, sourceName, preferredLoader, JIJDetectionEnabled())
 }
 
 func parseLocalModZipReader(r *zip.Reader, sourceName string, preferredLoader string, jijEnabled bool) []structs.ModInfo {
@@ -660,19 +1011,19 @@ func (ctx modJarParseContext) parseZipReader(r *zip.Reader, sourceName string, d
 
 	// Jar-in-Jar detection can be disabled to skip nested jar extraction. This
 	// is the expensive part of scanning large modpacks and only affects whether
-	// JijMods metadata is collected, never the top-level mod list.
+	// JIJMods metadata is collected, never the top-level mod list.
 	if !ctx.jijEnabled {
 		return mods
 	}
 
-	jijMods := make([]structs.JijModInfo, 0)
+	jijMods := make([]structs.JIJModInfo, 0)
 	for _, nestedPath := range uniqueNestedJarPaths(metadata.NestedJars) {
 		jijMods = append(jijMods, ctx.parseNestedJar(r, nestedPath, sourceName, depth+1)...)
 	}
-	jijMods = uniqueJijModsByID(jijMods)
+	jijMods = uniqueJIJModsByID(jijMods)
 	if len(jijMods) > 0 {
 		for i := range mods {
-			mods[i].JijMods = append([]structs.JijModInfo(nil), jijMods...)
+			mods[i].JIJMods = append([]structs.JIJModInfo(nil), jijMods...)
 		}
 	}
 	return mods
@@ -709,12 +1060,9 @@ func (ctx modJarParseContext) parseDeclaredMetadata(r *zip.Reader, sourceName st
 func (ctx modJarParseContext) parsers() []ModMetadataParser {
 	if ctx.allLoaders {
 		parsers := make([]ModMetadataParser, 0, len(modMetadataParsers))
-		if ctx.modLoader != "" {
-			for _, parser := range modMetadataParsers {
-				if parser.Name() == ctx.modLoader {
-					parsers = append(parsers, parser)
-					break
-				}
+		for _, parser := range modMetadataParsers {
+			if parser.Name() == ctx.modLoader {
+				parsers = append(parsers, parser)
 			}
 		}
 		for _, parser := range modMetadataParsers {
@@ -727,15 +1075,19 @@ func (ctx modJarParseContext) parsers() []ModMetadataParser {
 	if ctx.modLoader == "" {
 		return modMetadataParsers
 	}
+	var matched []ModMetadataParser
 	for _, parser := range modMetadataParsers {
 		if parser.Name() == ctx.modLoader {
-			return []ModMetadataParser{parser}
+			matched = append(matched, parser)
 		}
+	}
+	if len(matched) > 0 {
+		return matched
 	}
 	return modMetadataParsers
 }
 
-func (ctx modJarParseContext) parseNestedJar(r *zip.Reader, nestedPath string, sourceName string, depth int) []structs.JijModInfo {
+func (ctx modJarParseContext) parseNestedJar(r *zip.Reader, nestedPath string, sourceName string, depth int) []structs.JIJModInfo {
 	data, err := readZipFile(r, nestedPath)
 	if err != nil {
 		logging.Warn("read nested mod jar failed", "sourceName", sourceName, "nestedPath", nestedPath, "error", err)
@@ -754,17 +1106,17 @@ func (ctx modJarParseContext) parseNestedJar(r *zip.Reader, nestedPath string, s
 		return nil
 	}
 	nestedMods := ctx.parseZipReader(zr, sourceName+" > "+nestedPath, depth)
-	result := make([]structs.JijModInfo, 0, len(nestedMods))
+	result := make([]structs.JIJModInfo, 0, len(nestedMods))
 	for _, mod := range nestedMods {
 		if id := declaredModID(mod.ID); id != "" {
-			result = append(result, structs.JijModInfo{
+			result = append(result, structs.JIJModInfo{
 				ID:   id,
 				Name: mod.Name,
 			})
 		}
-		result = append(result, mod.JijMods...)
+		result = append(result, mod.JIJMods...)
 	}
-	return uniqueJijModsByID(result)
+	return uniqueJIJModsByID(result)
 }
 
 func parseJarJarNestedPaths(r *zip.Reader) ([]string, error) {
@@ -798,6 +1150,8 @@ func normalizeModLoader(modLoader string) string {
 	switch strings.ToLower(strings.TrimSpace(modLoader)) {
 	case loaderFabric:
 		return loaderFabric
+	case loaderQuilt:
+		return loaderQuilt
 	case loaderForge:
 		return loaderForge
 	case loaderNeoForge:
@@ -881,9 +1235,9 @@ func uniqueLoaders(loaders []string) []string {
 	return result
 }
 
-func uniqueJijModsByID(mods []structs.JijModInfo) []structs.JijModInfo {
+func uniqueJIJModsByID(mods []structs.JIJModInfo) []structs.JIJModInfo {
 	seen := make(map[string]struct{}, len(mods))
-	out := make([]structs.JijModInfo, 0, len(mods))
+	out := make([]structs.JIJModInfo, 0, len(mods))
 	for _, mod := range mods {
 		mod.ID = declaredModID(mod.ID)
 		if mod.ID == "" {
@@ -900,7 +1254,7 @@ func uniqueJijModsByID(mods []structs.JijModInfo) []structs.JijModInfo {
 }
 
 // PrimaryModIDs returns lowercased, deduplicated mod IDs declared directly by
-// the JAR. JIJ entries are stored under ModInfo.JijMods and are intentionally
+// the JAR. JIJ entries are stored under ModInfo.JIJMods and are intentionally
 // not included.
 func PrimaryModIDs(mods []structs.ModInfo) []string {
 	seen := make(map[string]struct{}, len(mods))
@@ -937,6 +1291,21 @@ var errModMetadataRoot = errors.New("mod metadata root must be a JSON object")
 //
 // Strict decoding runs first; normalization only happens on failure and only
 // rewrites the constructs above, so genuine syntax errors still fail.
+// unmarshalModMetadataJSONList is the array-root variant used by legacy
+// mcmod.info files.
+func unmarshalModMetadataJSONList[T any](data []byte, v *T) error {
+	var decoded T
+	if err := json.Unmarshal(data, &decoded); err == nil {
+		*v = decoded
+		return nil
+	}
+	decoder := json.NewDecoder(bytes.NewReader(normalizeModMetadataJSON(data)))
+	if err := decoder.Decode(v); err != nil {
+		return err
+	}
+	return nil
+}
+
 func unmarshalModMetadataJSON[T any](data []byte, v *T) error {
 	if !hasJSONObjectRoot(data) {
 		return errModMetadataRoot

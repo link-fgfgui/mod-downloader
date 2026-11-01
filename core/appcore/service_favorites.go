@@ -13,14 +13,18 @@ import (
 	"github.com/link-fgfgui/mod-downloader/core/storage"
 )
 
+// ListFavoriteLists returns every favorite list in display order.
 func (s *Service) ListFavoriteLists() []storage.FavoriteList {
 	return storage.ListFavoriteLists()
 }
 
+// CreateFavoriteList creates an unscoped favorite list.
 func (s *Service) CreateFavoriteList(name string) storage.FavoriteList {
 	return s.CreateFavoriteListForScope(name, "", "")
 }
 
+// CreateFavoriteListForScope creates a favorite list bound to a Minecraft
+// version and mod loader, or to no scope when both are empty.
 func (s *Service) CreateFavoriteListForScope(name, minecraftVersion, modLoader string) storage.FavoriteList {
 	list, err := storage.CreateFavoriteListForScope(name, minecraftVersion, modLoader)
 	if err != nil {
@@ -30,6 +34,8 @@ func (s *Service) CreateFavoriteListForScope(name, minecraftVersion, modLoader s
 	return list
 }
 
+// RenameFavoriteList updates a list name and returns the stored list, or an
+// empty value when the list does not exist.
 func (s *Service) RenameFavoriteList(id, name string) storage.FavoriteList {
 	list, ok, err := storage.UpdateFavoriteListName(id, name)
 	if err != nil {
@@ -42,6 +48,7 @@ func (s *Service) RenameFavoriteList(id, name string) storage.FavoriteList {
 	return list
 }
 
+// DeleteFavoriteList removes a list and reports whether it existed.
 func (s *Service) DeleteFavoriteList(id string) bool {
 	deleted, err := storage.DeleteFavoriteList(id)
 	if err != nil {
@@ -51,6 +58,8 @@ func (s *Service) DeleteFavoriteList(id string) bool {
 	return deleted
 }
 
+// UpdateFavoriteListMetadata persists name, icon and pinning changes for a
+// list.
 func (s *Service) UpdateFavoriteListMetadata(list storage.FavoriteList) storage.FavoriteList {
 	updated, ok, err := storage.UpdateFavoriteListMetadata(list)
 	if err != nil {
@@ -63,6 +72,7 @@ func (s *Service) UpdateFavoriteListMetadata(list storage.FavoriteList) storage.
 	return updated
 }
 
+// ReorderFavoriteLists stores the given list order.
 func (s *Service) ReorderFavoriteLists(ids []string) bool {
 	if err := storage.ReorderFavoriteLists(ids); err != nil {
 		logging.Error("reorder favorite lists failed", "error", err)
@@ -71,14 +81,18 @@ func (s *Service) ReorderFavoriteLists(ids []string) bool {
 	return true
 }
 
+// ListFavoriteMods returns the direct mods stored in one list.
 func (s *Service) ListFavoriteMods(listID string) []storage.FavoriteMod {
 	return storage.ListFavoriteMods(listID)
 }
 
+// ListFavoriteContents resolves a list together with referenced lists and
+// inherited mods.
 func (s *Service) ListFavoriteContents(listID string) storage.FavoriteListContents {
 	return storage.ListFavoriteContents(listID)
 }
 
+// AddFavoriteMod inserts or updates a mod in its target list.
 func (s *Service) AddFavoriteMod(mod storage.FavoriteMod) storage.FavoriteMod {
 	_, existed := favoriteModKeySet(storage.ListFavoriteMods(mod.ListID))[favoriteModIdentityKey(mod)]
 	saved, ok, err := storage.UpsertFavoriteMod(mod)
@@ -95,6 +109,8 @@ func (s *Service) AddFavoriteMod(mod storage.FavoriteMod) storage.FavoriteMod {
 	return saved
 }
 
+// AddFavoriteModsToLists upserts a batch of mods into several target lists and
+// reports added, updated and skipped entries.
 func (s *Service) AddFavoriteModsToLists(req FavoriteBulkAddRequest) FavoriteBulkOperationResult {
 	targetListIDs := uniqueNonEmpty(req.TargetListIDs)
 	if len(targetListIDs) == 0 || len(req.Mods) == 0 {
@@ -139,6 +155,7 @@ func (s *Service) AddFavoriteModsToLists(req FavoriteBulkAddRequest) FavoriteBul
 	return result
 }
 
+// CopyFavoriteListToList copies the resolved mods of one list into another.
 func (s *Service) CopyFavoriteListToList(req FavoriteListCopyRequest) FavoriteBulkOperationResult {
 	sourceListID := strings.TrimSpace(req.SourceListID)
 	targetListID := strings.TrimSpace(req.TargetListID)
@@ -163,6 +180,8 @@ func (s *Service) CopyFavoriteListToList(req FavoriteListCopyRequest) FavoriteBu
 	})
 }
 
+// PreviewFavoriteListCrossVersionCopy resolves each mod of a list against a
+// target Minecraft version and loader without writing anything.
 func (s *Service) PreviewFavoriteListCrossVersionCopy(req FavoriteCrossVersionCopyRequest) FavoriteCrossVersionCopyPreview {
 	sourceListID := strings.TrimSpace(req.SourceListID)
 	minecraftVersion := strings.TrimSpace(req.MinecraftVersion)
@@ -237,6 +256,8 @@ func (s *Service) PreviewFavoriteListCrossVersionCopy(req FavoriteCrossVersionCo
 	return preview
 }
 
+// ApplyFavoriteListCrossVersionCopy creates a target-scoped list from the
+// matches produced by PreviewFavoriteListCrossVersionCopy.
 func (s *Service) ApplyFavoriteListCrossVersionCopy(req FavoriteCrossVersionCopyRequest) FavoriteCrossVersionCopyApplyResult {
 	preview := s.PreviewFavoriteListCrossVersionCopy(req)
 	result := FavoriteCrossVersionCopyApplyResult{Preview: preview}
@@ -293,18 +314,18 @@ func (s *Service) favoriteCrossVersionCopyProject(mod storage.FavoriteMod, minec
 		return models.ModProject{}, false
 	}
 	if modID != "" {
-		if project, ok := storage.GetModPlatform(platform, modID); ok {
+		if project, ok := storage.GetModProject(platform, modID); ok {
 			return favoriteCrossVersionCopyProjectWithID(project), true
 		}
-		if project, ok := storage.GetModPlatformBySlug(platform, modID); ok {
+		if project, ok := storage.GetModProjectBySlug(platform, modID); ok {
 			return favoriteCrossVersionCopyProjectWithID(project), true
 		}
 	}
 	if slug != "" {
-		if project, ok := storage.GetModPlatformBySlug(platform, slug); ok {
+		if project, ok := storage.GetModProjectBySlug(platform, slug); ok {
 			return favoriteCrossVersionCopyProjectWithID(project), true
 		}
-		if project, ok := storage.GetModPlatform(platform, slug); ok {
+		if project, ok := storage.GetModProject(platform, slug); ok {
 			return favoriteCrossVersionCopyProjectWithID(project), true
 		}
 	}
@@ -335,6 +356,7 @@ func favoriteCrossVersionCopyVersionID(version models.ModVersion) string {
 	return strings.TrimSpace(version.ID)
 }
 
+// AddFavoriteListReference links a child list into a parent list.
 func (s *Service) AddFavoriteListReference(parentListID, childListID string) storage.FavoriteListRef {
 	ref, ok, err := storage.CreateFavoriteListRef(parentListID, childListID)
 	if err != nil {
@@ -347,6 +369,7 @@ func (s *Service) AddFavoriteListReference(parentListID, childListID string) sto
 	return ref
 }
 
+// RemoveFavoriteListReference unlinks a child list from a parent list.
 func (s *Service) RemoveFavoriteListReference(parentListID, childListID string) bool {
 	deleted, err := storage.DeleteFavoriteListRef(parentListID, childListID)
 	if err != nil {
@@ -356,12 +379,14 @@ func (s *Service) RemoveFavoriteListReference(parentListID, childListID string) 
 	return deleted
 }
 
+// ListFavoriteListRefs returns the child references of a parent list.
 func (s *Service) ListFavoriteListRefs(parentListID string) []storage.FavoriteListRef {
 	return storage.ListFavoriteListRefs(parentListID)
 }
 
-func (s *Service) RemoveFavoriteMod(listID, platform, modID, mcVersion, modLoader string) bool {
-	deleted, err := storage.DeleteFavoriteMod(listID, platform, modID, mcVersion, modLoader)
+// RemoveFavoriteMod deletes one mod entry from a list.
+func (s *Service) RemoveFavoriteMod(listID, platform, modID, minecraftVersion, modLoader string) bool {
+	deleted, err := storage.DeleteFavoriteMod(listID, platform, modID, minecraftVersion, modLoader)
 	if err != nil {
 		logging.Error("remove favorite mod failed", "listID", listID, "platform", platform, "modID", modID, "error", err)
 		return false
@@ -418,10 +443,10 @@ func favoriteModForTargetList(mod storage.FavoriteMod, targetListID string) stor
 func favoriteModIdentityKey(mod storage.FavoriteMod) string {
 	platform := strings.ToLower(strings.TrimSpace(mod.Platform))
 	modID := strings.ToLower(strings.TrimSpace(mod.ModID))
-	mcVersion := strings.TrimSpace(mod.MinecraftVersion)
+	minecraftVersion := strings.TrimSpace(mod.MinecraftVersion)
 	modLoader := strings.ToLower(strings.TrimSpace(mod.ModLoader))
 	if platform == "" || modID == "" {
 		return ""
 	}
-	return platform + "|" + modID + "|" + mcVersion + "|" + modLoader
+	return platform + "|" + modID + "|" + minecraftVersion + "|" + modLoader
 }

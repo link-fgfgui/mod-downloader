@@ -516,8 +516,8 @@ func (s *userStore) upsertFavoriteMod(mod FavoriteMod) (FavoriteMod, bool, error
 	return copyFavoriteMod(mod), true, nil
 }
 
-func (s *userStore) getFavoriteModByKey(listID, platform, modID, mcVersion, modLoader string) (FavoriteMod, bool, error) {
-	key := makeFavoriteModKey(listID, platform, modID, mcVersion, modLoader)
+func (s *userStore) getFavoriteModByKey(listID, platform, modID, minecraftVersion, modLoader string) (FavoriteMod, bool, error) {
+	key := makeFavoriteModKey(listID, platform, modID, minecraftVersion, modLoader)
 	if key.ListID == "" || key.Platform == "" || key.ModID == "" {
 		return FavoriteMod{}, false, nil
 	}
@@ -530,8 +530,8 @@ func (s *userStore) getFavoriteModByKey(listID, platform, modID, mcVersion, modL
 	)
 }
 
-func (s *userStore) deleteFavoriteMod(listID, platform, modID, mcVersion, modLoader string) (bool, error) {
-	key := makeFavoriteModKey(listID, platform, modID, mcVersion, modLoader)
+func (s *userStore) deleteFavoriteMod(listID, platform, modID, minecraftVersion, modLoader string) (bool, error) {
+	key := makeFavoriteModKey(listID, platform, modID, minecraftVersion, modLoader)
 	if key.ListID == "" || key.Platform == "" || key.ModID == "" {
 		return false, nil
 	}

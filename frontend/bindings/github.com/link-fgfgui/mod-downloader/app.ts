@@ -25,6 +25,9 @@ import * as structs$0 from "./core/structs/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as structs$1 from "./core/structs/minecraft/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as view$0 from "./core/structs/view/models.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -66,7 +69,7 @@ export function CheckDependencyFulfillment(req: structs$0.DependencyPreflightReq
     return $Call.ByID(1495726836, req);
 }
 
-export function ChooseCacheDir(locale: string): $CancellablePromise<structs$0.SettingsView> {
+export function ChooseCacheDir(locale: string): $CancellablePromise<view$0.SettingsView> {
     return $Call.ByID(1602493177, locale);
 }
 
@@ -102,12 +105,21 @@ export function GetAppVersion(): $CancellablePromise<string> {
     return $Call.ByID(1780012486);
 }
 
-export function GetDownloadQueueState(): $CancellablePromise<structs$0.DownloadQueueState> {
+export function GetDownloadQueueState(): $CancellablePromise<view$0.DownloadQueueState> {
     return $Call.ByID(223140799);
 }
 
-export function GetDownloadStates(req: structs$0.DownloadStatesRequest): $CancellablePromise<structs$0.ModDownloadButtonState[] | null> {
+export function GetDownloadStates(req: structs$0.DownloadStatesRequest): $CancellablePromise<view$0.ModDownloadButtonState[] | null> {
     return $Call.ByID(2998257085, req);
+}
+
+/**
+ * GetLocalModGroups returns the core-built Manage projection for one instance.
+ * Grouping, JIJ de-duplication, search text and loader compatibility all live
+ * in core so the GUI and TUI render the same rows.
+ */
+export function GetLocalModGroups(versionKey: string, modLoader: string): $CancellablePromise<view$0.LocalModGroup[] | null> {
+    return $Call.ByID(43243938, versionKey, modLoader);
 }
 
 export function GetMinecraftDir(): $CancellablePromise<string> {
@@ -137,7 +149,7 @@ export function GetSelectedVersion(): $CancellablePromise<structs$1.VersionInfo>
 /**
  * GetSettings returns a read-only view of the current settings.
  */
-export function GetSettings(): $CancellablePromise<structs$0.SettingsView> {
+export function GetSettings(): $CancellablePromise<view$0.SettingsView> {
     return $Call.ByID(2554697378);
 }
 
@@ -165,6 +177,13 @@ export function ListFavoriteContents(listID: string): $CancellablePromise<storag
     return $Call.ByID(1441335991, listID);
 }
 
+/**
+ * ListFavoriteContentsForScope returns a list's contents filtered to one scope.
+ */
+export function ListFavoriteContentsForScope(listID: string, minecraftVersion: string, modLoader: string): $CancellablePromise<storage$0.FavoriteListContents> {
+    return $Call.ByID(585695510, listID, minecraftVersion, modLoader);
+}
+
 export function ListFavoriteListRefs(parentListID: string): $CancellablePromise<storage$0.FavoriteListRef[] | null> {
     return $Call.ByID(884444067, parentListID);
 }
@@ -175,6 +194,14 @@ export function ListFavoriteLists(): $CancellablePromise<storage$0.FavoriteList[
 
 export function ListFavoriteMods(listID: string): $CancellablePromise<storage$0.FavoriteMod[] | null> {
     return $Call.ByID(67585452, listID);
+}
+
+/**
+ * ListFavoriteOverview returns the scope-filtered, core-ordered favorites
+ * projection. The frontend renders pinned/ungrouped as-is.
+ */
+export function ListFavoriteOverview(minecraftVersion: string, modLoader: string): $CancellablePromise<view$0.FavoriteOverview> {
+    return $Call.ByID(3934578302, minecraftVersion, modLoader);
 }
 
 export function ListMatchingProjectVersions(result: models$0.ModProject, minecraftVersion: string, modLoader: string): $CancellablePromise<models$0.ModVersion[] | null> {
@@ -253,47 +280,47 @@ export function RetryDownload(id: string): $CancellablePromise<boolean> {
     return $Call.ByID(2868588333, id);
 }
 
-export function SaveAnimationSettings(req: structs$0.SaveAnimationSettingsRequest): $CancellablePromise<structs$0.SettingsView> {
+/**
+ * SaveAPIKeys updates API keys and persists them immediately + reinitializes clients.
+ * An empty string means clear the key; the special value (see above) means keep unchanged.
+ */
+export function SaveAPIKeys(req: structs$0.SaveAPIKeysRequest): $CancellablePromise<view$0.SettingsView> {
+    return $Call.ByID(3575225732, req);
+}
+
+export function SaveAnimationSettings(req: structs$0.SaveAnimationSettingsRequest): $CancellablePromise<view$0.SettingsView> {
     return $Call.ByID(1048542667, req);
 }
 
-/**
- * SaveApiKeys updates API keys and persists them immediately + reinitializes clients.
- * An empty string means clear the key; the special value (see above) means keep unchanged.
- */
-export function SaveApiKeys(req: structs$0.SaveApiKeysRequest): $CancellablePromise<structs$0.SettingsView> {
-    return $Call.ByID(885101828, req);
-}
-
-export function SaveCacheDirPreference(dir: string): $CancellablePromise<structs$0.SettingsView> {
+export function SaveCacheDirPreference(dir: string): $CancellablePromise<view$0.SettingsView> {
     return $Call.ByID(644247192, dir);
 }
 
-export function SaveHardwareAccelerationSettings(req: structs$0.SaveHardwareAccelerationSettingsRequest): $CancellablePromise<structs$0.SettingsView> {
+export function SaveHardwareAccelerationSettings(req: structs$0.SaveHardwareAccelerationSettingsRequest): $CancellablePromise<view$0.SettingsView> {
     return $Call.ByID(3815687617, req);
 }
 
-export function SaveJijDetectionSettings(req: structs$0.SaveJijDetectionSettingsRequest): $CancellablePromise<structs$0.SettingsView> {
-    return $Call.ByID(3502560681, req);
+export function SaveJIJDetectionSettings(req: structs$0.SaveJIJDetectionSettingsRequest): $CancellablePromise<view$0.SettingsView> {
+    return $Call.ByID(2533299945, req);
 }
 
 export function SaveLanguage(language: string): $CancellablePromise<string> {
     return $Call.ByID(3495151482, language);
 }
 
-export function SaveMCIMSettings(req: structs$0.SaveMCIMSettingsRequest): $CancellablePromise<structs$0.SettingsView> {
+export function SaveMCIMSettings(req: structs$0.SaveMCIMSettingsRequest): $CancellablePromise<view$0.SettingsView> {
     return $Call.ByID(983863619, req);
 }
 
-export function SaveNetworkSettings(req: structs$0.SaveNetworkSettingsRequest): $CancellablePromise<structs$0.SettingsView> {
+export function SaveNetworkSettings(req: structs$0.SaveNetworkSettingsRequest): $CancellablePromise<view$0.SettingsView> {
     return $Call.ByID(1280426947, req);
 }
 
-export function SavePreferredReleaseTypeSettings(req: structs$0.SavePreferredReleaseTypeSettingsRequest): $CancellablePromise<structs$0.SettingsView> {
+export function SavePreferredReleaseTypeSettings(req: structs$0.SavePreferredReleaseTypeSettingsRequest): $CancellablePromise<view$0.SettingsView> {
     return $Call.ByID(1850370219, req);
 }
 
-export function SaveSimpleModeSettings(req: structs$0.SaveSimpleModeSettingsRequest): $CancellablePromise<structs$0.SettingsView> {
+export function SaveSimpleModeSettings(req: structs$0.SaveSimpleModeSettingsRequest): $CancellablePromise<view$0.SettingsView> {
     return $Call.ByID(2538458668, req);
 }
 
@@ -305,7 +332,7 @@ export function SaveTheme(theme: string): $CancellablePromise<string> {
     return $Call.ByID(2006138805, theme);
 }
 
-export function SaveUnusedDependencyCleanupSettings(req: structs$0.SaveUnusedDependencyCleanupSettingsRequest): $CancellablePromise<structs$0.SettingsView> {
+export function SaveUnusedDependencyCleanupSettings(req: structs$0.SaveUnusedDependencyCleanupSettingsRequest): $CancellablePromise<view$0.SettingsView> {
     return $Call.ByID(3433230972, req);
 }
 

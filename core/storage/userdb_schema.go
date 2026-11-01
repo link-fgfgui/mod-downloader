@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	// modernc.org/sqlite registers the pure-Go "sqlite" driver used by
+	// sql.Open("sqlite", ...); the import is blank by design.
 	_ "modernc.org/sqlite"
 )
 
@@ -25,6 +27,8 @@ const favoriteRefMaxDepth = 32
 
 var errFavoriteListRefCycle = errors.New("favorite list reference would create a cycle")
 
+// ErrFavoriteListNameConflict is returned when a list name already exists in
+// the target scope.
 var ErrFavoriteListNameConflict = errors.New("favorite list name already exists in target scope")
 
 func openUserStore(path string) (*userStore, error) {

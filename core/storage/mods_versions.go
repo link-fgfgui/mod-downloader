@@ -11,6 +11,7 @@ import (
 	"github.com/link-fgfgui/mod-downloader/core/models"
 )
 
+// SetPlatformVersions merges versions into the cache for one platform project.
 func SetPlatformVersions(platform, projectID string, versions []models.ModVersion) error {
 	d, err := readyDB()
 	if err != nil {
@@ -37,7 +38,9 @@ func SetPlatformVersions(platform, projectID string, versions []models.ModVersio
 	return nil
 }
 
-func SetPlatformVersionSnapshot(platform, projectID string, versions []models.ModVersion, updatedAt int64, scopes []ModPlatformVersionScope) error {
+// SetPlatformVersionSnapshot replaces a project's cached versions and records
+// the fetch timestamp for each requested scope.
+func SetPlatformVersionSnapshot(platform, projectID string, versions []models.ModVersion, updatedAt int64, scopes []PlatformVersionScope) error {
 	d, err := readyDB()
 	if err != nil {
 		return err
@@ -90,9 +93,9 @@ func touchSnapshotPlatform(state *cacheState, pool *stringPool, platform, projec
 	state.ModPlatforms[key] = internModProject(pool, p)
 }
 
-func normalizePlatformVersionScopes(scopes []ModPlatformVersionScope) []ModPlatformVersionScope {
+func normalizePlatformVersionScopes(scopes []PlatformVersionScope) []PlatformVersionScope {
 	seen := make(map[string]struct{}, len(scopes))
-	out := make([]ModPlatformVersionScope, 0, len(scopes))
+	out := make([]PlatformVersionScope, 0, len(scopes))
 	for _, scope := range scopes {
 		scope.MinecraftVersion = strings.TrimSpace(scope.MinecraftVersion)
 		scope.ModLoader = strings.ToLower(strings.TrimSpace(scope.ModLoader))
@@ -148,14 +151,16 @@ func normalizeDependencies(platformVersionID string, deps []models.ModDependency
 	return out
 }
 
-func GetPlatformVersionScopeUpdatedAt(platform, projectID string, scope ModPlatformVersionScope) (int64, bool) {
+// GetPlatformVersionScopeUpdatedAt returns when the cached versions for one
+// scope were last refreshed.
+func GetPlatformVersionScopeUpdatedAt(platform, projectID string, scope PlatformVersionScope) (int64, bool) {
 	d, err := readyDB()
 	if err != nil {
 		return 0, false
 	}
 	platform = normalizePlatform(platform)
 	projectID = strings.TrimSpace(projectID)
-	scopes := normalizePlatformVersionScopes([]ModPlatformVersionScope{scope})
+	scopes := normalizePlatformVersionScopes([]PlatformVersionScope{scope})
 	if platform == "" || projectID == "" || len(scopes) == 0 {
 		return 0, false
 	}
@@ -173,6 +178,7 @@ func GetPlatformVersionScopeUpdatedAt(platform, projectID string, scope ModPlatf
 	return rec.UpdatedAt, true
 }
 
+// GetPlatformVersions returns every cached version of one platform project.
 func GetPlatformVersions(platform, projectID string) ([]models.ModVersion, error) {
 	d, err := readyDB()
 	if err != nil {
@@ -283,6 +289,7 @@ func cachedVersionBefore(current, next models.ModVersion) bool {
 
 // --- mod dependencies ---
 
+// SetVersionDependencies replaces the dependency list of one platform version.
 func SetVersionDependencies(platformVersionID string, deps []models.ModDependency) error {
 	d, err := readyDB()
 	if err != nil {
@@ -315,6 +322,8 @@ func SetVersionDependencies(platformVersionID string, deps []models.ModDependenc
 	return nil
 }
 
+// GetVersionDependencies returns the cached dependencies of one platform
+// version.
 func GetVersionDependencies(platformVersionID string) ([]models.ModDependency, error) {
 	d, err := readyDB()
 	if err != nil {
@@ -346,6 +355,8 @@ func GetVersionDependencies(platformVersionID string) ([]models.ModDependency, e
 
 // --- pinned mods ---
 
+// SetVersionModIDs replaces the parsed remote-JAR mod IDs of one platform
+// version.
 func SetVersionModIDs(platformVersionID string, modIDs []string) error {
 	d, err := readyDB()
 	if err != nil {

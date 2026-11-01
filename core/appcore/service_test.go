@@ -151,8 +151,8 @@ func TestStartupConfiguresRemoteModIDConcurrency(t *testing.T) {
 	dir := t.TempDir()
 	svc := New(Options{
 		Config: &configs.Config{
-			Prefers:   configs.Preferences{SimpleMode: true},
-			Downloads: configs.DownloadConfig{ConcurrentDownloads: 3},
+			Preferences: configs.Preferences{SimpleMode: true},
+			Downloads:   configs.DownloadConfig{ConcurrentDownloads: 3},
 		},
 		Runtime: RuntimeOptions{
 			WorkDir:   dir,
@@ -520,8 +520,8 @@ minecraft_dir = "/from-file"
 	if err := svc.Startup(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if svc.Config().Keys.CurseforgeApiKey != "from-env" {
-		t.Fatalf("curseforge key = %q, want from-env", svc.Config().Keys.CurseforgeApiKey)
+	if svc.Config().Keys.CurseForgeAPIKey != "from-env" {
+		t.Fatalf("curseforge key = %q, want from-env", svc.Config().Keys.CurseForgeAPIKey)
 	}
 	if got := global.GetMinecraftDir(); got != "" {
 		t.Fatalf("global minecraft dir = %q, want empty", got)
@@ -933,7 +933,7 @@ func openFavoriteCrossVersionCopyService(t *testing.T) *Service {
 
 func storeFavoriteCrossVersionCopyProject(t *testing.T, platform, projectID, slug string, versions []models.ModVersion) {
 	t.Helper()
-	if err := storage.UpsertModPlatform(models.ModProject{
+	if err := storage.UpsertModProject(models.ModProject{
 		ID:        models.ProjectKey(platform, projectID),
 		Platform:  platform,
 		ProjectID: projectID,
@@ -942,7 +942,7 @@ func storeFavoriteCrossVersionCopyProject(t *testing.T, platform, projectID, slu
 	}); err != nil {
 		t.Fatal(err)
 	}
-	scopes := []storage.ModPlatformVersionScope{
+	scopes := []storage.PlatformVersionScope{
 		{MinecraftVersion: "1.21.1", ModLoader: "fabric"},
 		{MinecraftVersion: "1.21.1", ModLoader: "neoforge"},
 	}
@@ -968,10 +968,10 @@ func stubFavoriteCrossVersionCopyProjectLookup(t *testing.T) {
 	t.Helper()
 	lookupByID := favoriteCrossVersionCopyLookupProjectByID
 	lookupBySlug := favoriteCrossVersionCopyLookupProjectBySlug
-	favoriteCrossVersionCopyLookupProjectByID = func(platform, projectID, mcVersion, modLoader string) (models.ModProject, bool) {
+	favoriteCrossVersionCopyLookupProjectByID = func(_, _, _, _ string) (models.ModProject, bool) {
 		return models.ModProject{}, false
 	}
-	favoriteCrossVersionCopyLookupProjectBySlug = func(platform, slug, mcVersion, modLoader string) (models.ModProject, bool) {
+	favoriteCrossVersionCopyLookupProjectBySlug = func(_, _, _, _ string) (models.ModProject, bool) {
 		return models.ModProject{}, false
 	}
 	t.Cleanup(func() {
@@ -1052,15 +1052,15 @@ func TestSaveUnusedDependencyCleanupSettingsPersists(t *testing.T) {
 	if !view.AutoScanUnusedDependencies {
 		t.Fatal("view auto scan unused dependencies = false, want true")
 	}
-	if svc.Config().Prefers.AutoScanUnusedDependencies == nil || !*svc.Config().Prefers.AutoScanUnusedDependencies {
-		t.Fatalf("config auto scan unused dependencies = %#v, want true", svc.Config().Prefers.AutoScanUnusedDependencies)
+	if svc.Config().Preferences.AutoScanUnusedDependencies == nil || !*svc.Config().Preferences.AutoScanUnusedDependencies {
+		t.Fatalf("config auto scan unused dependencies = %#v, want true", svc.Config().Preferences.AutoScanUnusedDependencies)
 	}
 
 	loaded, err := configs.Load()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !loaded.Prefers.AutoScanUnusedDependenciesValue() {
+	if !loaded.Preferences.AutoScanUnusedDependenciesValue() {
 		t.Fatal("persisted auto scan unused dependencies = false, want true")
 	}
 }
@@ -1086,15 +1086,15 @@ func TestSaveSimpleModeSettingsPersistsAndAppliesImmediately(t *testing.T) {
 		t.Fatal("default simple mode = true, want false")
 	}
 	view := svc.SaveSimpleModeSettings(appstructs.SaveSimpleModeSettingsRequest{SimpleMode: true})
-	if !view.SimpleMode || !svc.Config().Prefers.SimpleMode || !modbridge.SimpleModeEnabled() {
-		t.Fatalf("enabled simple mode was not applied: view=%#v config=%#v runtime=%v", view, svc.Config().Prefers, modbridge.SimpleModeEnabled())
+	if !view.SimpleMode || !svc.Config().Preferences.SimpleMode || !modbridge.SimpleModeEnabled() {
+		t.Fatalf("enabled simple mode was not applied: view=%#v config=%#v runtime=%v", view, svc.Config().Preferences, modbridge.SimpleModeEnabled())
 	}
 
 	loaded, err := configs.Load()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !loaded.Prefers.SimpleMode {
+	if !loaded.Preferences.SimpleMode {
 		t.Fatal("persisted simple mode = false, want true")
 	}
 
@@ -1134,7 +1134,7 @@ func TestSaveLanguagePersistsAndNormalizes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := loaded.Prefers.Language.Normalized(); got != configs.LanguageChinese {
+	if got := loaded.Preferences.Language.Normalized(); got != configs.LanguageChinese {
 		t.Fatalf("persisted language = %q, want zh", got)
 	}
 	if got := svc.SaveLanguage("invalid"); got != configs.LanguageSystem.String() {
@@ -1176,7 +1176,7 @@ func TestSaveMCIMSettingsPersistsAndReconfiguresProviders(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !loaded.Prefers.MCIMEnabledValue() {
+	if !loaded.Preferences.MCIMEnabledValue() {
 		t.Fatal("persisted MCIM enabled = false, want true")
 	}
 
@@ -1190,14 +1190,14 @@ func TestSaveMCIMSettingsPersistsAndReconfiguresProviders(t *testing.T) {
 	}
 }
 
-func TestDefaultCurseforgeAPIKeyFallback(t *testing.T) {
-	prevDefault := configs.DefaultCurseforgeAPIKey
+func TestDefaultCurseForgeAPIKeyFallback(t *testing.T) {
+	prevDefault := configs.DefaultCurseForgeAPIKey
 	t.Cleanup(func() {
-		configs.DefaultCurseforgeAPIKey = prevDefault
+		configs.DefaultCurseForgeAPIKey = prevDefault
 		global.SetCurseForgeClient(nil)
 		global.SetModrinthClient(nil)
 	})
-	configs.DefaultCurseforgeAPIKey = "compiled-default-key"
+	configs.DefaultCurseForgeAPIKey = "compiled-default-key"
 
 	oldwd, err := os.Getwd()
 	if err != nil {
@@ -1217,44 +1217,44 @@ func TestDefaultCurseforgeAPIKeyFallback(t *testing.T) {
 	svc := New(Options{Config: &configs.Config{}})
 	svc.configureProviderClients()
 	sv := svc.GetSettings()
-	if !sv.HasCurseforgeKey {
-		t.Fatal("HasCurseforgeKey = false with compiled default, want true")
+	if !sv.HasCurseForgeKey {
+		t.Fatal("HasCurseForgeKey = false with compiled default, want true")
 	}
-	if sv.CurseforgeKeyMask != MaskKey("compiled-default-key") {
-		t.Fatalf("CurseforgeKeyMask = %q, want masked default", sv.CurseforgeKeyMask)
+	if sv.CurseForgeKeyMask != MaskKey("compiled-default-key") {
+		t.Fatalf("CurseForgeKeyMask = %q, want masked default", sv.CurseForgeKeyMask)
 	}
 	if global.GetCurseForgeClient() == nil {
 		t.Fatal("CurseForge client is nil with compiled default")
 	}
-	if got := svc.Config().Keys.CurseforgeApiKey; got != "" {
+	if got := svc.Config().Keys.CurseForgeAPIKey; got != "" {
 		t.Fatalf("configured key = %q, want empty (default must not be written into config)", got)
 	}
 
 	// Explicit user key wins over compiled default.
-	svc.config.Keys.CurseforgeApiKey = "user-override-key"
+	svc.config.Keys.CurseForgeAPIKey = "user-override-key"
 	svc.configureProviderClients()
 	sv = svc.GetSettings()
-	if sv.CurseforgeKeyMask != MaskKey("user-override-key") {
-		t.Fatalf("CurseforgeKeyMask = %q, want user mask", sv.CurseforgeKeyMask)
+	if sv.CurseForgeKeyMask != MaskKey("user-override-key") {
+		t.Fatalf("CurseForgeKeyMask = %q, want user mask", sv.CurseForgeKeyMask)
 	}
 
 	// Clear stores empty config and falls back to default again; default is not persisted.
-	sv = svc.SaveApiKeys(appstructs.SaveApiKeysRequest{CurseforgeApiKey: ""})
-	if svc.Config().Keys.CurseforgeApiKey != "" {
-		t.Fatalf("configured key after clear = %q, want empty", svc.Config().Keys.CurseforgeApiKey)
+	sv = svc.SaveAPIKeys(appstructs.SaveAPIKeysRequest{CurseForgeAPIKey: ""})
+	if svc.Config().Keys.CurseForgeAPIKey != "" {
+		t.Fatalf("configured key after clear = %q, want empty", svc.Config().Keys.CurseForgeAPIKey)
 	}
-	if !sv.HasCurseforgeKey {
-		t.Fatal("HasCurseforgeKey = false after clear with default, want true")
+	if !sv.HasCurseForgeKey {
+		t.Fatal("HasCurseForgeKey = false after clear with default, want true")
 	}
-	if sv.CurseforgeKeyMask != MaskKey("compiled-default-key") {
-		t.Fatalf("CurseforgeKeyMask after clear = %q, want default mask", sv.CurseforgeKeyMask)
+	if sv.CurseForgeKeyMask != MaskKey("compiled-default-key") {
+		t.Fatalf("CurseForgeKeyMask after clear = %q, want default mask", sv.CurseForgeKeyMask)
 	}
 	loaded, err := configs.Load()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if loaded.Keys.CurseforgeApiKey != "" {
-		t.Fatalf("persisted key = %q, want empty (must not write default into toml)", loaded.Keys.CurseforgeApiKey)
+	if loaded.Keys.CurseForgeAPIKey != "" {
+		t.Fatalf("persisted key = %q, want empty (must not write default into toml)", loaded.Keys.CurseForgeAPIKey)
 	}
 }
 
@@ -1345,7 +1345,7 @@ func TestSettingsViewExposesRequireCtrlForMultiSelect(t *testing.T) {
 	if svc.GetSettings().RequireCtrlForMultiSelect {
 		t.Fatal("RequireCtrlForMultiSelect = true by default, want false")
 	}
-	svc.config.Prefers.RequireCtrlForMultiSelect = true
+	svc.config.Preferences.RequireCtrlForMultiSelect = true
 	if !svc.GetSettings().RequireCtrlForMultiSelect {
 		t.Fatal("RequireCtrlForMultiSelect = false after enabling in config")
 	}

@@ -79,7 +79,7 @@ func enrichModMetadata(mods []structs.ModInfo) ([]structs.ModInfo, map[string]ui
 		if ok && hasProjectDisplayMetadata(project) {
 			enriched[i] = modbridge.ApplyPlatformMetadataToModInfo(enriched[i], project, version)
 		} else {
-			missingFiles[sha1] = enriched[i].CfFingerprint
+			missingFiles[sha1] = enriched[i].CurseForgeFingerprint
 		}
 	}
 	return enriched, missingFiles

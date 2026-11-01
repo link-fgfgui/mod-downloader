@@ -30,6 +30,8 @@ var pinnedMinecraftReleaseVersions = []string{
 	"1.7.10",
 }
 
+// FetchMinecraftReleaseVersions downloads Mojang's manifest and returns the
+// release version IDs, with pinned versions first.
 func FetchMinecraftReleaseVersions() ([]string, error) {
 	client := networking.NewClientWithUserAgent(10*time.Second, "mod-downloader/dev")
 	resp, err := client.Get(minecraftVersionManifestURL)
@@ -81,6 +83,8 @@ func pinMinecraftReleaseVersions(versions []string) []string {
 	return result
 }
 
+// GetMinecraftReleaseVersions returns cached release IDs, fetching them on the
+// first call, and falls back to the pinned list when the fetch fails.
 func GetMinecraftReleaseVersions() []string {
 	releaseVersions := global.GetMinecraftReleaseVersions()
 	if len(releaseVersions) > 0 {

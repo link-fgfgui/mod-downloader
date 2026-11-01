@@ -9,17 +9,20 @@ import (
 	"github.com/link-fgfgui/mod-downloader/core/models"
 )
 
+// PlatformAssociation links a CurseForge project to its Modrinth equivalent.
 type PlatformAssociation struct {
 	ID                  string `json:"id"`
 	CurseForgeProjectID string `json:"curseforgeProjectId,omitempty"`
 	ModrinthProjectID   string `json:"modrinthProjectId,omitempty"`
 }
 
+// CachedModVersionCandidate pairs a cached project with one of its versions.
 type CachedModVersionCandidate struct {
 	Project models.ModProject
 	Version models.ModVersion
 }
 
+// PinnedMod is a mod version pinned for one Minecraft version/loader scope.
 type PinnedMod struct {
 	ID               string `json:"id"`
 	Platform         string `json:"platform"`
@@ -29,6 +32,7 @@ type PinnedMod struct {
 	ModLoader        string `json:"modLoader"`
 }
 
+// FavoriteList is a user-created or system favorite list.
 type FavoriteList struct {
 	ID               string `json:"id"`
 	GroupID          string `json:"groupId,omitempty"`
@@ -45,6 +49,7 @@ type FavoriteList struct {
 	System           bool   `json:"system,omitempty"`
 }
 
+// FavoriteGroup is a collapsible group of favorite lists.
 type FavoriteGroup struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
@@ -53,6 +58,7 @@ type FavoriteGroup struct {
 	SortOrder int    `json:"sortOrder"`
 }
 
+// FavoriteListRef is a directed parent-to-child reference between lists.
 type FavoriteListRef struct {
 	ID           string `json:"id"`
 	ParentListID string `json:"parentListId"`
@@ -62,6 +68,7 @@ type FavoriteListRef struct {
 	SortOrder    int    `json:"sortOrder"`
 }
 
+// FavoriteMod is one mod saved in a favorite list.
 type FavoriteMod struct {
 	ID               string   `json:"id"`
 	ListID           string   `json:"listId"`
@@ -79,6 +86,8 @@ type FavoriteMod struct {
 	UpdatedAt        int64    `json:"updatedAt"`
 }
 
+// FavoriteModEntry is a favorite mod together with the list it was inherited
+// from when resolving referenced lists.
 type FavoriteModEntry struct {
 	FavoriteMod
 	SourceListID   string `json:"sourceListId,omitempty"`
@@ -86,14 +95,18 @@ type FavoriteModEntry struct {
 	Referenced     bool   `json:"referenced,omitempty"`
 }
 
+// FavoriteListContents is the fully resolved content of one favorite list,
+// including referenced lists and inherited mods.
 type FavoriteListContents struct {
 	ListID string             `json:"listId"`
 	Mods   []FavoriteModEntry `json:"mods"`
 	Refs   []FavoriteListRef  `json:"refs,omitempty"`
 }
 
+// UsageStatKey identifies one persisted usage counter.
 type UsageStatKey string
 
+// Supported usage counters.
 const (
 	UsageStatDownloadsCompleted UsageStatKey = "downloads_completed"
 	UsageStatModsEnabled        UsageStatKey = "mods_enabled"
@@ -103,6 +116,7 @@ const (
 	UsageStatPackwizExports     UsageStatKey = "packwiz_exports"
 )
 
+// UsageStats is the adapter-facing snapshot of all usage counters.
 type UsageStats struct {
 	DownloadsCompleted int64 `json:"downloadsCompleted"`
 	ModsEnabled        int64 `json:"modsEnabled"`
@@ -112,7 +126,9 @@ type UsageStats struct {
 	PackwizExports     int64 `json:"packwizExports"`
 }
 
-type ModPlatformVersionScope struct {
+// PlatformVersionScope selects cached platform versions for one Minecraft
+// version and loader.
+type PlatformVersionScope struct {
 	MinecraftVersion string
 	ModLoader        string
 }
@@ -125,10 +141,10 @@ type storedVersionScope struct {
 	UpdatedAt        int64  `json:"updatedAt"`
 }
 
-func normalizePinnedModKey(platform, modID, mcVersion, modLoader string) (string, string, string, string) {
+func normalizePinnedModKey(platform, modID, minecraftVersion, modLoader string) (string, string, string, string) {
 	return strings.ToLower(strings.TrimSpace(platform)),
 		strings.ToLower(strings.TrimSpace(modID)),
-		strings.TrimSpace(mcVersion),
+		strings.TrimSpace(minecraftVersion),
 		strings.ToLower(strings.TrimSpace(modLoader))
 }
 
@@ -185,23 +201,23 @@ func makeVersionKey(platform, projectID, versionID string) versionKey {
 	return versionKey{Platform: normalizePlatform(platform), ProjectID: strings.TrimSpace(projectID), VersionID: strings.TrimSpace(versionID)}
 }
 
-func makePinnedModKey(platform, modID, mcVersion, modLoader string) pinnedModKey {
-	platform, modID, mcVersion, modLoader = normalizePinnedModKey(platform, modID, mcVersion, modLoader)
-	return pinnedModKey{Platform: platform, ModID: modID, MinecraftVersion: mcVersion, ModLoader: modLoader}
+func makePinnedModKey(platform, modID, minecraftVersion, modLoader string) pinnedModKey {
+	platform, modID, minecraftVersion, modLoader = normalizePinnedModKey(platform, modID, minecraftVersion, modLoader)
+	return pinnedModKey{Platform: platform, ModID: modID, MinecraftVersion: minecraftVersion, ModLoader: modLoader}
 }
 
-func makeFavoriteModKey(listID, platform, modID, mcVersion, modLoader string) favoriteModKey {
-	platform, modID, mcVersion, modLoader = normalizePinnedModKey(platform, modID, mcVersion, modLoader)
+func makeFavoriteModKey(listID, platform, modID, minecraftVersion, modLoader string) favoriteModKey {
+	platform, modID, minecraftVersion, modLoader = normalizePinnedModKey(platform, modID, minecraftVersion, modLoader)
 	return favoriteModKey{
 		ListID:           strings.TrimSpace(listID),
 		Platform:         platform,
 		ModID:            modID,
-		MinecraftVersion: mcVersion,
+		MinecraftVersion: minecraftVersion,
 		ModLoader:        modLoader,
 	}
 }
 
-func makeVersionScopeKey(platform, projectID string, scope ModPlatformVersionScope) versionScopeKey {
+func makeVersionScopeKey(platform, projectID string, scope PlatformVersionScope) versionScopeKey {
 	return versionScopeKey{
 		Platform:         normalizePlatform(platform),
 		ProjectID:        strings.TrimSpace(projectID),

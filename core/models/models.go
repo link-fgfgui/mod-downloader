@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 link-fgfgui
 // SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
 
+// Package models defines the canonical domain models shared by every adapter.
 package models
 
 import (
@@ -11,7 +12,7 @@ import (
 type ModProject struct {
 	ID          string   `json:"id"`                   // Composite: "platform:projectID" or just projectID
 	Platform    string   `json:"platform"`             // "CurseForge" | "Modrinth"
-	ProjectID   string   `json:"projectId"`            // Numeric ID for CF, slug for MR
+	ProjectID   string   `json:"projectId"`            // Platform-native project ID
 	Slug        string   `json:"slug"`                 // URL slug
 	Title       string   `json:"title"`                // Display name
 	Icon        string   `json:"icon"`                 // Material Design Icon name (e.g. "mdi-package-variant")
@@ -28,7 +29,7 @@ type ModVersion struct {
 	ID           string          `json:"id"`           // Platform-specific version ID
 	Platform     string          `json:"platform"`     // "CurseForge" | "Modrinth"
 	ProjectID    string          `json:"projectId"`    // Parent project ID
-	VersionID    string          `json:"versionId"`    // Alias for ID (frontend compatibility)
+	VersionID    string          `json:"versionId"`    // Alias for ID kept for adapter compatibility
 	Name         string          `json:"name"`         // Display name
 	Version      string          `json:"version"`      // Version number string
 	ReleaseType  string          `json:"releaseType"`  // "release" | "beta" | "alpha"

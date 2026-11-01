@@ -34,12 +34,14 @@ type localModDependencyGroup struct {
 	categories   []string
 }
 
+// ScanUnusedDependencies reports mods in the selected instance that no enabled
+// mod requires, excluding the requested paths.
 func (s *Service) ScanUnusedDependencies(req appstructs.UnusedDependencyScanRequest) (appstructs.UnusedDependencyScanResult, error) {
 	selected := global.GetSelectedVersion()
 	if selected.ID == "" && selected.Name == "" {
 		return appstructs.UnusedDependencyScanResult{}, errors.New("no selected version")
 	}
-	if !minecraft.JijDetectionEnabled() {
+	if !minecraft.JIJDetectionEnabled() {
 		// Fail closed: without nested-jar metadata the provider index cannot see
 		// IDs supplied by Jar-in-Jar children, so a jar could be reported as
 		// unused while another mod still requires the bundled dependency.
@@ -135,7 +137,7 @@ func localModDependencyGroups(mods []mcstructs.ModInfo) []localModDependencyGrou
 			order = append(order, key)
 		}
 		group.modIDs = appendNormalizedUnique(group.modIDs, mod.ID)
-		group.jijModIDs = appendJijModIDs(group.jijModIDs, mod.JijMods)
+		group.jijModIDs = appendJIJModIDs(group.jijModIDs, mod.JIJMods)
 		group.dependencies = appendDependencyIDs(group.dependencies, mod.Dependencies)
 		group.categories = appendNormalizedUniqueMany(group.categories, mod.Categories)
 		if group.fileName == "" {
@@ -201,7 +203,7 @@ func appendDependencyIDs(ids []string, deps []mcstructs.LocalModDependency) []st
 	return ids
 }
 
-func appendJijModIDs(ids []string, mods []mcstructs.JijModInfo) []string {
+func appendJIJModIDs(ids []string, mods []mcstructs.JIJModInfo) []string {
 	for _, mod := range mods {
 		ids = appendNormalizedUnique(ids, mod.ID)
 	}

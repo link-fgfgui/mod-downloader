@@ -7,41 +7,29 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"os/exec"
 	"path/filepath"
 	goruntime "runtime"
 	"strings"
 
 	"github.com/link-fgfgui/mod-downloader/core/appcore"
-	"github.com/link-fgfgui/mod-downloader/core/httpserver"
+	"github.com/link-fgfgui/mod-downloader/core/host"
+	"github.com/link-fgfgui/mod-downloader/core/instance"
 	"github.com/link-fgfgui/mod-downloader/core/logging"
 	"github.com/link-fgfgui/mod-downloader/core/models"
 	"github.com/link-fgfgui/mod-downloader/core/storage"
 	appstructs "github.com/link-fgfgui/mod-downloader/core/structs"
 	structs "github.com/link-fgfgui/mod-downloader/core/structs/minecraft"
+	appview "github.com/link-fgfgui/mod-downloader/core/structs/view"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-const minecraftDirChangedEvent = "minecraft-dir-changed"
-const selectedVersionChangedEvent = "selected-version-changed"
-const searchModsUpdatedEvent = "search-mods-updated"
-const extensionModsAcceptedEvent = "extension-mods-accepted"
-const downloadStatesUpdatedEvent = "download-states-updated"
-const downloadQueueUpdatedEvent = "download-queue-updated"
-const downloadFailedEvent = "download-failed"
-const downloadCompletedEvent = "download-completed"
-const usageStatsUpdatedEvent = "usage-stats-updated"
-
 // App struct
 type App struct {
-	app        *application.App
-	core       *appcore.Service
-	server     *httpserver.Server
-	startupErr error
-	serverErr  error
-	quitFunc   func()
+	app      *application.App
+	host     *host.Host
+	quitFunc func()
 }
 
 // NewApp creates a new App application struct
@@ -54,103 +42,58 @@ func (a *App) GetAppVersion() string {
 }
 
 func (a *App) ServiceStartup(ctx context.Context, _ application.ServiceOptions) error {
-	a.core = appcore.New(appcore.Options{
-		Runtime:               appRuntimeOptions(),
+	a.host = host.New(host.Options{
 		Version:               currentAppVersion(),
 		LoadMinecraftReleases: true,
-		OnEvent:               a.emitCoreEvent,
 	})
-	if err := a.core.Startup(ctx); err != nil {
-		a.startupErr = err
+	a.registerCoreEvents(a.host)
+	if err := a.host.Start(ctx); err != nil {
+		if errors.Is(err, instance.ErrAlreadyRunning) {
+			// Wails has not shown the window yet. Abort the run instead of
+			// opening a second window against the same storage.
+			return err
+		}
 		// A partially initialized core must not be used: fail fast and leave the
 		// HTTP server down so the frontend sees explicit rejections instead of
-		// silent empty results.
+		// silent empty results. GetStartupStatus reports the typed failure.
 		logging.Error("core startup failed", "error", err)
 		return nil
-	}
-
-	a.server = httpserver.New(httpserver.DefaultAddr, httpserver.Options{Accept: a.core.AcceptExtensionProjects})
-	if err := a.server.Start(); err != nil {
-		a.serverErr = err
-		logging.Error("start http server failed", "error", err)
 	}
 	return nil
 }
 
 func (a *App) service() *appcore.Service {
-	if a.startupErr != nil {
-		reason := "core startup failed: " + a.startupErr.Error()
-		logging.Error("app service unavailable", "reason", reason)
-		panic(reason)
+	if a.host != nil {
+		if svc := a.host.Service(); svc != nil {
+			return svc
+		}
 	}
-	if a.core == nil {
-		reason := "core not initialized"
-		logging.Error("app service unavailable", "reason", reason)
-		panic(reason)
+	reason := "core not initialized"
+	if a.host != nil {
+		if status := a.host.StartupStatus(); status.Error != "" {
+			reason = "core startup failed: " + status.Error
+		}
 	}
-	return a.core
+	logging.Error("app service unavailable", "reason", reason)
+	panic(reason)
 }
 
-func appRuntimeOptions() appcore.RuntimeOptions {
-	dir, err := os.Getwd()
-	if err != nil {
-		logging.Error("resolve gui default cache dir failed", "error", err)
-		return appcore.RuntimeOptions{}
-	}
-	return appcore.RuntimeOptions{DefaultCacheDir: dir}
-}
-
-func (a *App) emitCoreEvent(event appcore.Event) {
+// emit forwards a core event to the Wails event bus. Events emitted before the
+// application exists are dropped.
+func (a *App) emit(eventName string, payload any) {
 	if a.app == nil {
 		return
 	}
-	eventName := ""
-	switch event.Kind {
-	case appcore.EventSearchModsUpdated:
-		eventName = searchModsUpdatedEvent
-	case appcore.EventExtensionModsAccepted:
-		eventName = extensionModsAcceptedEvent
-	case appcore.EventDownloadStatesUpdated:
-		eventName = downloadStatesUpdatedEvent
-	case appcore.EventDownloadQueueUpdated:
-		eventName = downloadQueueUpdatedEvent
-	case appcore.EventDownloadFailed:
-		eventName = downloadFailedEvent
-	case appcore.EventDownloadCompleted:
-		eventName = downloadCompletedEvent
-	case appcore.EventMinecraftDirChanged:
-		eventName = minecraftDirChangedEvent
-	case appcore.EventSelectedVersionChanged:
-		eventName = selectedVersionChangedEvent
-	case appcore.EventUsageStatsUpdated:
-		eventName = usageStatsUpdatedEvent
-	default:
-		return
-	}
-	if event.Payload == nil {
-		a.app.Event.Emit(eventName, nil)
-		return
-	}
-	a.app.Event.Emit(eventName, event.Payload)
+	a.app.Event.Emit(eventName, payload)
 }
 
 // GetStartupStatus reports whether the core is usable without invoking any
 // business RPC. Frontend bootstrap must call this once before mounting stores.
 func (a *App) GetStartupStatus() appstructs.StartupStatus {
-	status := appstructs.StartupStatus{Ready: a.core != nil && a.startupErr == nil}
-	if a.startupErr != nil {
-		status.Stage = "unknown"
-		status.Error = a.startupErr.Error()
-		var startupErr *appcore.StartupError
-		if errors.As(a.startupErr, &startupErr) {
-			status.Stage = startupErr.Stage
-			status.Error = startupErr.Err.Error()
-		}
+	if a.host == nil {
+		return appstructs.StartupStatus{}
 	}
-	if a.serverErr != nil {
-		status.ExtensionServerError = a.serverErr.Error()
-	}
-	return status
+	return a.host.StartupStatus()
 }
 
 // Quit asks the native shell to exit; the startup failure screen uses it.
@@ -228,6 +171,17 @@ func (a *App) ListFavoriteContents(listID string) storage.FavoriteListContents {
 	return a.service().ListFavoriteContents(listID)
 }
 
+// ListFavoriteOverview returns the scope-filtered, core-ordered favorites
+// projection. The frontend renders pinned/ungrouped as-is.
+func (a *App) ListFavoriteOverview(minecraftVersion string, modLoader string) appview.FavoriteOverview {
+	return a.service().ListFavoriteOverview(minecraftVersion, modLoader)
+}
+
+// ListFavoriteContentsForScope returns a list's contents filtered to one scope.
+func (a *App) ListFavoriteContentsForScope(listID string, minecraftVersion string, modLoader string) storage.FavoriteListContents {
+	return a.service().ListFavoriteContentsForScope(listID, minecraftVersion, modLoader)
+}
+
 func (a *App) AddFavoriteMod(mod storage.FavoriteMod) storage.FavoriteMod {
 	return a.service().AddFavoriteMod(mod)
 }
@@ -303,7 +257,7 @@ func (a *App) GetPreferences() appstructs.AppPreferences {
 }
 
 // GetSettings returns a read-only view of the current settings.
-func (a *App) GetSettings() appstructs.SettingsView {
+func (a *App) GetSettings() appview.SettingsView {
 	return a.service().GetSettings()
 }
 
@@ -317,46 +271,46 @@ func (a *App) SaveLanguage(language string) string {
 	return a.service().SaveLanguage(language)
 }
 
-func (a *App) SaveAnimationSettings(req appstructs.SaveAnimationSettingsRequest) appstructs.SettingsView {
+func (a *App) SaveAnimationSettings(req appstructs.SaveAnimationSettingsRequest) appview.SettingsView {
 	return a.service().SaveAnimationSettings(req)
 }
 
-func (a *App) SaveSimpleModeSettings(req appstructs.SaveSimpleModeSettingsRequest) appstructs.SettingsView {
+func (a *App) SaveSimpleModeSettings(req appstructs.SaveSimpleModeSettingsRequest) appview.SettingsView {
 	return a.service().SaveSimpleModeSettings(req)
 }
 
-func (a *App) SaveUnusedDependencyCleanupSettings(req appstructs.SaveUnusedDependencyCleanupSettingsRequest) appstructs.SettingsView {
+func (a *App) SaveUnusedDependencyCleanupSettings(req appstructs.SaveUnusedDependencyCleanupSettingsRequest) appview.SettingsView {
 	return a.service().SaveUnusedDependencyCleanupSettings(req)
 }
 
-func (a *App) SaveMCIMSettings(req appstructs.SaveMCIMSettingsRequest) appstructs.SettingsView {
+func (a *App) SaveMCIMSettings(req appstructs.SaveMCIMSettingsRequest) appview.SettingsView {
 	return a.service().SaveMCIMSettings(req)
 }
 
-func (a *App) SaveJijDetectionSettings(req appstructs.SaveJijDetectionSettingsRequest) appstructs.SettingsView {
-	return a.service().SaveJijDetectionSettings(req)
+func (a *App) SaveJIJDetectionSettings(req appstructs.SaveJIJDetectionSettingsRequest) appview.SettingsView {
+	return a.service().SaveJIJDetectionSettings(req)
 }
 
-func (a *App) SavePreferredReleaseTypeSettings(req appstructs.SavePreferredReleaseTypeSettingsRequest) appstructs.SettingsView {
+func (a *App) SavePreferredReleaseTypeSettings(req appstructs.SavePreferredReleaseTypeSettingsRequest) appview.SettingsView {
 	return a.service().SavePreferredReleaseTypeSettings(req)
 }
 
-func (a *App) SaveHardwareAccelerationSettings(req appstructs.SaveHardwareAccelerationSettingsRequest) appstructs.SettingsView {
+func (a *App) SaveHardwareAccelerationSettings(req appstructs.SaveHardwareAccelerationSettingsRequest) appview.SettingsView {
 	return a.service().SaveHardwareAccelerationSettings(req)
 }
 
-func (a *App) SaveNetworkSettings(req appstructs.SaveNetworkSettingsRequest) appstructs.SettingsView {
+func (a *App) SaveNetworkSettings(req appstructs.SaveNetworkSettingsRequest) appview.SettingsView {
 	return a.service().SaveNetworkSettings(req)
 }
 
-func (a *App) SaveCacheDirPreference(dir string) appstructs.SettingsView {
+func (a *App) SaveCacheDirPreference(dir string) appview.SettingsView {
 	return a.service().SaveCacheDirPreference(dir)
 }
 
-// SaveApiKeys updates API keys and persists them immediately + reinitializes clients.
+// SaveAPIKeys updates API keys and persists them immediately + reinitializes clients.
 // An empty string means clear the key; the special value (see above) means keep unchanged.
-func (a *App) SaveApiKeys(req appstructs.SaveApiKeysRequest) appstructs.SettingsView {
-	return a.service().SaveApiKeys(req)
+func (a *App) SaveAPIKeys(req appstructs.SaveAPIKeysRequest) appview.SettingsView {
+	return a.service().SaveAPIKeys(req)
 }
 
 func (a *App) QueueModDownload(req appstructs.ModDownloadRequest) appstructs.ModDownloadResult {
@@ -375,7 +329,7 @@ func (a *App) RestoreCachedDependency(req appstructs.RestoreCachedDependencyRequ
 	return a.service().RestoreCachedDependency(req)
 }
 
-func (a *App) GetDownloadQueueState() appstructs.DownloadQueueState {
+func (a *App) GetDownloadQueueState() appview.DownloadQueueState {
 	return a.service().GetDownloadQueueState()
 }
 
@@ -411,16 +365,13 @@ func (a *App) AnalyzeBatchIncompatibleConflicts(req appstructs.BatchDownloadRequ
 	return a.service().AnalyzeBatchIncompatibleConflicts(req)
 }
 
-func (a *App) GetDownloadStates(req appstructs.DownloadStatesRequest) []appstructs.ModDownloadButtonState {
+func (a *App) GetDownloadStates(req appstructs.DownloadStatesRequest) []appview.ModDownloadButtonState {
 	return a.service().GetDownloadStates(req)
 }
 
 func (a *App) ServiceShutdown() error {
-	if a.server != nil {
-		a.server.Stop()
-	}
-	if a.core != nil {
-		a.core.Shutdown()
+	if a.host != nil {
+		a.host.Shutdown()
 	}
 	return nil
 }
@@ -460,7 +411,7 @@ func (a *App) dialogWindow() application.Window {
 	return a.app.Window.Current()
 }
 
-func (a *App) ChooseCacheDir(locale string) (appstructs.SettingsView, error) {
+func (a *App) ChooseCacheDir(locale string) (appview.SettingsView, error) {
 	dir, err := a.app.Dialog.OpenFileWithOptions(&application.OpenFileDialogOptions{
 		Title:                localizedDialogText(locale).chooseCacheDir,
 		Directory:            a.GetSettings().CacheDir,
@@ -503,6 +454,13 @@ func (a *App) RefreshVersions() []structs.VersionInfo {
 
 func (a *App) RefreshSelectedVersionMods() structs.VersionInfo {
 	return a.service().RefreshSelectedVersionMods()
+}
+
+// GetLocalModGroups returns the core-built Manage projection for one instance.
+// Grouping, JIJ de-duplication, search text and loader compatibility all live
+// in core so the GUI and TUI render the same rows.
+func (a *App) GetLocalModGroups(versionKey string, modLoader string) []appview.LocalModGroup {
+	return a.service().GetLocalModGroups(versionKey, modLoader)
 }
 
 func (a *App) ToggleConnectorLoader() (structs.VersionInfo, error) {

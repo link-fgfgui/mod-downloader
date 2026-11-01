@@ -242,7 +242,7 @@ func TestIncompatibleConflictsCachedFindsInstalledDependency(t *testing.T) {
 			DependencyProjectID: "bad",
 			DependencyType:      "incompatible",
 		}},
-	}}, time.Now().Unix(), []storage.ModPlatformVersionScope{{MinecraftVersion: "1.21.1", ModLoader: "fabric"}}); err != nil {
+	}}, time.Now().Unix(), []storage.PlatformVersionScope{{MinecraftVersion: "1.21.1", ModLoader: "fabric"}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := storage.SetPlatformVersionSnapshot("Modrinth", "bad", []models.ModVersion{{
@@ -255,7 +255,7 @@ func TestIncompatibleConflictsCachedFindsInstalledDependency(t *testing.T) {
 		GameVersions: []string{"1.21.1"},
 		Loaders:      []string{"fabric"},
 		ModIDs:       []string{"badmod"},
-	}}, time.Now().Unix(), []storage.ModPlatformVersionScope{{MinecraftVersion: "1.21.1", ModLoader: "fabric"}}); err != nil {
+	}}, time.Now().Unix(), []storage.PlatformVersionScope{{MinecraftVersion: "1.21.1", ModLoader: "fabric"}}); err != nil {
 		t.Fatal(err)
 	}
 	global.UpsertLocalMod(mcstructs.ModInfo{
@@ -287,7 +287,7 @@ func TestAnalyzeBatchIncompatibleConflictsGroupsBySelectedMod(t *testing.T) {
 	global.ClearLocalMods()
 	t.Cleanup(global.ClearLocalMods)
 
-	scope := []storage.ModPlatformVersionScope{{MinecraftVersion: "1.21.1", ModLoader: "fabric"}}
+	scope := []storage.PlatformVersionScope{{MinecraftVersion: "1.21.1", ModLoader: "fabric"}}
 	now := time.Now().Unix()
 	if err := storage.SetPlatformVersionSnapshot("Modrinth", "main", []models.ModVersion{{
 		ID:        "main-version",

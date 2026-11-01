@@ -1,3 +1,4 @@
+@/home/link/Downloads/next_development_plan.md
 
 本地mod管理，右上的视图切换不会记录状态（切换页面后重置）
 

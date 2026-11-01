@@ -1,6 +1,8 @@
 import { gsap } from "gsap";
 
 export const defaultAnimationDurationMultiplier = 1;
+// Input range for the settings slider. Core owns the enforced bounds
+// (configs.NormalizeAnimationDurationMultiplier); these only shape the widget.
 export const minAnimationDurationMultiplier = 0.1;
 export const maxAnimationDurationMultiplier = 3;
 
@@ -22,9 +24,9 @@ export type AnimationSettings = {
 };
 
 export function normalizeAnimationDurationMultiplier(value: unknown): number {
+  // Settings arrive normalized from core; only guard missing/invalid values.
   const numeric = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(numeric) || numeric <= 0) return defaultAnimationDurationMultiplier;
-  return Math.min(maxAnimationDurationMultiplier, Math.max(minAnimationDurationMultiplier, numeric));
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : defaultAnimationDurationMultiplier;
 }
 
 /**

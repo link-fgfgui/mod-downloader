@@ -22,14 +22,14 @@ func TestPreferencesThemeReadsPrefixedEnvironment(t *testing.T) {
 	if err := readEnv(&cfg); err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Prefers.Theme != ThemeLight {
-		t.Fatalf("theme = %q, want %q", cfg.Prefers.Theme, ThemeLight)
+	if cfg.Preferences.Theme != ThemeLight {
+		t.Fatalf("theme = %q, want %q", cfg.Preferences.Theme, ThemeLight)
 	}
-	if cfg.Prefers.Language != LanguageEnglish {
-		t.Fatalf("language = %q, want %q", cfg.Prefers.Language, LanguageEnglish)
+	if cfg.Preferences.Language != LanguageEnglish {
+		t.Fatalf("language = %q, want %q", cfg.Preferences.Language, LanguageEnglish)
 	}
-	if cfg.Prefers.NormalizedAnimationDurationMultiplier() != 2.5 {
-		t.Fatalf("animation multiplier = %v, want 2.5", cfg.Prefers.NormalizedAnimationDurationMultiplier())
+	if cfg.Preferences.NormalizedAnimationDurationMultiplier() != 2.5 {
+		t.Fatalf("animation multiplier = %v, want 2.5", cfg.Preferences.NormalizedAnimationDurationMultiplier())
 	}
 }
 
@@ -70,8 +70,8 @@ language = "zh"
 `, &cfg); err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Prefers.Language != LanguageChinese {
-		t.Fatalf("language = %q, want %q", cfg.Prefers.Language, LanguageChinese)
+	if cfg.Preferences.Language != LanguageChinese {
+		t.Fatalf("language = %q, want %q", cfg.Preferences.Language, LanguageChinese)
 	}
 }
 
@@ -87,7 +87,7 @@ simple_mode = true
 `, &cfg); err != nil {
 		t.Fatal(err)
 	}
-	if !cfg.Prefers.SimpleMode {
+	if !cfg.Preferences.SimpleMode {
 		t.Fatal("TOML simple mode = false, want true")
 	}
 
@@ -96,7 +96,7 @@ simple_mode = true
 	if err := readEnv(&cfg); err != nil {
 		t.Fatal(err)
 	}
-	if !cfg.Prefers.SimpleMode {
+	if !cfg.Preferences.SimpleMode {
 		t.Fatal("environment simple mode = false, want true")
 	}
 }
@@ -113,7 +113,7 @@ hardware_acceleration = false
 `, &cfg); err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Prefers.HardwareAccelerationValue() {
+	if cfg.Preferences.HardwareAccelerationValue() {
 		t.Fatal("TOML hardware acceleration = true, want false")
 	}
 
@@ -122,7 +122,7 @@ hardware_acceleration = false
 	if err := readEnv(&cfg); err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Prefers.HardwareAccelerationValue() {
+	if cfg.Preferences.HardwareAccelerationValue() {
 		t.Fatal("environment hardware acceleration = true, want false")
 	}
 }
@@ -177,10 +177,10 @@ func TestSaveReplacesConfigAtomicallyAndLeavesNoTempFiles(t *testing.T) {
 		}
 	})
 
-	if err := Save(&Config{Prefers: Preferences{MinecraftDir: "/first"}}); err != nil {
+	if err := Save(&Config{Preferences: Preferences{MinecraftDir: "/first"}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := Save(&Config{Prefers: Preferences{MinecraftDir: "/second"}}); err != nil {
+	if err := Save(&Config{Preferences: Preferences{MinecraftDir: "/second"}}); err != nil {
 		t.Fatal(err)
 	}
 	contents, err := os.ReadFile(filepath.Join(dir, configFileName))
@@ -226,7 +226,7 @@ func TestSaveFailurePreservesOriginalConfig(t *testing.T) {
 	if err := os.Chmod(dir, 0o555); err != nil {
 		t.Fatal(err)
 	}
-	if err := Save(&Config{Prefers: Preferences{MinecraftDir: "/replacement"}}); err == nil {
+	if err := Save(&Config{Preferences: Preferences{MinecraftDir: "/replacement"}}); err == nil {
 		t.Fatal("Save succeeded with an unwritable config directory")
 	}
 	contents, err := os.ReadFile(filepath.Join(dir, configFileName))
@@ -272,11 +272,11 @@ minecraft_version = "1.20.1"
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Keys.CurseforgeApiKey != "from-env" {
-		t.Fatalf("curseforge key = %q, want from-env", cfg.Keys.CurseforgeApiKey)
+	if cfg.Keys.CurseForgeAPIKey != "from-env" {
+		t.Fatalf("curseforge key = %q, want from-env", cfg.Keys.CurseForgeAPIKey)
 	}
-	if cfg.Prefers.MinecraftDir != "" {
-		t.Fatalf("minecraft dir = %q, want empty", cfg.Prefers.MinecraftDir)
+	if cfg.Preferences.MinecraftDir != "" {
+		t.Fatalf("minecraft dir = %q, want empty", cfg.Preferences.MinecraftDir)
 	}
 	if cfg.Runtime.MinecraftVersion != "1.21.1" || cfg.Runtime.ModLoader != "fabric" || cfg.Runtime.CacheDir != "/tmp/md-cache" {
 		t.Fatalf("runtime = %#v", cfg.Runtime)
@@ -305,11 +305,11 @@ animation_duration_multiplier = 1.75
 `, &cfg); err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Prefers.Theme != ThemeSystem {
-		t.Fatalf("theme = %q, want %q", cfg.Prefers.Theme, ThemeSystem)
+	if cfg.Preferences.Theme != ThemeSystem {
+		t.Fatalf("theme = %q, want %q", cfg.Preferences.Theme, ThemeSystem)
 	}
-	if cfg.Prefers.NormalizedAnimationDurationMultiplier() != 1.75 {
-		t.Fatalf("animation multiplier = %v, want 1.75", cfg.Prefers.NormalizedAnimationDurationMultiplier())
+	if cfg.Preferences.NormalizedAnimationDurationMultiplier() != 1.75 {
+		t.Fatalf("animation multiplier = %v, want 1.75", cfg.Preferences.NormalizedAnimationDurationMultiplier())
 	}
 }
 
@@ -321,8 +321,8 @@ theme = 2
 `, &cfg); err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Prefers.Theme != ThemeSystem {
-		t.Fatalf("theme = %q, want %q", cfg.Prefers.Theme, ThemeSystem)
+	if cfg.Preferences.Theme != ThemeSystem {
+		t.Fatalf("theme = %q, want %q", cfg.Preferences.Theme, ThemeSystem)
 	}
 }
 
@@ -361,7 +361,7 @@ auto_scan_unused_dependencies = true
 `, &cfg); err != nil {
 		t.Fatal(err)
 	}
-	if !cfg.Prefers.AutoScanUnusedDependenciesValue() {
+	if !cfg.Preferences.AutoScanUnusedDependenciesValue() {
 		t.Fatal("explicit auto scan unused dependencies = false, want true")
 	}
 }
@@ -378,7 +378,7 @@ mcim_enabled = true
 `, &cfg); err != nil {
 		t.Fatal(err)
 	}
-	if !cfg.Prefers.MCIMEnabledValue() {
+	if !cfg.Preferences.MCIMEnabledValue() {
 		t.Fatal("TOML MCIM enabled = false, want true")
 	}
 
@@ -387,7 +387,7 @@ mcim_enabled = true
 	if err := readEnv(&cfg); err != nil {
 		t.Fatal(err)
 	}
-	if !cfg.Prefers.MCIMEnabledValue() {
+	if !cfg.Preferences.MCIMEnabledValue() {
 		t.Fatal("environment MCIM enabled = false, want true")
 	}
 }

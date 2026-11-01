@@ -27,6 +27,7 @@ import (
 	"github.com/link-fgfgui/mod-downloader/core/storage"
 	appstructs "github.com/link-fgfgui/mod-downloader/core/structs"
 	mcstructs "github.com/link-fgfgui/mod-downloader/core/structs/minecraft"
+	appview "github.com/link-fgfgui/mod-downloader/core/structs/view"
 )
 
 func resetDownloadQueueForTest(t *testing.T) {
@@ -59,13 +60,13 @@ func TestConfigureSimpleModeClearsAndBlocksOptionalDependencyReminders(t *testin
 	t.Cleanup(func() { ConfigureSimpleMode(false) })
 	downloadQueue.Lock()
 	downloadQueue.optionalReminders = []optionalDependencyReminderState{{
-		Snapshot: appstructs.OptionalDependencyReminder{ID: "optional-1"},
+		Snapshot: appview.OptionalDependencyReminder{ID: "optional-1"},
 		Requests: []appstructs.ModDownloadRequest{{ProjectID: "modrinth:optional"}},
 	}}
 	downloadQueue.Unlock()
 
-	emitted := make(chan appstructs.DownloadQueueState, 1)
-	ConfigureSimpleMode(true, Events{OnQueueState: func(state appstructs.DownloadQueueState) {
+	emitted := make(chan appview.DownloadQueueState, 1)
+	ConfigureSimpleMode(true, Events{OnQueueState: func(state appview.DownloadQueueState) {
 		emitted <- state
 	}})
 	select {
@@ -138,10 +139,10 @@ func seedDownloadProjectVersion(t *testing.T, projectID string, version models.M
 		Slug:      projectID,
 		Title:     projectID,
 	}
-	if err := storage.UpsertModPlatform(project); err != nil {
-		t.Fatalf("storage.UpsertModPlatform(%q) error = %v", projectID, err)
+	if err := storage.UpsertModProject(project); err != nil {
+		t.Fatalf("storage.UpsertModProject(%q) error = %v", projectID, err)
 	}
-	if err := storage.SetPlatformVersionSnapshot("Modrinth", projectID, []models.ModVersion{version}, time.Now().Unix(), []storage.ModPlatformVersionScope{{
+	if err := storage.SetPlatformVersionSnapshot("Modrinth", projectID, []models.ModVersion{version}, time.Now().Unix(), []storage.PlatformVersionScope{{
 		MinecraftVersion: "1.21.1",
 		ModLoader:        "fabric",
 	}}); err != nil {
@@ -150,7 +151,7 @@ func seedDownloadProjectVersion(t *testing.T, projectID string, version models.M
 	return project
 }
 
-func waitForDownloadState(t *testing.T, match func(appstructs.DownloadQueueState) bool) appstructs.DownloadQueueState {
+func waitForDownloadState(t *testing.T, match func(appview.DownloadQueueState) bool) appview.DownloadQueueState {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
@@ -214,9 +215,9 @@ func TestDownloadQueueProgressUpdateUsesTransferTotalAndEmitsAfterUnlock(t *test
 	}
 	downloadQueue.Unlock()
 
-	emitted := make(chan appstructs.DownloadQueueState, 1)
+	emitted := make(chan appview.DownloadQueueState, 1)
 	updateDownloadProgress("download-1", filetransfer.Progress{BytesComplete: 40, TotalBytes: 80}, 50, Events{
-		OnQueueState: func(state appstructs.DownloadQueueState) {
+		OnQueueState: func(state appview.DownloadQueueState) {
 			emitted <- state
 		},
 	})
@@ -300,7 +301,7 @@ func TestPathInLocalModPathsMatchesRelativePaths(t *testing.T) {
 
 func TestDependencyDownloadRequestCarriesDependencyVersionID(t *testing.T) {
 	resetDownloadQueueForTest(t)
-	req, ok := modbridge.DependencyDownloadRequest("Modrinth", models.ModDependency{
+	req, ok := modbridge.BuildDependencyDownloadRequest("Modrinth", models.ModDependency{
 		DependencyProjectID: "fabric-api",
 		DependencyVersionID: "version-123",
 		DependencyType:      "required",
@@ -311,7 +312,7 @@ func TestDependencyDownloadRequestCarriesDependencyVersionID(t *testing.T) {
 		InstanceID:       "cli:/tmp/mods",
 	})
 	if !ok {
-		t.Fatal("DependencyDownloadRequest() ok = false")
+		t.Fatal("BuildDependencyDownloadRequest() ok = false")
 	}
 	if req.VersionID != "version-123" {
 		t.Fatalf("VersionID = %q, want version-123", req.VersionID)
@@ -379,12 +380,12 @@ func TestDownloadCompletedEventOnlyFiresForNewInstalledFile(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("new install did not emit completion")
 	}
-	waitForDownloadState(t, func(state appstructs.DownloadQueueState) bool {
+	waitForDownloadState(t, func(state appview.DownloadQueueState) bool {
 		return state.Running == 0 && state.Pending == 0
 	})
 
 	enqueueDownload(t.Context(), job, events)
-	waitForDownloadState(t, func(state appstructs.DownloadQueueState) bool {
+	waitForDownloadState(t, func(state appview.DownloadQueueState) bool {
 		return state.Running == 0 && state.Pending == 0
 	})
 	select {
@@ -478,7 +479,7 @@ func TestCancelDownloadDuringDependencyAnalysisKeepsRetryableQueueItem(t *testin
 
 	analysisStarted := make(chan struct{})
 	releaseAnalysis := make(chan struct{})
-	refreshMatchingProjectVersions = func(result models.ModProject, minecraftVersion string, modLoader string) []models.ModVersion {
+	refreshMatchingProjectVersions = func(models.ModProject, string, string) []models.ModVersion {
 		close(analysisStarted)
 		<-releaseAnalysis
 		mainVersion.Dependencies = []models.ModDependency{{
@@ -487,7 +488,7 @@ func TestCancelDownloadDuringDependencyAnalysisKeepsRetryableQueueItem(t *testin
 		}}
 		return []models.ModVersion{mainVersion}
 	}
-	installStatusPrecise = func(req appstructs.ModDownloadRequest) string {
+	installStatusPrecise = func(appstructs.ModDownloadRequest) string {
 		return modbridge.BtnStatusNew
 	}
 
@@ -508,7 +509,7 @@ func TestCancelDownloadDuringDependencyAnalysisKeepsRetryableQueueItem(t *testin
 	case <-time.After(2 * time.Second):
 		t.Fatal("dependency analysis did not start")
 	}
-	running := waitForDownloadState(t, func(state appstructs.DownloadQueueState) bool {
+	running := waitForDownloadState(t, func(state appview.DownloadQueueState) bool {
 		return state.Running == 1 && len(state.Items) == 1 && state.Items[0].Cancelable
 	})
 	runningID := running.Items[0].ID
@@ -516,12 +517,12 @@ func TestCancelDownloadDuringDependencyAnalysisKeepsRetryableQueueItem(t *testin
 		t.Fatalf("running item has empty id: %#v", running.Items[0])
 	}
 
-	if !CancelDownload(context.Background(), runningID) {
+	if !CancelDownload(runningID) {
 		t.Fatal("CancelDownload() = false, want true")
 	}
 	close(releaseAnalysis)
 
-	state := waitForDownloadState(t, func(state appstructs.DownloadQueueState) bool {
+	state := waitForDownloadState(t, func(state appview.DownloadQueueState) bool {
 		return state.Running == 0 && state.Pending == 0 && len(state.Items) == 1 && state.Items[0].Status == "canceled"
 	})
 	item := state.Items[0]
@@ -590,7 +591,7 @@ func TestCancelPendingDownloadKeepsRetryableQueueItem(t *testing.T) {
 	}}
 	downloadQueue.Unlock()
 
-	if !CancelDownload(nil, "download-1") {
+	if !CancelDownload("download-1") {
 		t.Fatal("CancelDownload() = false, want true")
 	}
 
@@ -666,8 +667,8 @@ func TestRemoveDownloadRemovesFailedAndCanceledRetryableItems(t *testing.T) {
 			downloadQueue.Unlock()
 
 			eventCount := 0
-			var emitted appstructs.DownloadQueueState
-			if !RemoveDownload(" download-target ", Events{OnQueueState: func(state appstructs.DownloadQueueState) {
+			var emitted appview.DownloadQueueState
+			if !RemoveDownload(" download-target ", Events{OnQueueState: func(state appview.DownloadQueueState) {
 				eventCount++
 				emitted = state
 			}}) {
@@ -698,8 +699,8 @@ func TestRemoveDownloadRemovesPendingWithoutCreatingCanceledHistory(t *testing.T
 	downloadQueue.Unlock()
 
 	eventCount := 0
-	var emitted appstructs.DownloadQueueState
-	if !RemoveDownload("download-target", Events{OnQueueState: func(state appstructs.DownloadQueueState) {
+	var emitted appview.DownloadQueueState
+	if !RemoveDownload("download-target", Events{OnQueueState: func(state appview.DownloadQueueState) {
 		eventCount++
 		emitted = state
 	}}) {
@@ -745,7 +746,7 @@ func TestRemoveDownloadRejectsInvalidOrRunningItems(t *testing.T) {
 			downloadQueue.Unlock()
 
 			eventCount := 0
-			if RemoveDownload(tt.id, Events{OnQueueState: func(appstructs.DownloadQueueState) {
+			if RemoveDownload(tt.id, Events{OnQueueState: func(appview.DownloadQueueState) {
 				eventCount++
 			}}) {
 				t.Fatal("RemoveDownload() = true, want false")
@@ -827,7 +828,7 @@ func TestCancelRunningDownloadMovesItemToCanceledImmediately(t *testing.T) {
 	}}
 	downloadQueue.Unlock()
 
-	if !CancelDownload(nil, "download-1") {
+	if !CancelDownload("download-1") {
 		t.Fatal("CancelDownload() = false, want true")
 	}
 	if !canceled {
@@ -895,7 +896,7 @@ func TestDoDownloadWithStallTimeoutReturnsPromptlyWhenContextCanceled(t *testing
 	t.Cleanup(func() {
 		close(release)
 	})
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Length", "1024")
 		w.WriteHeader(http.StatusOK)
 		if flusher, ok := w.(http.Flusher); ok {
@@ -1010,7 +1011,7 @@ func TestConfigureControlsFileAndQueueConcurrency(t *testing.T) {
 		t.Fatalf("queue state = %#v, want two running downloads", state)
 	}
 	cancel()
-	waitForDownloadState(t, func(state appstructs.DownloadQueueState) bool {
+	waitForDownloadState(t, func(state appview.DownloadQueueState) bool {
 		return state.Running == 0 && state.Pending == 0
 	})
 	deadline := time.Now().Add(time.Second)
@@ -1262,11 +1263,11 @@ func TestOptionalDependencyReminderStateDismissAndClear(t *testing.T) {
 	downloadQueue.Lock()
 	downloadQueue.nextReminderID = 1
 	downloadQueue.optionalReminders = []optionalDependencyReminderState{{
-		Snapshot: appstructs.OptionalDependencyReminder{
+		Snapshot: appview.OptionalDependencyReminder{
 			ID:             "optional-1",
 			MainProjectKey: "modrinth:main",
 			MainTitle:      "Main",
-			Dependencies: []appstructs.OptionalDependencyCandidate{{
+			Dependencies: []appview.OptionalDependencyCandidate{{
 				ProjectKey: "modrinth:optional",
 				Title:      "Optional",
 			}},
@@ -1287,7 +1288,7 @@ func TestOptionalDependencyReminderStateDismissAndClear(t *testing.T) {
 	}
 
 	downloadQueue.Lock()
-	downloadQueue.optionalReminders = []optionalDependencyReminderState{{Snapshot: appstructs.OptionalDependencyReminder{ID: "optional-2"}}}
+	downloadQueue.optionalReminders = []optionalDependencyReminderState{{Snapshot: appview.OptionalDependencyReminder{ID: "optional-2"}}}
 	downloadQueue.Unlock()
 	if !ClearOptionalDependencyReminders() {
 		t.Fatal("ClearOptionalDependencyReminders() = false, want true")
@@ -1301,7 +1302,7 @@ func TestInstallOptionalDependenciesConsumesReminder(t *testing.T) {
 	resetDownloadQueueForTest(t)
 	downloadQueue.Lock()
 	downloadQueue.optionalReminders = []optionalDependencyReminderState{{
-		Snapshot: appstructs.OptionalDependencyReminder{ID: "optional-1"},
+		Snapshot: appview.OptionalDependencyReminder{ID: "optional-1"},
 		Requests: []appstructs.ModDownloadRequest{{
 			ProjectID:        "",
 			MinecraftVersion: "1.21.1",
@@ -1475,7 +1476,7 @@ func TestWaitForDownloadTracksItsOwnQueueEntry(t *testing.T) {
 		waiting <- result
 	}()
 
-	if !CancelDownload(nil, secondID) {
+	if !CancelDownload(secondID) {
 		t.Fatal("CancelDownload(second) = false")
 	}
 	select {

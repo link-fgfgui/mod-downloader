@@ -18,10 +18,15 @@ var (
 	hardlinkIndexGeneration uint64
 )
 
+// HardlinkIndexAdd records the newest path for sha1 in the current scan
+// generation.
 func HardlinkIndexAdd(sha1, absolutePath string) {
 	HardlinkIndexAddForGeneration(sha1, absolutePath, HardlinkIndexGeneration())
 }
 
+// HardlinkIndexAddForGeneration records absolutePath for sha1 only when
+// generation still matches the active scan, preventing stale scans from
+// overwriting newer results.
 func HardlinkIndexAddForGeneration(sha1, absolutePath string, generation uint64) bool {
 	sha1 = strings.ToLower(strings.TrimSpace(sha1))
 	absolutePath = filepath.Clean(strings.TrimSpace(absolutePath))
@@ -41,6 +46,7 @@ func HardlinkIndexAddForGeneration(sha1, absolutePath string, generation uint64)
 	return true
 }
 
+// HardlinkIndexRemove drops every SHA1 entry that points at absolutePath.
 func HardlinkIndexRemove(absolutePath string) {
 	absolutePath = filepath.Clean(strings.TrimSpace(absolutePath))
 	if absolutePath == "" {
@@ -56,6 +62,8 @@ func HardlinkIndexRemove(absolutePath string) {
 	}
 }
 
+// HardlinkIndexLookup returns the indexed path for sha1, dropping the entry
+// when the file no longer exists.
 func HardlinkIndexLookup(sha1 string) (string, bool) {
 	sha1 = strings.ToLower(strings.TrimSpace(sha1))
 	if sha1 == "" {
@@ -81,6 +89,7 @@ func HardlinkIndexLookup(sha1 string) (string, bool) {
 	return path, true
 }
 
+// HardlinkIndexClear empties the index and starts a new scan generation.
 func HardlinkIndexClear() {
 	hardlinkIndexMu.Lock()
 	defer hardlinkIndexMu.Unlock()
@@ -90,6 +99,7 @@ func HardlinkIndexClear() {
 	logging.Info("hardlink index cleared", "previousCount", count, "generation", hardlinkIndexGeneration)
 }
 
+// HardlinkIndexGeneration returns the current scan generation.
 func HardlinkIndexGeneration() uint64 {
 	hardlinkIndexMu.RLock()
 	defer hardlinkIndexMu.RUnlock()

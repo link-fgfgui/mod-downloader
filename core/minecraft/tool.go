@@ -87,16 +87,20 @@ func normalizePathSeparators(path string) string {
 	return strings.ReplaceAll(path, "/", string(os.PathSeparator))
 }
 
-// SimplifyPathWithEnv takes an absolute path and simplifies it using the longest-matching environment variable.
-func SimplifyPathWithEnv(dirPath2 string) string {
-	dirPath2 = ExpandPathWithEnv(dirPath2)
-	// 1. Clean the input path to ensure a canonical format (normalize extra slashes, etc.)
-	var dirPath = filepath.Clean(dirPath2)
+// SimplifyPathWithEnv expands environment variables, then replaces the
+// longest matching environment prefix with its variable name (for example
+// "$HOME/.minecraft"). It returns the expanded, cleaned path when no variable
+// matches.
+func SimplifyPathWithEnv(path string) string {
+	expandedPath := ExpandPathWithEnv(path)
+	// Clean the path first so prefix matching is not confused by duplicate
+	// separators or "." components.
+	cleanedPath := filepath.Clean(expandedPath)
 
 	bestMatchEnv := ""
 	bestMatchValue := ""
 
-	// 2. Iterate over all environment variables of the current process.
+	// Iterate over all environment variables of the current process.
 	// os.Environ() returns a slice of "KEY=VALUE" strings.
 	for _, env := range os.Environ() {
 		pair := strings.SplitN(env, "=", 2)
@@ -112,18 +116,18 @@ func SimplifyPathWithEnv(dirPath2 string) string {
 			continue
 		}
 
-		// 3. Check whether the env value is a prefix of the input path.
+		// Check whether the env value is a prefix of the input path.
 		// When using strings.HasPrefix, watch for boundary issues to avoid
 		// "/Users/jack" falsely matching "/Users/jackson".
 		// Ensure the next character after the match is a path separator,
 		// or that the two paths are exactly equal.
-		if strings.HasPrefix(dirPath, val) {
-			rel, err := filepath.Rel(val, dirPath)
+		if strings.HasPrefix(cleanedPath, val) {
+			rel, err := filepath.Rel(val, cleanedPath)
 			if err != nil || strings.HasPrefix(rel, "..") {
 				continue // Not a true sub-path
 			}
 
-			// 4. Pick the "best" match: the longest env value gives the most precise substitution.
+			// Pick the "best" match: the longest env value gives the most precise substitution.
 			if len(val) > len(bestMatchValue) {
 				bestMatchValue = val
 				bestMatchEnv = key
@@ -131,9 +135,9 @@ func SimplifyPathWithEnv(dirPath2 string) string {
 		}
 	}
 
-	// 5. If a suitable match was found, perform the substitution.
+	// If a suitable match was found, perform the substitution.
 	if bestMatchEnv != "" {
-		rel, _ := filepath.Rel(bestMatchValue, dirPath)
+		rel, _ := filepath.Rel(bestMatchValue, cleanedPath)
 		if rel == "." {
 			return "$" + bestMatchEnv
 		}
@@ -141,10 +145,11 @@ func SimplifyPathWithEnv(dirPath2 string) string {
 		return filepath.Join("$"+bestMatchEnv, rel)
 	}
 
-	// No matching env variable found; return the cleaned path as-is.
-	return dirPath2
+	return cleanedPath
 }
 
+// CheckManifest parses one version JSON and returns the instance projection
+// when it has both an instance ID and a Minecraft version.
 func CheckManifest(jsonPath string) (structs.VersionInfo, bool) {
 	raw, err := os.ReadFile(jsonPath)
 	if err != nil {
@@ -340,20 +345,22 @@ func scanModsDirForHardlink(modsDir string, add func(sha1, path string) bool) in
 	return added
 }
 
-func ScanAllModDirsForHardlink(mcDir string, versions []structs.VersionInfo, add func(sha1, path string) bool) int {
-	mcDir = filepath.Clean(strings.TrimSpace(mcDir))
-	if mcDir == "" || add == nil {
+// ScanAllModDirsForHardlink scans every instance's mods directory and feeds
+// each JAR hash/path pair to add. It returns the number of indexed files.
+func ScanAllModDirsForHardlink(minecraftDir string, versions []structs.VersionInfo, add func(sha1, path string) bool) int {
+	minecraftDir = filepath.Clean(strings.TrimSpace(minecraftDir))
+	if minecraftDir == "" || add == nil {
 		return 0
 	}
 	total := 0
 	for _, version := range versions {
-		versionDir := VersionDirPath(mcDir, version)
+		versionDir := VersionDirPath(minecraftDir, version)
 		if versionDir == "" {
 			continue
 		}
 		modsDir := filepath.Join(versionDir, "mods")
 		total += scanModsDirForHardlink(modsDir, add)
 	}
-	logging.Info("hardlink index full scan completed", "minecraftDir", mcDir, "versionCount", len(versions), "fileCount", total)
+	logging.Info("hardlink index full scan completed", "minecraftDir", minecraftDir, "versionCount", len(versions), "fileCount", total)
 	return total
 }

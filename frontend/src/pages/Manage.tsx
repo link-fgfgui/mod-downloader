@@ -63,20 +63,16 @@ import {
   buildModDependencyGraph,
 } from "@/lib/modDependencyGraph";
 import {
-  displayModName,
-  groupMods,
   groupRowKey,
+  groupSearchText,
   groupTooltip,
   hasGroupedDetails,
-  isGroupIncompatible,
-  modCategories,
-  searchableGroupText,
   strongModIds,
-  type ModGroup,
-} from "@/lib/modGroups";
+} from "@/lib/modGroupDisplay";
 import { useFlipListAnimation } from "@/hooks/useFlipListAnimation";
 import { useFlipTreeAnimation } from "@/hooks/useFlipTreeAnimation";
 import { useLocalModSelection } from "@/hooks/useLocalModSelection";
+import { useManageViewMode } from "@/hooks/useManageViewMode";
 import { useUnusedDependencies } from "@/hooks/useUnusedDependencies";
 import { scaledDuration } from "@/lib/animations";
 import { useDownloadQueueStore } from "@/stores/downloadQueue";
@@ -89,10 +85,8 @@ import { useDownloadSearchStore } from "@/stores/downloadSearch";
 import { useSettingsStore } from "@/stores/settings";
 import { matchesSearchExpression } from "@/utils/searchExpression";
 import type { FavoriteModDraft } from "@/stores/favorites";
-import type { ModInfo } from "@/types";
+import type { LocalModGroup, ModInfo } from "@/types";
 import { cn } from "@/lib/utils";
-
-type ViewMode = "list" | "tree";
 
 const EMPTY_MODS: ModInfo[] = [];
 
@@ -142,11 +136,42 @@ export function ManagePage() {
   const queueActive = useDownloadQueueStore((state) => state.queue.active);
   const requireCtrlForMultiSelect = useSettingsStore((state) => state.settings?.requireCtrlForMultiSelect ?? false);
 
+  const selectedVersionKey = selectedInstance?.id || selectedInstance?.name || "";
+  const groupsKey = `${selectedVersionKey}\u0000${selectedLoader}`;
+  const [groupState, setGroupState] = useState<{ key: string; groups: LocalModGroup[] }>({
+    key: "",
+    groups: [],
+  });
+
+  // Groups are built by core; refetch whenever the scanned mods or the active
+  // loader change so the incompatible partition always reflects core's verdict.
+  // The key guard hides the previous instance's rows while the new set loads.
+  useEffect(() => {
+    if (!selectedVersionKey) {
+      setGroupState({ key: groupsKey, groups: [] });
+      return;
+    }
+    let cancelled = false;
+    void api
+      .GetLocalModGroups(selectedVersionKey, selectedLoader)
+      .then((result) => {
+        if (!cancelled) setGroupState({ key: groupsKey, groups: result ?? [] });
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setGroupState({ key: groupsKey, groups: [] });
+        toast.error(`${t("manage.operationFailed")}: ${errorMessage(error)}`);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [groupsKey, mods, selectedLoader, selectedVersionKey, t]);
+
   const [searchInput, setSearchInput] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
   const [enabledFilter, setEnabledFilter] = useState("all");
   const [sortMode, setSortMode] = useState("default");
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [viewMode, setViewMode] = useManageViewMode();
   const viewModeRef = useRef<HTMLDivElement | null>(null);
   const listModeRef = useRef<HTMLButtonElement | null>(null);
   const treeModeRef = useRef<HTMLButtonElement | null>(null);
@@ -157,7 +182,7 @@ export function ManagePage() {
   const [viewIndicator, setViewIndicator] = useState({ left: 0, width: 0 });
   const [incompatibleExpanded, setIncompatibleExpanded] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
-  const [versionGroup, setVersionGroup] = useState<ModGroup | null>(null);
+  const [versionGroup, setVersionGroup] = useState<LocalModGroup | null>(null);
   const [versionOpen, setVersionOpen] = useState(false);
   const [favoriteDrafts, setFavoriteDrafts] = useState<FavoriteModDraft[]>([]);
   const [favoriteOpen, setFavoriteOpen] = useState(false);
@@ -254,11 +279,11 @@ export function ManagePage() {
     return () => window.clearTimeout(timer);
   }, [searchInput]);
 
-  const allGroups = useMemo(() => groupMods(mods), [mods]);
+  const allGroups = groupState.key === groupsKey ? groupState.groups : [];
   const filteredGroups = useMemo(
     () =>
       allGroups.filter((group) => {
-        const matches = matchesSearchExpression(searchableGroupText(group), appliedSearch);
+        const matches = matchesSearchExpression(groupSearchText(group), appliedSearch);
         const enabled =
           enabledFilter === "all" || group.primary.enabled === (enabledFilter === "enabled");
         return matches && enabled;
@@ -280,8 +305,8 @@ export function ManagePage() {
     t,
   });
 
-  const compareNames = (a: ModGroup, b: ModGroup) =>
-    displayModName(a).toLowerCase().localeCompare(displayModName(b).toLowerCase());
+  const compareNames = (a: LocalModGroup, b: LocalModGroup) =>
+    a.displayName.toLowerCase().localeCompare(b.displayName.toLowerCase());
 
   const sortedGroups = useMemo(() => {
     if (sortMode === "default") return filteredGroups;
@@ -297,8 +322,8 @@ export function ManagePage() {
     // candidateFor changes when a new scan completes.
   }, [candidateFor, filteredGroups, sortMode]);
 
-  const compatible = sortedGroups.filter((group) => !isGroupIncompatible(group, selectedLoader));
-  const incompatible = sortedGroups.filter((group) => isGroupIncompatible(group, selectedLoader));
+  const compatible = sortedGroups.filter((group) => !group.incompatible);
+  const incompatible = sortedGroups.filter((group) => group.incompatible);
   const hasActiveFilter = appliedSearch !== "" || enabledFilter !== "all";
 
   // Only groups the user can currently see participate in batch actions, so a
@@ -329,7 +354,7 @@ export function ManagePage() {
     if (viewMode === "tree") setSelectedTreeKey("");
   }, [viewMode]);
 
-  const toggleSelection = (group: ModGroup, event: { ctrlKey: boolean; metaKey: boolean }) => {
+  const toggleSelection = (group: LocalModGroup, event: { ctrlKey: boolean; metaKey: boolean }) => {
     const key = groupRowKey(group);
     const additive = !requireCtrlForMultiSelect || event.ctrlKey || event.metaKey;
     setSelectedKeys((current) => {
@@ -346,7 +371,7 @@ export function ManagePage() {
 
   const clearSelection = () => setSelectedKeys(new Set());
 
-  const canFavoriteGroup = (group: ModGroup) =>
+  const canFavoriteGroup = (group: LocalModGroup) =>
     Boolean(
       minecraftVersion.trim() &&
         selectedLoader.trim() &&
@@ -354,7 +379,7 @@ export function ManagePage() {
         group.primary.onlineProjectId,
     );
 
-  const favoriteDraftFromGroup = (group: ModGroup): FavoriteModDraft => ({
+  const favoriteDraftFromGroup = (group: LocalModGroup): FavoriteModDraft => ({
     platform: group.primary.onlinePlatform || "",
     modId: group.primary.onlineProjectId || "",
     minecraftVersion:
@@ -363,14 +388,14 @@ export function ManagePage() {
       selectedInstance?.minecraftVersion ||
       "",
     modLoader: selectedLoader || selectedInstance?.modLoader || "",
-    title: displayModName(group),
+    title: group.displayName,
     slug: group.primary.onlineSlug || "",
     iconUrl: group.primary.iconUrl || "",
     description: group.primary.description || "",
-    categories: modCategories(group),
+    categories: group.categories ?? [],
   });
 
-  const openFavorites = (groups: ModGroup[]) => {
+  const openFavorites = (groups: LocalModGroup[]) => {
     if (!groups.length || !groups.every(canFavoriteGroup)) {
       toast.warning(t("favorites.invalidSelection"));
       return;
@@ -379,18 +404,18 @@ export function ManagePage() {
     setFavoriteOpen(true);
   };
 
-  const openVersion = (group: ModGroup) => {
+  const openVersion = (group: LocalModGroup) => {
     if (!canReplaceVersion(group)) return;
     setVersionGroup(group);
     setVersionOpen(true);
   };
 
-  const canReplaceVersion = (group: ModGroup) =>
+  const canReplaceVersion = (group: LocalModGroup) =>
     Boolean(group.primary.onlinePlatform && group.primary.onlineProjectId && hasSelectedInstance);
 
-  const searchVersion = (group: ModGroup) => {
+  const searchVersion = (group: LocalModGroup) => {
     const searchStore = useDownloadSearchStore.getState();
-    searchStore.setQuery(displayModName(group));
+    searchStore.setQuery(group.displayName);
     searchStore.requestAutoSearch();
     void navigate("/download");
   };
@@ -453,7 +478,7 @@ export function ManagePage() {
   };
 
   const treeGroupFor = (path: string) =>
-    allGroups.find((group) => group.strong.some((mod) => (mod.path || "") === path)) || null;
+    allGroups.find((group) => (group.strong || []).some((mod) => (mod.path || "") === path)) || null;
 
   const toggleTreeNode = (key: string) => {
     setSelectedTreeKey(key);
@@ -482,7 +507,7 @@ export function ManagePage() {
     return { label: t("manage.tree.status.enabled"), color: "text-emerald-600 dark:text-emerald-400", icon: ToggleRight };
   };
 
-  const openLocation = async (group: ModGroup | null) => {
+  const openLocation = async (group: LocalModGroup | null) => {
     if (!group?.primary?.path) return;
     try {
       await api.OpenLocalModLocation(group.primary.path);
@@ -493,11 +518,11 @@ export function ManagePage() {
 
   const selectionActions = manageSelectionActions(selectedGroups, clearSelection);
 
-  const renderGroupCard = (group: ModGroup) => {
+  const renderGroupCard = (group: LocalModGroup) => {
     const key = groupRowKey(group);
     const selected = selectedKeys.has(key);
     const unused = candidateFor(group);
-    const categories = modCategories(group);
+    const categories = group.categories ?? [];
     const groupAction = group.primary.enabled ? "disable" : "enable";
     return (
       <div
@@ -508,7 +533,7 @@ export function ManagePage() {
           selected
             ? "border-primary/50 bg-primary/10 shadow-sm hover:bg-primary/15"
             : "hover:border-foreground/20 hover:bg-accent/60 hover:shadow-md",
-          isGroupIncompatible(group, selectedLoader) && "opacity-80",
+          group.incompatible && "opacity-80",
           exitingGroupKeys.has(key) && "md-row-exiting",
         )}
         onClick={(event) => toggleSelection(group, event)}
@@ -527,11 +552,11 @@ export function ManagePage() {
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
-            <span className="truncate text-sm font-semibold">{displayModName(group)}</span>
+            <span className="truncate text-sm font-semibold">{group.displayName}</span>
             {hasGroupedDetails(group) ? (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Badge variant="outline" className="shrink-0">{group.strong.length + group.jij.length}</Badge>
+                  <Badge variant="outline" className="shrink-0">{(group.strong?.length || 0) + (group.jij?.length || 0)}</Badge>
                 </TooltipTrigger>
                 <TooltipContent className="whitespace-pre-line">{groupTooltip(group)}</TooltipContent>
               </Tooltip>

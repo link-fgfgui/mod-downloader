@@ -31,6 +31,7 @@ import (
 	"github.com/link-fgfgui/mod-downloader/core/storage"
 	appstructs "github.com/link-fgfgui/mod-downloader/core/structs"
 	structs "github.com/link-fgfgui/mod-downloader/core/structs/minecraft"
+	appview "github.com/link-fgfgui/mod-downloader/core/structs/view"
 )
 
 const minecraftReleaseCacheTTL = 24 * time.Hour
@@ -67,6 +68,7 @@ func unregisterActiveService(service *Service) {
 	}
 }
 
+// APIKeyKeepSentinel is the request value that preserves a stored API key.
 const APIKeyKeepSentinel = "<keep>"
 
 var (
@@ -74,6 +76,7 @@ var (
 	favoriteCrossVersionCopyLookupProjectBySlug = providers.LookupProjectByPlatformSlug
 )
 
+// Local mod batch actions accepted by ApplyLocalModBatchOperation.
 const (
 	LocalModBatchActionEnable  = "enable"
 	LocalModBatchActionDisable = "disable"
@@ -81,14 +84,19 @@ const (
 	LocalModBatchActionDelete  = "delete"
 )
 
+// New returns a Service with the given options; Startup must be called before
+// the service is used.
 func New(options Options) *Service {
 	return &Service{config: options.Config, options: options}
 }
 
+// UserAgent returns the HTTP user agent advertised with provider requests.
 func (s *Service) UserAgent() string {
 	return userAgentForVersion(s.options.Version)
 }
 
+// Startup initializes providers, storage, logging and background tasks.
+// Calling it on an already started service is a no-op.
 func (s *Service) Startup(ctx context.Context) error {
 	s.lifecycleMu.Lock()
 	defer s.lifecycleMu.Unlock()
@@ -139,8 +147,8 @@ func (s *Service) startup() error {
 	s.applyConfigOverrides()
 	s.configureLogging()
 	s.applyRuntimeConfig()
-	if minecraftDir := minecraft.ExpandPathWithEnv(s.config.Prefers.MinecraftDir); strings.TrimSpace(minecraftDir) != "" {
-		s.config.Prefers.MinecraftDir = minecraftDir
+	if minecraftDir := minecraft.ExpandPathWithEnv(s.config.Preferences.MinecraftDir); strings.TrimSpace(minecraftDir) != "" {
+		s.config.Preferences.MinecraftDir = minecraftDir
 		global.SetMinecraftDir(minecraftDir)
 	}
 
@@ -179,9 +187,9 @@ func (s *Service) applyRuntimeConfig(simpleModeEvents ...downloader.Events) {
 		TargetDownloadRateMiB:   cfg.Downloads.TargetDownloadRateMiBValue(),
 		VerifySHA1:              cfg.Downloads.VerifySHA1,
 	})
-	configureSimpleMode(cfg.Prefers.SimpleMode, simpleModeEvents...)
-	modbridge.ConfigurePreferredReleaseType(cfg.Prefers.PreferredReleaseTypeValue())
-	minecraft.SetJijDetectionEnabled(cfg.Prefers.EnableJijDetectionValue())
+	configureSimpleMode(cfg.Preferences.SimpleMode, simpleModeEvents...)
+	modbridge.ConfigurePreferredReleaseType(cfg.Preferences.PreferredReleaseTypeValue())
+	minecraft.SetJIJDetectionEnabled(cfg.Preferences.EnableJIJDetectionValue())
 	configureRemoteModIDConcurrency(cfg.Downloads.ConcurrentDownloadsValue())
 	s.configureProviderClients()
 }
@@ -210,6 +218,8 @@ func loadMinecraftReleaseVersions() error {
 	return nil
 }
 
+// Shutdown stops the service, persists the current configuration and drains
+// background work.
 func (s *Service) Shutdown() {
 	s.lifecycleMu.Lock()
 	defer s.lifecycleMu.Unlock()
@@ -224,6 +234,7 @@ func (s *Service) Shutdown() {
 	s.lifecycleState = serviceStateIdle
 }
 
+// Close stops the service and releases its resources without saving config.
 func (s *Service) Close() {
 	s.lifecycleMu.Lock()
 	defer s.lifecycleMu.Unlock()
@@ -238,6 +249,7 @@ func (s *Service) Close() {
 	s.lifecycleState = serviceStateIdle
 }
 
+// Config returns the live configuration, allocating an empty one if needed.
 func (s *Service) Config() *configs.Config {
 	if s.config == nil {
 		s.config = &configs.Config{}
@@ -245,6 +257,7 @@ func (s *Service) Config() *configs.Config {
 	return s.config
 }
 
+// GetMinecraftReleaseVersions returns the cached Minecraft release versions.
 func (s *Service) GetMinecraftReleaseVersions() []string {
 	return minecraft.GetMinecraftReleaseVersions()
 }
@@ -254,13 +267,13 @@ func (s *Service) applyConfigOverrides() {
 		s.config = &configs.Config{}
 	}
 	if s.options.ConfigOverrides.HasMinecraftDir {
-		s.config.Prefers.MinecraftDir = s.options.ConfigOverrides.MinecraftDir
+		s.config.Preferences.MinecraftDir = s.options.ConfigOverrides.MinecraftDir
 	}
 	if s.options.ConfigOverrides.HasCurseForgeAPIKey {
-		s.config.Keys.CurseforgeApiKey = s.options.ConfigOverrides.CurseForgeAPIKey
+		s.config.Keys.CurseForgeAPIKey = s.options.ConfigOverrides.CurseForgeAPIKey
 	}
 	if s.options.ConfigOverrides.HasModrinthAPIKey {
-		s.config.Keys.ModrinthApiKey = s.options.ConfigOverrides.ModrinthAPIKey
+		s.config.Keys.ModrinthAPIKey = s.options.ConfigOverrides.ModrinthAPIKey
 	}
 }
 
@@ -351,18 +364,18 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func (s *Service) effectiveCurseforgeAPIKey() string {
+func (s *Service) effectiveCurseForgeAPIKey() string {
 	if s == nil || s.config == nil {
-		return configs.EffectiveCurseforgeAPIKey("")
+		return configs.EffectiveCurseForgeAPIKey("")
 	}
-	return configs.EffectiveCurseforgeAPIKey(s.config.Keys.CurseforgeApiKey)
+	return configs.EffectiveCurseForgeAPIKey(s.config.Keys.CurseForgeAPIKey)
 }
 
 func (s *Service) configureProviderClients() {
 	limiter := newRequestRateLimiter(s.Config().API.RequestsPerSecondValue())
 	limitedTransport := rateLimitedTransport{limiter: limiter, base: networking.NewTransport()}
-	useMCIM := s.Config().Prefers.MCIMEnabledValue()
-	curseForgeAPIKey := s.effectiveCurseforgeAPIKey()
+	useMCIM := s.Config().Preferences.MCIMEnabledValue()
+	curseForgeAPIKey := s.effectiveCurseForgeAPIKey()
 	if curseForgeAPIKey != "" || useMCIM {
 		apiBaseURL := ""
 		if useMCIM {
@@ -416,7 +429,7 @@ func (s *Service) configureLoggingConfig(config configs.LoggingConfig) {
 
 func (s *Service) downloadEvents() downloader.Events {
 	return downloader.Events{
-		OnQueueState: func(state appstructs.DownloadQueueState) {
+		OnQueueState: func(state appview.DownloadQueueState) {
 			s.emit(EventDownloadQueueUpdated, state)
 		},
 		OnDownloadFailed: func(event appstructs.DownloadFailedEvent) {
@@ -443,6 +456,7 @@ func (s *Service) emit(kind EventKind, payload any) {
 	}
 }
 
+// MaskKey masks a secret while keeping its first and last four characters.
 func MaskKey(value string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
@@ -455,33 +469,7 @@ func MaskKey(value string) string {
 }
 
 func loadMinecraftDirVersions(gameDir string) []structs.VersionInfo {
-	versionsDir := filepath.Join(gameDir, "versions")
-	entries, err := os.ReadDir(versionsDir)
-	if err != nil {
-		logging.Error("read versions dir failed", "versionsDir", versionsDir, "error", err)
-		return nil
-	}
-
-	infos := make([]structs.VersionInfo, 0, len(entries))
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		versionID := entry.Name()
-		versionDir := filepath.Join(versionsDir, versionID)
-		jsonPath := filepath.Join(versionDir, versionID+".json")
-		info, ok := minecraft.CheckManifest(jsonPath)
-		if !ok {
-			continue
-		}
-		if !ValidMinecraftInstance(info) {
-			logging.Warn("skip invalid minecraft version", "versionID", versionID, "minecraftVersion", info.MinecraftVersion, "modLoader", info.ModLoader)
-			continue
-		}
-		infos = append(infos, info)
-	}
-	return infos
+	return minecraft.LoadGameDirVersions(gameDir)
 }
 
 func ensureSelectedVersion(versions []structs.VersionInfo) {
@@ -495,6 +483,7 @@ func ensureSelectedVersion(versions []structs.VersionInfo) {
 	global.SetSelectedVersion(versions[0])
 }
 
+// FindVersionByKey finds an instance by directory name or ID.
 func FindVersionByKey(versions []structs.VersionInfo, key string) (structs.VersionInfo, bool) {
 	for _, version := range versions {
 		if version.Name == key || version.ID == key {
@@ -504,25 +493,24 @@ func FindVersionByKey(versions []structs.VersionInfo, key string) (structs.Versi
 	return structs.VersionInfo{}, false
 }
 
-func versionInstanceDir(version structs.VersionInfo) string {
+func versionInstanceKey(version structs.VersionInfo) string {
 	if strings.TrimSpace(version.ID) != "" {
 		return strings.TrimSpace(version.ID)
 	}
 	return strings.TrimSpace(version.Name)
 }
 
+// ValidMinecraftInstance reports whether an instance has a supported loader and
+// a Minecraft version.
 func ValidMinecraftInstance(version structs.VersionInfo) bool {
-	switch strings.ToLower(strings.TrimSpace(version.ModLoader)) {
-	case "fabric", "forge", "neoforge":
-		return strings.TrimSpace(version.MinecraftVersion) != ""
-	default:
-		return false
-	}
+	return minecraft.ValidInstance(version)
 }
 
+// ScanVersionMods returns the instance with its mod list rescanned from disk
+// and connector state reconciled.
 func ScanVersionMods(version structs.VersionInfo, mcDir string) structs.VersionInfo {
 	version = initializeActualModLoader(version)
-	versionDirName := versionInstanceDir(version)
+	versionDirName := versionInstanceKey(version)
 	if strings.TrimSpace(mcDir) == "" || strings.TrimSpace(versionDirName) == "" {
 		version.Mods = nil
 		return reconcileConnectorVersion(version)
@@ -682,6 +670,8 @@ func (s *Service) watchModsDir(ctx context.Context, dir, versionID, versionName 
 	}
 }
 
+// ScanAllModDirsForHardlinkIndex indexes mod jars across all instances, aborting
+// when the directory or index generation changes.
 func ScanAllModDirsForHardlinkIndex(mcDir string, versions []structs.VersionInfo, generation uint64) {
 	if global.GetMinecraftDir() != mcDir || global.HardlinkIndexGeneration() != generation {
 		return
@@ -704,7 +694,7 @@ func (s *Service) stop(saveConfig bool) {
 		if s.config == nil {
 			s.config = &configs.Config{}
 		}
-		s.config.Prefers.MinecraftDir = global.GetMinecraftDir()
+		s.config.Preferences.MinecraftDir = global.GetMinecraftDir()
 		if err := configs.Save(s.config); err != nil {
 			logging.Error("save config failed", "error", err)
 		}

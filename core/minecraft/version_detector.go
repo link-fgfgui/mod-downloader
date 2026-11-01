@@ -23,6 +23,8 @@ const (
 
 var serverVersionPattern = regexp.MustCompile(`^(?:Alpha |Beta )?(?:v)?[0-9]+(?:\.[0-9]+)*(?:_[0-9]+)?[a-z]?$`)
 
+// DetectMinecraftVersionFromJar detects the Minecraft version embedded in a
+// server or client JAR.
 func DetectMinecraftVersionFromJar(jarPath string) (string, bool) {
 	r, err := zip.OpenReader(jarPath)
 	if err != nil {
@@ -33,6 +35,8 @@ func DetectMinecraftVersionFromJar(jarPath string) (string, bool) {
 	return DetectMinecraftVersionFromZip(&r.Reader)
 }
 
+// DetectMinecraftVersionFromZip detects the Minecraft version from an opened
+// JAR, trying version.json, the client class then the server class.
 func DetectMinecraftVersionFromZip(r *zip.Reader) (string, bool) {
 	if version := detectMinecraftVersionJSON(r); version != "" {
 		return version, true
@@ -85,6 +89,8 @@ func detectMinecraftServerVersion(r *zip.Reader) string {
 	return ExtractServerMinecraftVersion(strings)
 }
 
+// ParseClassStrings returns the UTF-8 constants in a Java class file's
+// constant pool.
 func ParseClassStrings(data []byte) ([]string, error) {
 	if len(data) < 10 {
 		return nil, io.ErrUnexpectedEOF
@@ -201,6 +207,8 @@ func ExtractClientMinecraftVersion(strs []string) string {
 	return ""
 }
 
+// ExtractServerMinecraftVersion scans server log constants for the first
+// version-shaped token.
 func ExtractServerMinecraftVersion(strs []string) string {
 	const maxServerVersionLookback = 8
 

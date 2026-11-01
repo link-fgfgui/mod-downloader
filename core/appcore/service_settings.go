@@ -12,8 +12,10 @@ import (
 	"github.com/link-fgfgui/mod-downloader/core/minecraft"
 	"github.com/link-fgfgui/mod-downloader/core/storage"
 	appstructs "github.com/link-fgfgui/mod-downloader/core/structs"
+	appview "github.com/link-fgfgui/mod-downloader/core/structs/view"
 )
 
+// GetPreferences returns the persisted theme, language and animation subset.
 func (s *Service) GetPreferences() appstructs.AppPreferences {
 	if s.config == nil {
 		return appstructs.AppPreferences{
@@ -23,20 +25,21 @@ func (s *Service) GetPreferences() appstructs.AppPreferences {
 		}
 	}
 	return appstructs.AppPreferences{
-		Theme:                       s.config.Prefers.Theme.Normalized().String(),
-		Language:                    s.config.Prefers.Language.Normalized().String(),
-		AnimationDurationMultiplier: s.config.Prefers.NormalizedAnimationDurationMultiplier(),
+		Theme:                       s.config.Preferences.Theme.Normalized().String(),
+		Language:                    s.config.Preferences.Language.Normalized().String(),
+		AnimationDurationMultiplier: s.config.Preferences.NormalizedAnimationDurationMultiplier(),
 	}
 }
 
-func (s *Service) GetSettings() appstructs.SettingsView {
-	sv := appstructs.SettingsView{
+// GetSettings returns the client-safe settings snapshot with clamped values.
+func (s *Service) GetSettings() appview.SettingsView {
+	sv := appview.SettingsView{
 		Theme:                       configs.ThemeDark.String(),
 		Language:                    configs.LanguageSystem.String(),
 		SimpleMode:                  false,
 		AnimationDurationMultiplier: configs.DefaultAnimationDurationMultiplier,
 		AutoScanUnusedDependencies:  configs.DefaultAutoScanUnusedDependencies,
-		EnableJijDetection:          configs.DefaultEnableJijDetection,
+		EnableJIJDetection:          configs.DefaultEnableJIJDetection,
 		HardwareAcceleration:        configs.DefaultHardwareAcceleration,
 		PreferredReleaseType:        configs.DefaultPreferredReleaseType,
 		FileConcurrency:             configs.DefaultFileConcurrency,
@@ -44,30 +47,30 @@ func (s *Service) GetSettings() appstructs.SettingsView {
 		TargetDownloadRateMiB:       configs.DefaultTargetDownloadRateMiB,
 	}
 	if s.config != nil {
-		sv.Theme = s.config.Prefers.Theme.Normalized().String()
-		sv.Language = s.config.Prefers.Language.Normalized().String()
-		sv.SimpleMode = s.config.Prefers.SimpleMode
-		sv.AnimationDurationMultiplier = s.config.Prefers.NormalizedAnimationDurationMultiplier()
-		sv.AutoScanUnusedDependencies = s.config.Prefers.AutoScanUnusedDependenciesValue()
-		sv.MCIMEnabled = s.config.Prefers.MCIMEnabledValue()
-		sv.EnableJijDetection = s.config.Prefers.EnableJijDetectionValue()
-		sv.HardwareAcceleration = s.config.Prefers.HardwareAccelerationValue()
-		sv.RequireCtrlForMultiSelect = s.config.Prefers.RequireCtrlForMultiSelect
-		sv.PreferredReleaseType = s.config.Prefers.PreferredReleaseTypeValue()
+		sv.Theme = s.config.Preferences.Theme.Normalized().String()
+		sv.Language = s.config.Preferences.Language.Normalized().String()
+		sv.SimpleMode = s.config.Preferences.SimpleMode
+		sv.AnimationDurationMultiplier = s.config.Preferences.NormalizedAnimationDurationMultiplier()
+		sv.AutoScanUnusedDependencies = s.config.Preferences.AutoScanUnusedDependenciesValue()
+		sv.MCIMEnabled = s.config.Preferences.MCIMEnabledValue()
+		sv.EnableJIJDetection = s.config.Preferences.EnableJIJDetectionValue()
+		sv.HardwareAcceleration = s.config.Preferences.HardwareAccelerationValue()
+		sv.RequireCtrlForMultiSelect = s.config.Preferences.RequireCtrlForMultiSelect
+		sv.PreferredReleaseType = s.config.Preferences.PreferredReleaseTypeValue()
 		sv.FileConcurrency = s.config.Downloads.FileConcurrencyValue()
 		sv.ConcurrentDownloads = s.config.Downloads.ConcurrentDownloadsValue()
 		sv.AdaptiveFileConcurrency = s.config.Downloads.AdaptiveFileConcurrency
 		sv.TargetDownloadRateMiB = s.config.Downloads.TargetDownloadRateMiBValue()
 		sv.VerifySHA1 = s.config.Downloads.VerifySHA1
 		sv.RequestsPerSecond = s.config.API.RequestsPerSecondValue()
-		sv.MinecraftDir = minecraft.SimplifyPathWithEnv(minecraft.ExpandPathWithEnv(s.config.Prefers.MinecraftDir))
+		sv.MinecraftDir = minecraft.SimplifyPathWithEnv(minecraft.ExpandPathWithEnv(s.config.Preferences.MinecraftDir))
 		sv.CacheDir = minecraft.SimplifyPathWithEnv(minecraft.ExpandPathWithEnv(s.config.Runtime.CacheDir))
-		sv.HasModrinthKey = strings.TrimSpace(s.config.Keys.ModrinthApiKey) != ""
-		sv.ModrinthKeyMask = MaskKey(s.config.Keys.ModrinthApiKey)
+		sv.HasModrinthKey = strings.TrimSpace(s.config.Keys.ModrinthAPIKey) != ""
+		sv.ModrinthKeyMask = MaskKey(s.config.Keys.ModrinthAPIKey)
 	}
-	effectiveCFKey := s.effectiveCurseforgeAPIKey()
-	sv.HasCurseforgeKey = effectiveCFKey != ""
-	sv.CurseforgeKeyMask = MaskKey(effectiveCFKey)
+	effectiveCFKey := s.effectiveCurseForgeAPIKey()
+	sv.HasCurseForgeKey = effectiveCFKey != ""
+	sv.CurseForgeKeyMask = MaskKey(effectiveCFKey)
 	if sv.MinecraftDir == "" {
 		sv.MinecraftDir = minecraft.SimplifyPathWithEnv(global.GetMinecraftDir())
 	}
@@ -75,7 +78,7 @@ func (s *Service) GetSettings() appstructs.SettingsView {
 		sv.CachePath = minecraft.SimplifyPathWithEnv(path)
 	}
 	sv.SaveError = s.saveErrorSnapshot()
-	return sv
+	return configs.NormalizeSettingsView(sv)
 }
 
 // persistConfig records config write failures so the UI can stop reporting a
@@ -93,12 +96,14 @@ func (s *Service) persistConfig(action string, attrs ...any) {
 	s.saveErrMu.Unlock()
 }
 
+// saveErrorSnapshot returns the most recent config write failure, if any.
 func (s *Service) saveErrorSnapshot() string {
 	s.saveErrMu.Lock()
 	defer s.saveErrMu.Unlock()
 	return s.lastSaveError
 }
 
+// SaveTheme validates and persists the UI theme, returning its wire value.
 func (s *Service) SaveTheme(theme string) string {
 	if s.config == nil {
 		s.config = &configs.Config{}
@@ -107,11 +112,13 @@ func (s *Service) SaveTheme(theme string) string {
 	if parsed == "" {
 		parsed = configs.ThemeDark
 	}
-	s.config.Prefers.Theme = parsed
+	s.config.Preferences.Theme = parsed
 	s.persistConfig("save theme failed", "theme", parsed)
 	return parsed.String()
 }
 
+// SaveLanguage validates and persists the UI language, returning its wire
+// value.
 func (s *Service) SaveLanguage(language string) string {
 	if s.config == nil {
 		s.config = &configs.Config{}
@@ -120,55 +127,61 @@ func (s *Service) SaveLanguage(language string) string {
 	if parsed == "" {
 		parsed = configs.LanguageSystem
 	}
-	s.config.Prefers.Language = parsed
+	s.config.Preferences.Language = parsed
 	s.persistConfig("save language failed", "language", parsed)
 	return parsed.String()
 }
 
-func (s *Service) SaveAnimationSettings(req appstructs.SaveAnimationSettingsRequest) appstructs.SettingsView {
+// SaveAnimationSettings normalizes and persists the UI animation multiplier.
+func (s *Service) SaveAnimationSettings(req appstructs.SaveAnimationSettingsRequest) appview.SettingsView {
 	if s.config == nil {
 		s.config = &configs.Config{}
 	}
-	s.config.Prefers.AnimationDurationMultiplier = configs.NormalizeAnimationDurationMultiplier(req.AnimationDurationMultiplier)
+	s.config.Preferences.AnimationDurationMultiplier = configs.NormalizeAnimationDurationMultiplier(req.AnimationDurationMultiplier)
 	s.persistConfig("save animation settings failed", "animationDurationMultiplier", req.AnimationDurationMultiplier)
 	return s.GetSettings()
 }
 
-func (s *Service) SaveSimpleModeSettings(req appstructs.SaveSimpleModeSettingsRequest) appstructs.SettingsView {
+// SaveSimpleModeSettings persists simple mode and applies its runtime effects.
+func (s *Service) SaveSimpleModeSettings(req appstructs.SaveSimpleModeSettingsRequest) appview.SettingsView {
 	if s.config == nil {
 		s.config = &configs.Config{}
 	}
-	s.config.Prefers.SimpleMode = req.SimpleMode
+	s.config.Preferences.SimpleMode = req.SimpleMode
 	s.persistConfig("save simple mode setting failed", "simpleMode", req.SimpleMode)
 	s.applyRuntimeConfig(s.downloadEvents())
 	return s.GetSettings()
 }
 
-func (s *Service) SaveUnusedDependencyCleanupSettings(req appstructs.SaveUnusedDependencyCleanupSettingsRequest) appstructs.SettingsView {
+// SaveUnusedDependencyCleanupSettings persists the auto-scan preference.
+func (s *Service) SaveUnusedDependencyCleanupSettings(req appstructs.SaveUnusedDependencyCleanupSettingsRequest) appview.SettingsView {
 	if s.config == nil {
 		s.config = &configs.Config{}
 	}
-	s.config.Prefers.AutoScanUnusedDependencies = configs.BoolPtr(req.AutoScanUnusedDependencies)
+	s.config.Preferences.AutoScanUnusedDependencies = configs.BoolPtr(req.AutoScanUnusedDependencies)
 	s.persistConfig("save unused dependency cleanup settings failed", "autoScanUnusedDependencies", req.AutoScanUnusedDependencies)
 	return s.GetSettings()
 }
 
-func (s *Service) SaveMCIMSettings(req appstructs.SaveMCIMSettingsRequest) appstructs.SettingsView {
+// SaveMCIMSettings persists the MCIM mirror toggle and reapplies clients.
+func (s *Service) SaveMCIMSettings(req appstructs.SaveMCIMSettingsRequest) appview.SettingsView {
 	if s.config == nil {
 		s.config = &configs.Config{}
 	}
-	s.config.Prefers.MCIMEnabled = req.MCIMEnabled
+	s.config.Preferences.MCIMEnabled = req.MCIMEnabled
 	s.persistConfig("save MCIM settings failed", "mcimEnabled", req.MCIMEnabled)
 	s.applyRuntimeConfig(s.downloadEvents())
 	return s.GetSettings()
 }
 
-func (s *Service) SaveJijDetectionSettings(req appstructs.SaveJijDetectionSettingsRequest) appstructs.SettingsView {
+// SaveJIJDetectionSettings persists the Jar-in-Jar toggle and clears cached
+// parse results.
+func (s *Service) SaveJIJDetectionSettings(req appstructs.SaveJIJDetectionSettingsRequest) appview.SettingsView {
 	if s.config == nil {
 		s.config = &configs.Config{}
 	}
-	s.config.Prefers.EnableJijDetection = configs.BoolPtr(req.EnableJijDetection)
-	s.persistConfig("save JIJ detection setting failed", "enableJijDetection", req.EnableJijDetection)
+	s.config.Preferences.EnableJIJDetection = configs.BoolPtr(req.EnableJIJDetection)
+	s.persistConfig("save JIJ detection setting failed", "enableJijDetection", req.EnableJIJDetection)
 	s.applyRuntimeConfig(s.downloadEvents())
 	return s.GetSettings()
 }
@@ -176,52 +189,61 @@ func (s *Service) SaveJijDetectionSettings(req appstructs.SaveJijDetectionSettin
 // SaveHardwareAccelerationSettings persists the webview GPU preference. The
 // value is read while the app starts on the next launch; it cannot be applied
 // to the already-created webview at runtime.
-func (s *Service) SaveHardwareAccelerationSettings(req appstructs.SaveHardwareAccelerationSettingsRequest) appstructs.SettingsView {
+func (s *Service) SaveHardwareAccelerationSettings(req appstructs.SaveHardwareAccelerationSettingsRequest) appview.SettingsView {
 	if s.config == nil {
 		s.config = &configs.Config{}
 	}
-	s.config.Prefers.HardwareAcceleration = configs.BoolPtr(req.HardwareAcceleration)
+	s.config.Preferences.HardwareAcceleration = configs.BoolPtr(req.HardwareAcceleration)
 	s.persistConfig("save hardware acceleration setting failed", "hardwareAcceleration", req.HardwareAcceleration)
 	return s.GetSettings()
 }
 
-func (s *Service) SavePreferredReleaseTypeSettings(req appstructs.SavePreferredReleaseTypeSettingsRequest) appstructs.SettingsView {
+// SavePreferredReleaseTypeSettings normalizes and persists the release-type
+// filter applied to project versions.
+func (s *Service) SavePreferredReleaseTypeSettings(req appstructs.SavePreferredReleaseTypeSettingsRequest) appview.SettingsView {
 	if s.config == nil {
 		s.config = &configs.Config{}
 	}
 	value := configs.Preferences{PreferredReleaseType: req.PreferredReleaseType}.PreferredReleaseTypeValue()
-	s.config.Prefers.PreferredReleaseType = value
+	s.config.Preferences.PreferredReleaseType = value
 	s.persistConfig("save preferred release type setting failed", "preferredReleaseType", value)
 	s.applyRuntimeConfig(s.downloadEvents())
 	return s.GetSettings()
 }
 
-func (s *Service) SaveNetworkSettings(req appstructs.SaveNetworkSettingsRequest) appstructs.SettingsView {
+// SaveNetworkSettings clamps and persists download concurrency, rate limits and
+// API request pacing, then applies them to the running clients.
+func (s *Service) SaveNetworkSettings(req appstructs.SaveNetworkSettingsRequest) appview.SettingsView {
 	if s.config == nil {
 		s.config = &configs.Config{}
 	}
-	s.config.Downloads.FileConcurrency = configs.DownloadConfig{FileConcurrency: req.FileConcurrency}.FileConcurrencyValue()
-	s.config.Downloads.ConcurrentDownloads = configs.DownloadConfig{ConcurrentDownloads: req.ConcurrentDownloads}.ConcurrentDownloadsValue()
+	req = configs.NormalizeNetworkSettings(req)
+	s.config.Downloads.FileConcurrency = req.FileConcurrency
+	s.config.Downloads.ConcurrentDownloads = req.ConcurrentDownloads
 	s.config.Downloads.AdaptiveFileConcurrency = req.AdaptiveFileConcurrency
-	s.config.Downloads.TargetDownloadRateMiB = configs.DownloadConfig{TargetDownloadRateMiB: req.TargetDownloadRateMiB}.TargetDownloadRateMiBValue()
+	s.config.Downloads.TargetDownloadRateMiB = req.TargetDownloadRateMiB
 	s.config.Downloads.VerifySHA1 = req.VerifySHA1
-	s.config.API.RequestsPerSecond = configs.APIConfig{RequestsPerSecond: req.RequestsPerSecond}.RequestsPerSecondValue()
+	s.config.API.RequestsPerSecond = req.RequestsPerSecond
 	s.persistConfig("save network settings failed")
 	s.applyRuntimeConfig(s.downloadEvents())
 	return s.GetSettings()
 }
 
+// SaveMinecraftDirPreference persists the Minecraft directory override and
+// updates the process-wide value.
 func (s *Service) SaveMinecraftDirPreference(dir string) string {
 	if s.config == nil {
 		s.config = &configs.Config{}
 	}
-	s.config.Prefers.MinecraftDir = strings.TrimSpace(dir)
+	s.config.Preferences.MinecraftDir = strings.TrimSpace(dir)
 	s.persistConfig("save minecraft dir preference failed", "minecraftDir", dir)
-	global.SetMinecraftDir(minecraft.ExpandPathWithEnv(s.config.Prefers.MinecraftDir))
-	return s.config.Prefers.MinecraftDir
+	global.SetMinecraftDir(minecraft.ExpandPathWithEnv(s.config.Preferences.MinecraftDir))
+	return s.config.Preferences.MinecraftDir
 }
 
-func (s *Service) SaveCacheDirPreference(dir string) appstructs.SettingsView {
+// SaveCacheDirPreference persists the cache directory override and reopens the
+// database at the new location.
+func (s *Service) SaveCacheDirPreference(dir string) appview.SettingsView {
 	if s.config == nil {
 		s.config = &configs.Config{}
 	}
@@ -239,15 +261,17 @@ func (s *Service) SaveCacheDirPreference(dir string) appstructs.SettingsView {
 	return s.GetSettings()
 }
 
-func (s *Service) SaveApiKeys(req appstructs.SaveApiKeysRequest) appstructs.SettingsView {
+// SaveAPIKeys persists the provider API keys unless the keep-sentinel value
+// signals that the stored key must be preserved.
+func (s *Service) SaveAPIKeys(req appstructs.SaveAPIKeysRequest) appview.SettingsView {
 	if s.config == nil {
 		s.config = &configs.Config{}
 	}
-	if req.CurseforgeApiKey != APIKeyKeepSentinel {
-		s.config.Keys.CurseforgeApiKey = strings.TrimSpace(req.CurseforgeApiKey)
+	if req.CurseForgeAPIKey != APIKeyKeepSentinel {
+		s.config.Keys.CurseForgeAPIKey = strings.TrimSpace(req.CurseForgeAPIKey)
 	}
-	if req.ModrinthApiKey != APIKeyKeepSentinel {
-		s.config.Keys.ModrinthApiKey = strings.TrimSpace(req.ModrinthApiKey)
+	if req.ModrinthAPIKey != APIKeyKeepSentinel {
+		s.config.Keys.ModrinthAPIKey = strings.TrimSpace(req.ModrinthAPIKey)
 	}
 	s.persistConfig("save api keys failed")
 	s.applyRuntimeConfig(s.downloadEvents())

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/services/app";
 import { useSettingsStore } from "@/stores/settings";
 import type { ModInfo, UnusedDependencyCandidate } from "@/types";
-import type { ModGroup } from "@/lib/modGroups";
+import type { LocalModGroup } from "@/types";
 
 interface UnusedDependenciesOptions {
   mods: ModInfo[];
@@ -53,7 +53,7 @@ export function useUnusedDependencies(options: UnusedDependenciesOptions) {
   }, [candidates]);
 
   const candidateFor = useCallback(
-    (group: ModGroup): UnusedDependencyCandidate | null => {
+    (group: LocalModGroup): UnusedDependencyCandidate | null => {
       for (const mod of group.strong || []) {
         const path = (mod.path || "").trim();
         if (path && byPath.has(path)) return byPath.get(path)!;
@@ -79,7 +79,7 @@ export function useUnusedDependencies(options: UnusedDependenciesOptions) {
   }, []);
 
   const tooltipFor = useCallback(
-    (group: ModGroup) => {
+    (group: LocalModGroup) => {
       const candidate = candidateFor(group);
       if (!candidate) return "";
       const ids = (candidate.modIds || []).join(", ");

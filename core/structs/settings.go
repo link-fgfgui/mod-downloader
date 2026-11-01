@@ -20,70 +20,53 @@ type AppPreferences struct {
 	AnimationDurationMultiplier float64 `json:"animationDurationMultiplier"`
 }
 
-// SettingsView is a client-safe settings snapshot. API keys are represented
-// by existence and masks; plaintext keys never cross the Wails boundary.
-type SettingsView struct {
-	Theme                       string  `json:"theme"`
-	Language                    string  `json:"language"`
-	SimpleMode                  bool    `json:"simpleMode"`
-	AnimationDurationMultiplier float64 `json:"animationDurationMultiplier"`
-	AutoScanUnusedDependencies  bool    `json:"autoScanUnusedDependencies"`
-	MCIMEnabled                 bool    `json:"mcimEnabled"`
-	EnableJijDetection          bool    `json:"enableJijDetection"`
-	HardwareAcceleration        bool    `json:"hardwareAcceleration"`
-	RequireCtrlForMultiSelect   bool    `json:"requireCtrlForMultiSelect"`
-	PreferredReleaseType        string  `json:"preferredReleaseType"`
-	MinecraftDir                string  `json:"minecraftDir"`
-	CacheDir                    string  `json:"cacheDir"`
-	CachePath                   string  `json:"cachePath"`
-	HasCurseforgeKey            bool    `json:"hasCurseforgeKey"`
-	CurseforgeKeyMask           string  `json:"curseforgeKeyMask"`
-	HasModrinthKey              bool    `json:"hasModrinthKey"`
-	ModrinthKeyMask             string  `json:"modrinthKeyMask"`
-	FileConcurrency             int     `json:"fileConcurrency"`
-	ConcurrentDownloads         int     `json:"concurrentDownloads"`
-	AdaptiveFileConcurrency     bool    `json:"adaptiveFileConcurrency"`
-	TargetDownloadRateMiB       float64 `json:"targetDownloadRateMiB"`
-	VerifySHA1                  bool    `json:"verifySha1"`
-	RequestsPerSecond           int     `json:"requestsPerSecond"`
-	// SaveError carries the last failed config write. Empty means the last
-	// persist attempt succeeded.
-	SaveError string `json:"saveError,omitempty"`
+// SaveAPIKeysRequest carries the API keys to persist. An empty key clears the
+// stored value; the keep sentinel leaves it untouched.
+type SaveAPIKeysRequest struct {
+	CurseForgeAPIKey string `json:"curseforgeApiKey"`
+	ModrinthAPIKey   string `json:"modrinthApiKey"`
 }
 
-type SaveApiKeysRequest struct {
-	CurseforgeApiKey string `json:"curseforgeApiKey"`
-	ModrinthApiKey   string `json:"modrinthApiKey"`
-}
-
+// SaveAnimationSettingsRequest updates the UI animation speed multiplier.
 type SaveAnimationSettingsRequest struct {
 	AnimationDurationMultiplier float64 `json:"animationDurationMultiplier"`
 }
 
+// SaveSimpleModeSettingsRequest toggles simple mode.
 type SaveSimpleModeSettingsRequest struct {
 	SimpleMode bool `json:"simpleMode"`
 }
 
+// SaveUnusedDependencyCleanupSettingsRequest toggles automatic unused
+// dependency scans.
 type SaveUnusedDependencyCleanupSettingsRequest struct {
 	AutoScanUnusedDependencies bool `json:"autoScanUnusedDependencies"`
 }
 
+// SaveMCIMSettingsRequest toggles the MCIM CurseForge mirror.
 type SaveMCIMSettingsRequest struct {
 	MCIMEnabled bool `json:"mcimEnabled"`
 }
 
-type SaveJijDetectionSettingsRequest struct {
-	EnableJijDetection bool `json:"enableJijDetection"`
+// SaveJIJDetectionSettingsRequest toggles Jar-in-Jar detection.
+type SaveJIJDetectionSettingsRequest struct {
+	EnableJIJDetection bool `json:"enableJijDetection"`
 }
 
+// SavePreferredReleaseTypeSettingsRequest sets the preferred release channel
+// ("latest", "release", "beta" or "alpha").
 type SavePreferredReleaseTypeSettingsRequest struct {
 	PreferredReleaseType string `json:"preferredReleaseType"`
 }
 
+// SaveHardwareAccelerationSettingsRequest toggles GPU rendering. The change
+// takes effect on the next launch.
 type SaveHardwareAccelerationSettingsRequest struct {
 	HardwareAcceleration bool `json:"hardwareAcceleration"`
 }
 
+// SaveNetworkSettingsRequest updates download concurrency, rate limiting and
+// API request pacing; the core clamps every field to its documented range.
 type SaveNetworkSettingsRequest struct {
 	FileConcurrency         int     `json:"fileConcurrency"`
 	ConcurrentDownloads     int     `json:"concurrentDownloads"`

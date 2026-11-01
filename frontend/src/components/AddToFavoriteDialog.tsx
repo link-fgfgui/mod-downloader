@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { errorMessage } from "@/lib/format";
+import { api } from "@/services/app";
 
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
@@ -16,12 +17,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  listMatchesScope,
   normalizeKeyPart,
   normalizeMinecraftVersion,
   useFavoritesStore,
   type FavoriteModDraft,
 } from "@/stores/favorites";
+import type { FavoriteList } from "@/types";
 
 interface AddToFavoriteDialogProps {
   open: boolean;
@@ -32,41 +33,56 @@ interface AddToFavoriteDialogProps {
 
 export function AddToFavoriteDialog({ open, drafts, onOpenChange, onAdded }: AddToFavoriteDialogProps) {
   const { t } = useTranslation();
-  const lists = useFavoritesStore((state) => state.lists);
-  const loadingLists = useFavoritesStore((state) => state.loadingLists);
   const selectedListId = useFavoritesStore((state) => state.selectedListId);
-  const loadLists = useFavoritesStore((state) => state.loadLists);
   const createList = useFavoritesStore((state) => state.createList);
   const addDrafts = useFavoritesStore((state) => state.addDrafts);
   const [selectedListName, setSelectedListName] = useState("");
   const [saving, setSaving] = useState(false);
   const [scopeError, setScopeError] = useState(false);
+  const [loadingScope, setLoadingScope] = useState(false);
+  const [allLists, setAllLists] = useState<FavoriteList[]>([]);
+  const [scopedLists, setScopedLists] = useState<FavoriteList[]>([]);
 
   const draftMinecraftVersion = normalizeMinecraftVersion(drafts[0]?.minecraftVersion);
   const draftModLoader = normalizeKeyPart(drafts[0]?.modLoader);
-  const inScope = useMemo(
-    () => lists.filter((list) => listMatchesScope(list, draftMinecraftVersion, draftModLoader)),
-    [draftMinecraftVersion, draftModLoader, lists],
-  );
+  const inScope = useMemo(() => scopedLists, [scopedLists]);
   const scopeLabel =
     draftMinecraftVersion && draftModLoader
       ? `${draftMinecraftVersion} / ${draftModLoader.toUpperCase()}`
       : "";
   const canCreate = drafts.every((draft) => Boolean(draft.minecraftVersion?.trim() && draft.modLoader?.trim()));
 
+  // The dialog can target a different scope than the page, so ask core for the
+  // draft scope's overview instead of filtering the page's lists locally.
   useEffect(() => {
     if (!open) return;
     setScopeError(false);
-    void loadLists().then(() => {
-      const current = useFavoritesStore.getState();
-      const scoped = current.lists.filter((list) =>
-        listMatchesScope(list, draftMinecraftVersion, draftModLoader),
-      );
-      setSelectedListName(
-        scoped.find((list) => list.id === current.selectedListId)?.name || scoped[0]?.name || "",
-      );
-    });
-  }, [draftMinecraftVersion, draftModLoader, loadLists, open, selectedListId]);
+    let cancelled = false;
+    setLoadingScope(true);
+    void Promise.all([
+      api.ListFavoriteLists(),
+      api.ListFavoriteOverview(draftMinecraftVersion, draftModLoader),
+    ])
+      .then(([lists, overview]) => {
+        if (cancelled) return;
+        const scoped = [...(overview?.pinned ?? []), ...(overview?.ungrouped ?? [])];
+        setAllLists(lists ?? []);
+        setScopedLists(scoped);
+        const current = useFavoritesStore.getState();
+        setSelectedListName(
+          scoped.find((list) => list.id === current.selectedListId)?.name || scoped[0]?.name || "",
+        );
+      })
+      .catch((error) => {
+        if (!cancelled) toast.error(t("favorites.operationFailed") + ": " + errorMessage(error));
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingScope(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [draftMinecraftVersion, draftModLoader, open, selectedListId, t]);
 
   const submit = async () => {
     const name = selectedListName.trim();
@@ -74,12 +90,12 @@ export function AddToFavoriteDialog({ open, drafts, onOpenChange, onAdded }: Add
     setSaving(true);
     setScopeError(false);
     try {
-      const existing = lists.find(
+      const existing = allLists.find(
         (list) => list.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase(),
       );
       let listId = existing?.id ?? "";
       if (existing) {
-        if (!listMatchesScope(existing, draftMinecraftVersion, draftModLoader)) {
+        if (!scopedLists.some((list) => list.id === existing.id)) {
           setScopeError(true);
           return;
         }
@@ -119,7 +135,7 @@ export function AddToFavoriteDialog({ open, drafts, onOpenChange, onAdded }: Add
               }}
               options={inScope.map((list) => ({ value: list.name, label: list.name }))}
               placeholder={t("favorites.addDialog.newList")}
-              disabled={saving || loadingLists}
+              disabled={saving || loadingScope}
               allowCustom
               autoFocus
               customLabel={(value) => t("common.useCustom", { value })}
@@ -145,7 +161,7 @@ export function AddToFavoriteDialog({ open, drafts, onOpenChange, onAdded }: Add
           </Button>
           <Button
             type="button"
-            disabled={saving || loadingLists || !canCreate || !selectedListName.trim()}
+            disabled={saving || loadingScope || !canCreate || !selectedListName.trim()}
             onClick={() => void submit()}
           >
             {saving ? <Loader2 className="size-4 animate-spin" /> : null}

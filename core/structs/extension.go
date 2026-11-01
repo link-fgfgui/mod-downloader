@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 link-fgfgui
 // SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
 
+// Package structs defines the adapter-neutral request, result and settings
+// projections exchanged across the core/UI boundary.
 package structs
 
 // ExtensionProjectPayload mirrors the browser extension's scan payload:

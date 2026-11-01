@@ -11,65 +11,77 @@ import (
 	"github.com/link-fgfgui/mod-downloader/core/providers"
 	"github.com/link-fgfgui/mod-downloader/core/storage"
 	appstructs "github.com/link-fgfgui/mod-downloader/core/structs"
+	appview "github.com/link-fgfgui/mod-downloader/core/structs/view"
 )
 
+// SearchMods streams search results through the EventSearchModsUpdated event.
 func (s *Service) SearchMods(req appstructs.SearchModsRequest) {
-	providers.SearchMods(req, func(update appstructs.SearchModsUpdate) {
+	providers.SearchMods(req, func(update appview.SearchModsUpdate) {
 		s.emit(EventSearchModsUpdated, update)
 	})
 }
 
-func (s *Service) SearchModsCollect(req appstructs.SearchModsRequest) appstructs.SearchModsUpdate {
-	var last appstructs.SearchModsUpdate
-	providers.SearchMods(req, func(update appstructs.SearchModsUpdate) {
+// SearchModsCollect runs a search and returns only the final page.
+func (s *Service) SearchModsCollect(req appstructs.SearchModsRequest) appview.SearchModsUpdate {
+	var last appview.SearchModsUpdate
+	providers.SearchMods(req, func(update appview.SearchModsUpdate) {
 		last = update
 	})
 	return last
 }
 
-func (s *Service) SearchModsTextCollect(req appstructs.SearchModsRequest) appstructs.SearchModsUpdate {
-	var last appstructs.SearchModsUpdate
-	providers.SearchModsText(req, func(update appstructs.SearchModsUpdate) {
+// SearchModsTextCollect runs the broad text search only and returns the final
+// page.
+func (s *Service) SearchModsTextCollect(req appstructs.SearchModsRequest) appview.SearchModsUpdate {
+	var last appview.SearchModsUpdate
+	providers.SearchModsText(req, func(update appview.SearchModsUpdate) {
 		last = update
 	})
 	return last
 }
 
+// ListMatchingProjectVersions returns cached versions matching a scope.
 func (s *Service) ListMatchingProjectVersions(result models.ModProject, minecraftVersion string, modLoader string) []models.ModVersion {
 	return providers.ListMatchingProjectVersions(result, minecraftVersion, modLoader)
 }
 
-func (s *Service) LookupProject(platform, idOrSlug, mcVersion, modLoader string) (models.ModProject, bool) {
-	return providers.LookupProjectByPlatform(platform, idOrSlug, mcVersion, modLoader)
+// LookupProject resolves a project by ID or slug.
+func (s *Service) LookupProject(platform, idOrSlug, minecraftVersion, modLoader string) (models.ModProject, bool) {
+	return providers.LookupProjectByPlatform(platform, idOrSlug, minecraftVersion, modLoader)
 }
 
-func (s *Service) LookupProjectBySlug(platform, slug, mcVersion, modLoader string) (models.ModProject, bool) {
-	return providers.LookupProjectByPlatformSlug(platform, slug, mcVersion, modLoader)
+// LookupProjectBySlug resolves a project by its platform slug.
+func (s *Service) LookupProjectBySlug(platform, slug, minecraftVersion, modLoader string) (models.ModProject, bool) {
+	return providers.LookupProjectByPlatformSlug(platform, slug, minecraftVersion, modLoader)
 }
 
-func (s *Service) LookupProjectByID(platform, projectID, mcVersion, modLoader string) (models.ModProject, bool) {
-	return providers.LookupProjectByPlatformID(platform, projectID, mcVersion, modLoader)
+// LookupProjectByID resolves a project by its platform project ID.
+func (s *Service) LookupProjectByID(platform, projectID, minecraftVersion, modLoader string) (models.ModProject, bool) {
+	return providers.LookupProjectByPlatformID(platform, projectID, minecraftVersion, modLoader)
 }
 
+// GetPinnedModVersion returns the pinned version for a mod in one scope, or
+// the zero value when no pin exists.
 func (s *Service) GetPinnedModVersion(platform string, modID string, minecraftVersion string, modLoader string) storage.PinnedMod {
 	pin, _ := storage.GetPinnedMod(platform, modID, minecraftVersion, modLoader)
 	return pin
 }
 
+// PinModVersion toggles a pin: pinning the already-pinned version unpins it.
 func (s *Service) PinModVersion(req appstructs.ModVersionPinRequest) storage.PinnedMod {
 	platform := strings.ToLower(strings.TrimSpace(req.Platform))
 	modID := strings.ToLower(strings.TrimSpace(req.ModID))
 	versionID := strings.TrimSpace(req.VersionID)
-	mcVersion := strings.TrimSpace(req.MinecraftVersion)
+	minecraftVersion := strings.TrimSpace(req.MinecraftVersion)
 	modLoader := strings.ToLower(strings.TrimSpace(req.ModLoader))
 
-	if platform == "" || modID == "" || versionID == "" || mcVersion == "" || modLoader == "" {
+	if platform == "" || modID == "" || versionID == "" || minecraftVersion == "" || modLoader == "" {
 		return storage.PinnedMod{}
 	}
 
-	existing, found := storage.GetPinnedMod(platform, modID, mcVersion, modLoader)
+	existing, found := storage.GetPinnedMod(platform, modID, minecraftVersion, modLoader)
 	if found && strings.EqualFold(existing.VersionID, versionID) {
-		_ = storage.DeletePinnedMod(platform, modID, mcVersion, modLoader)
+		_ = storage.DeletePinnedMod(platform, modID, minecraftVersion, modLoader)
 		return storage.PinnedMod{}
 	}
 
@@ -77,34 +89,36 @@ func (s *Service) PinModVersion(req appstructs.ModVersionPinRequest) storage.Pin
 		Platform:         platform,
 		ModID:            modID,
 		VersionID:        versionID,
-		MinecraftVersion: mcVersion,
+		MinecraftVersion: minecraftVersion,
 		ModLoader:        modLoader,
 	}
 	if err := storage.UpsertPinnedMod(pin); err != nil {
-		logging.Error("upsert pinned mod failed", "platform", platform, "modID", modID, "versionID", versionID, "minecraftVersion", mcVersion, "modLoader", modLoader, "error", err)
+		logging.Error("upsert pinned mod failed", "platform", platform, "modID", modID, "versionID", versionID, "minecraftVersion", minecraftVersion, "modLoader", modLoader, "error", err)
 		return storage.PinnedMod{}
 	}
-	pin, _ = storage.GetPinnedMod(platform, modID, mcVersion, modLoader)
+	pin, _ = storage.GetPinnedMod(platform, modID, minecraftVersion, modLoader)
 	return pin
 }
 
+// ListPinnedMods returns every pinned mod.
 func (s *Service) ListPinnedMods() []storage.PinnedMod {
 	return storage.ListPinnedMods()
 }
 
-func (s *Service) UnpinMod(platform, modID, mcVersion, modLoader string) bool {
+// UnpinMod removes the pin for a mod in one scope.
+func (s *Service) UnpinMod(platform, modID, minecraftVersion, modLoader string) bool {
 	platform = strings.ToLower(strings.TrimSpace(platform))
 	modID = strings.ToLower(strings.TrimSpace(modID))
-	mcVersion = strings.TrimSpace(mcVersion)
+	minecraftVersion = strings.TrimSpace(minecraftVersion)
 	modLoader = strings.ToLower(strings.TrimSpace(modLoader))
-	if platform == "" || modID == "" || mcVersion == "" || modLoader == "" {
+	if platform == "" || modID == "" || minecraftVersion == "" || modLoader == "" {
 		return false
 	}
-	if _, found := storage.GetPinnedMod(platform, modID, mcVersion, modLoader); !found {
+	if _, found := storage.GetPinnedMod(platform, modID, minecraftVersion, modLoader); !found {
 		return false
 	}
-	if err := storage.DeletePinnedMod(platform, modID, mcVersion, modLoader); err != nil {
-		logging.Error("unpin mod failed", "platform", platform, "modID", modID, "minecraftVersion", mcVersion, "modLoader", modLoader, "error", err)
+	if err := storage.DeletePinnedMod(platform, modID, minecraftVersion, modLoader); err != nil {
+		logging.Error("unpin mod failed", "platform", platform, "modID", modID, "minecraftVersion", minecraftVersion, "modLoader", modLoader, "error", err)
 		return false
 	}
 	return true

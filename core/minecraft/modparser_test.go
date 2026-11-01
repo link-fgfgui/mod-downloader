@@ -77,14 +77,14 @@ func TestParseFabricNestedJarsRecursively(t *testing.T) {
 		t.Fatalf("ParseModZipReader() ids = %#v, want %#v", got, want)
 	}
 
-	gotJij := jijModIDs(mods[0].JijMods)
-	wantJij := []string{"child-fabric", "grand-child"}
-	if !reflect.DeepEqual(gotJij, wantJij) {
-		t.Fatalf("ParseModZipReader() JijMods ids = %#v, want %#v", gotJij, wantJij)
+	gotJIJ := jijModIDs(mods[0].JIJMods)
+	wantJIJ := []string{"child-fabric", "grand-child"}
+	if !reflect.DeepEqual(gotJIJ, wantJIJ) {
+		t.Fatalf("ParseModZipReader() JIJMods ids = %#v, want %#v", gotJIJ, wantJIJ)
 	}
 }
 
-func TestParseSkipsJijWhenDetectionDisabled(t *testing.T) {
+func TestParseSkipsJIJWhenDetectionDisabled(t *testing.T) {
 	child := testJar(t, map[string][]byte{
 		"fabric.mod.json": []byte(`{
 			"schemaVersion": 1,
@@ -102,19 +102,19 @@ func TestParseSkipsJijWhenDetectionDisabled(t *testing.T) {
 		"META-INF/jars/child.jar": child,
 	})
 
-	SetJijDetectionEnabled(false)
-	t.Cleanup(func() { SetJijDetectionEnabled(true) })
+	SetJIJDetectionEnabled(false)
+	t.Cleanup(func() { SetJIJDetectionEnabled(true) })
 
 	mods := ParseModZipReader(testZipReader(t, top), "top.jar", "fabric")
 	if got := modIDs(mods); !reflect.DeepEqual(got, []string{"top-fabric"}) {
 		t.Fatalf("ids = %#v, want [top-fabric]", got)
 	}
-	if len(mods[0].JijMods) != 0 {
-		t.Fatalf("JijMods = %#v, want none when detection disabled", mods[0].JijMods)
+	if len(mods[0].JIJMods) != 0 {
+		t.Fatalf("JIJMods = %#v, want none when detection disabled", mods[0].JIJMods)
 	}
 }
 
-func TestParseJijCacheScopeFollowsToggle(t *testing.T) {
+func TestParseJIJCacheScopeFollowsToggle(t *testing.T) {
 	child := testJar(t, map[string][]byte{
 		"fabric.mod.json": []byte(`{
 			"schemaVersion": 1,
@@ -136,21 +136,21 @@ func TestParseJijCacheScopeFollowsToggle(t *testing.T) {
 		t.Fatalf("write jar: %v", err)
 	}
 
-	SetJijDetectionEnabled(true)
-	t.Cleanup(func() { SetJijDetectionEnabled(true) })
+	SetJIJDetectionEnabled(true)
+	t.Cleanup(func() { SetJIJDetectionEnabled(true) })
 
 	on := ParseLocalModJarWithSHA1(path, "jij-cache-scope-toggle", "fabric")
-	if len(on) != 1 || len(on[0].JijMods) == 0 {
-		t.Fatalf("JijMods with detection enabled = %#v, want nested entries", on)
+	if len(on) != 1 || len(on[0].JIJMods) == 0 {
+		t.Fatalf("JIJMods with detection enabled = %#v, want nested entries", on)
 	}
 
-	SetJijDetectionEnabled(false)
+	SetJIJDetectionEnabled(false)
 	off := ParseLocalModJarWithSHA1(path, "jij-cache-scope-toggle", "fabric")
 	if len(off) != 1 {
 		t.Fatalf("mods with detection disabled = %#v, want one mod", off)
 	}
-	if len(off[0].JijMods) != 0 {
-		t.Fatalf("JijMods after toggle = %#v, want the cached JIJ result to be bypassed", off[0].JijMods)
+	if len(off[0].JIJMods) != 0 {
+		t.Fatalf("JIJMods after toggle = %#v, want the cached JIJ result to be bypassed", off[0].JIJMods)
 	}
 }
 
@@ -396,10 +396,10 @@ mandatory=true
 		t.Fatalf("ParseModZipReader() ids = %#v, want %#v", got, want)
 	}
 
-	gotJij := jijModIDs(mods[0].JijMods)
-	wantJij := []string{"childforge"}
-	if !reflect.DeepEqual(gotJij, wantJij) {
-		t.Fatalf("ParseModZipReader() JijMods ids = %#v, want %#v", gotJij, wantJij)
+	gotJIJ := jijModIDs(mods[0].JIJMods)
+	wantJIJ := []string{"childforge"}
+	if !reflect.DeepEqual(gotJIJ, wantJIJ) {
+		t.Fatalf("ParseModZipReader() JIJMods ids = %#v, want %#v", gotJIJ, wantJIJ)
 	}
 }
 
@@ -481,10 +481,10 @@ type="optional"
 	}
 }
 
-// TestForgeJijModsAreAttachedToTopLevelMods verifies that top-level [[mods]]
+// TestForgeJIJModsAreAttachedToTopLevelMods verifies that top-level [[mods]]
 // entries stay in the returned ModInfo list while nested jar / JIJ entries are
-// attached to each top-level entry as JijMods.
-func TestForgeJijModsAreAttachedToTopLevelMods(t *testing.T) {
+// attached to each top-level entry as JIJMods.
+func TestForgeJIJModsAreAttachedToTopLevelMods(t *testing.T) {
 	// child JAR: declare two mods, only reachable as a JIJ from the host.
 	child := testJar(t, map[string][]byte{
 		"META-INF/mods.toml": []byte(`
@@ -524,16 +524,16 @@ displayName="Extra Mod declared in same mods.toml"
 	mods := ParseModZipReader(testZipReader(t, top), "top.jar", "forge")
 
 	wantStrong := []string{"topmod", "extramod"}
-	wantJij := []string{"childmod", "childmod-extra"}
+	wantJIJ := []string{"childmod", "childmod-extra"}
 
 	strongIDs := modIDs(mods)
 	if !reflect.DeepEqual(strongIDs, wantStrong) {
 		t.Errorf("strong modIDs = %#v, want %#v", strongIDs, wantStrong)
 	}
 	for _, mod := range mods {
-		jijIDs := jijModIDs(mod.JijMods)
-		if !reflect.DeepEqual(jijIDs, wantJij) {
-			t.Errorf("%s JijMods = %#v, want %#v", mod.ID, jijIDs, wantJij)
+		jijIDs := jijModIDs(mod.JIJMods)
+		if !reflect.DeepEqual(jijIDs, wantJIJ) {
+			t.Errorf("%s JIJMods = %#v, want %#v", mod.ID, jijIDs, wantJIJ)
 		}
 	}
 
@@ -548,7 +548,7 @@ displayName="Extra Mod declared in same mods.toml"
 	for _, id := range primary {
 		primarySet[id] = true
 	}
-	for _, id := range wantJij {
+	for _, id := range wantJIJ {
 		if primarySet[id] {
 			t.Errorf("PrimaryModIDs() unexpectedly contains JIJ modID %q", id)
 		}
@@ -702,7 +702,7 @@ func modIDs(mods []structs.ModInfo) []string {
 	return ids
 }
 
-func jijModIDs(mods []structs.JijModInfo) []string {
+func jijModIDs(mods []structs.JIJModInfo) []string {
 	ids := make([]string, 0, len(mods))
 	for _, mod := range mods {
 		ids = append(ids, mod.ID)

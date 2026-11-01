@@ -28,6 +28,7 @@ import (
 	"github.com/link-fgfgui/mod-downloader/core/storage"
 	appstructs "github.com/link-fgfgui/mod-downloader/core/structs"
 	mcstructs "github.com/link-fgfgui/mod-downloader/core/structs/minecraft"
+	appview "github.com/link-fgfgui/mod-downloader/core/structs/view"
 )
 
 // Button status constants shared by downloader and modbridge.
@@ -68,6 +69,8 @@ func init() {
 	preferredReleaseType.Store(0)
 }
 
+// ConfigurePreferredReleaseType sets the process-wide release channel used
+// when several versions match.
 func ConfigurePreferredReleaseType(value string) {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "alpha":
@@ -183,6 +186,8 @@ func ConfigureSimpleMode(enabled bool) {
 	backfillMu.Unlock()
 }
 
+// SimpleModeEnabled reports whether remote JAR metadata resolution is
+// disabled by simple mode.
 func SimpleModeEnabled() bool {
 	return simpleMode.Load()
 }
@@ -248,8 +253,8 @@ func ApplySelectedInstance(req appstructs.ModDownloadRequest) (appstructs.ModDow
 	if targetDir == "" || instanceID == "" {
 		return req, instanceID, targetDir, false
 	}
-	if mcVersion := strings.TrimSpace(selected.MinecraftVersion); mcVersion != "" {
-		req.MinecraftVersion = mcVersion
+	if minecraftVersion := strings.TrimSpace(selected.MinecraftVersion); minecraftVersion != "" {
+		req.MinecraftVersion = minecraftVersion
 	}
 	if loader := strings.ToLower(strings.TrimSpace(selected.ModLoader)); loader != "" && loader != "vanilla" {
 		req.ModLoader = loader
@@ -283,6 +288,8 @@ func ResolveInstallTarget(req appstructs.ModDownloadRequest) (appstructs.ModDown
 	return ApplySelectedInstance(req)
 }
 
+// InstanceIDForTargetDir derives the stable instance ID used for an explicit
+// target directory.
 func InstanceIDForTargetDir(targetDir string) string {
 	targetDir = cleanPath(targetDir)
 	if targetDir == "" {
@@ -462,7 +469,7 @@ func incompatibleConflicts(req appstructs.ModDownloadRequest, precise bool) []ap
 		if !IsDependencyType(dep, "incompatible") {
 			continue
 		}
-		depReq, ok := DependencyDownloadRequest(version.Platform, dep, req)
+		depReq, ok := BuildDependencyDownloadRequest(version.Platform, dep, req)
 		if !ok {
 			logging.Warn("incompatible dependency cannot be resolved", "platform", version.Platform, "projectID", dep.DependencyProjectID, "versionID", dep.DependencyVersionID, "type", dep.DependencyType)
 			continue
@@ -519,6 +526,8 @@ func incompatibleConflicts(req appstructs.ModDownloadRequest, precise bool) []ap
 	return conflicts
 }
 
+// AnalyzeBatchIncompatibleConflicts checks every project in a batch for local
+// incompatible mods.
 func AnalyzeBatchIncompatibleConflicts(req appstructs.BatchDownloadRequest) appstructs.BatchIncompatibleAnalysis {
 	req.MinecraftVersion = strings.TrimSpace(req.MinecraftVersion)
 	req.ModLoader = strings.ToLower(strings.TrimSpace(req.ModLoader))
@@ -556,20 +565,20 @@ func AnalyzeBatchIncompatibleConflicts(req appstructs.BatchDownloadRequest) apps
 // onBackfillComplete, when non-nil, is invoked once after any async remote
 // mod-ID backfills triggered by cache misses finish; callers use it to notify
 // the frontend to re-fetch states so the now-populated DB cache takes effect.
-func DownloadStates(req appstructs.DownloadStatesRequest, onBackfillComplete func()) []appstructs.ModDownloadButtonState {
+func DownloadStates(req appstructs.DownloadStatesRequest, onBackfillComplete func()) []appview.ModDownloadButtonState {
 	req.MinecraftVersion = strings.TrimSpace(req.MinecraftVersion)
 	req.ModLoader = strings.ToLower(strings.TrimSpace(req.ModLoader))
 	req.TargetDir = cleanPath(req.TargetDir)
 	req.InstanceID = strings.TrimSpace(req.InstanceID)
 	if SimpleModeEnabled() {
-		states := make([]appstructs.ModDownloadButtonState, len(req.Results))
+		states := make([]appview.ModDownloadButtonState, len(req.Results))
 		for i := range req.Results {
 			states[i] = defaultDownloadButtonState(req.Results[i])
 		}
 		return states
 	}
 
-	states := make([]appstructs.ModDownloadButtonState, len(req.Results))
+	states := make([]appview.ModDownloadButtonState, len(req.Results))
 	targetReq, instanceID, targetDir, ok := ResolveInstallTarget(appstructs.ModDownloadRequest{
 		MinecraftVersion: req.MinecraftVersion,
 		ModLoader:        req.ModLoader,
@@ -961,7 +970,7 @@ func PlatformMetadataForSHA1(sha1 string) (models.ModProject, models.ModVersion,
 		return models.ModProject{}, models.ModVersion{}, false
 	}
 
-	project, found := storage.GetModPlatform(version.Platform, version.ProjectID)
+	project, found := storage.GetModProject(version.Platform, version.ProjectID)
 	if !found {
 		return models.ModProject{}, version, false
 	}
@@ -1003,6 +1012,8 @@ func ApplyPlatformMetadataToModInfo(info mcstructs.ModInfo, project models.ModPr
 	return info
 }
 
+// ApplyPlatformMetadataToModInfos applies project and version metadata to
+// every mod record of a JAR.
 func ApplyPlatformMetadataToModInfos(mods []mcstructs.ModInfo, project models.ModProject, version models.ModVersion) []mcstructs.ModInfo {
 	if len(mods) == 0 {
 		return nil
@@ -1055,11 +1066,11 @@ func remoteHost(rawURL string) string {
 
 // --- private helpers ---
 
-func defaultDownloadButtonState(result models.ModProject) appstructs.ModDownloadButtonState {
-	return appstructs.ModDownloadButtonState{Key: providers.ProjectReferenceFromSearchResult(result), Status: BtnStatusNew, Icon: "mdi-download", Color: "primary"}
+func defaultDownloadButtonState(result models.ModProject) appview.ModDownloadButtonState {
+	return appview.ModDownloadButtonState{Key: providers.ProjectReferenceFromSearchResult(result), Status: BtnStatusNew, Icon: "mdi-download", Color: "primary"}
 }
 
-func applyButtonStatus(state *appstructs.ModDownloadButtonState, status string) {
+func applyButtonStatus(state *appview.ModDownloadButtonState, status string) {
 	state.Status = status
 	switch status {
 	case BtnStatusInstalled:
@@ -1087,7 +1098,9 @@ func applyButtonStatus(state *appstructs.ModDownloadButtonState, status string) 
 	}
 }
 
-func DependencyDownloadRequest(platform string, dep models.ModDependency, parent appstructs.ModDownloadRequest) (appstructs.ModDownloadRequest, bool) {
+// BuildDependencyDownloadRequest builds the child install request for one
+// dependency, inheriting the parent's target and game scope.
+func BuildDependencyDownloadRequest(platform string, dep models.ModDependency, parent appstructs.ModDownloadRequest) (appstructs.ModDownloadRequest, bool) {
 	projectID := strings.TrimSpace(dep.DependencyProjectID)
 	platform = strings.ToLower(strings.TrimSpace(platform))
 	if projectID == "" || (platform != "curseforge" && platform != "modrinth") {
@@ -1100,7 +1113,7 @@ func DependencyDownloadRequest(platform string, dep models.ModDependency, parent
 		Platform:  platform,
 		ProjectID: projectID,
 	}
-	if cached, ok := providers.GetProjectByID(ref); ok {
+	if cached, ok := providers.GetProjectByKey(ref); ok {
 		project = cached
 		if strings.TrimSpace(project.ID) == "" {
 			project.ID = ref
@@ -1123,6 +1136,8 @@ func DependencyDownloadRequest(platform string, dep models.ModDependency, parent
 	}, true
 }
 
+// IsDependencyType reports whether dep has the given dependency type,
+// case-insensitively.
 func IsDependencyType(dep models.ModDependency, dependencyType string) bool {
 	return strings.EqualFold(strings.TrimSpace(dep.DependencyType), dependencyType)
 }

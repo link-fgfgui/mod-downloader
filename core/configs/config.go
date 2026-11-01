@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 link-fgfgui
 // SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
 
+// Package configs loads, normalizes and persists the TOML/environment
+// configuration shared by every adapter.
 package configs
 
 import (
@@ -22,7 +24,7 @@ type loggingOnlyConfig struct {
 }
 
 type hardwareAccelerationConfig struct {
-	Prefers Preferences `toml:"preferences"`
+	Preferences Preferences `toml:"preferences"`
 }
 
 // AppConfigPath returns the path to the config file in pwd.
@@ -54,13 +56,13 @@ func Load() (*Config, error) {
 				return nil, fmt.Errorf("read env: %w", err)
 			}
 			cfg.Logging = cfg.Logging.Canonical()
-			logging.Info("config loaded from environment", "hasCurseforgeKey", cfg.Keys.CurseforgeApiKey != "", "hasModrinthKey", cfg.Keys.ModrinthApiKey != "", "minecraftDir", cfg.Prefers.MinecraftDir)
+			logging.Info("config loaded from environment", "hasCurseforgeKey", cfg.Keys.CurseForgeAPIKey != "", "hasModrinthKey", cfg.Keys.ModrinthAPIKey != "", "minecraftDir", cfg.Preferences.MinecraftDir)
 			return &cfg, nil
 		}
 		logging.Error("load config file failed", "path", path, "error", err)
 		return nil, fmt.Errorf("read config %s: %w", path, err)
 	}
-	if err := readHardwareAccelerationEnv(&cfg.Prefers); err != nil {
+	if err := readHardwareAccelerationEnv(&cfg.Preferences); err != nil {
 		return nil, fmt.Errorf("read hardware acceleration env: %w", err)
 	}
 	if err := readLoggingEnv(&cfg.Logging); err != nil {
@@ -68,7 +70,7 @@ func Load() (*Config, error) {
 	}
 
 	cfg.Logging = cfg.Logging.Canonical()
-	logging.Info("config loaded from file", "path", path, "hasCurseforgeKey", cfg.Keys.CurseforgeApiKey != "", "hasModrinthKey", cfg.Keys.ModrinthApiKey != "", "minecraftDir", cfg.Prefers.MinecraftDir)
+	logging.Info("config loaded from file", "path", path, "hasCurseforgeKey", cfg.Keys.CurseForgeAPIKey != "", "hasModrinthKey", cfg.Keys.ModrinthAPIKey != "", "minecraftDir", cfg.Preferences.MinecraftDir)
 	return &cfg, nil
 }
 
@@ -113,20 +115,20 @@ func LoadHardwareAcceleration() bool {
 			return DefaultHardwareAcceleration
 		}
 	}
-	if err := readHardwareAccelerationEnv(&cfg.Prefers); err != nil {
+	if err := readHardwareAccelerationEnv(&cfg.Preferences); err != nil {
 		return DefaultHardwareAcceleration
 	}
-	if cfg.Prefers.HardwareAcceleration == nil {
+	if cfg.Preferences.HardwareAcceleration == nil {
 		return DefaultHardwareAcceleration
 	}
-	return *cfg.Prefers.HardwareAcceleration
+	return *cfg.Preferences.HardwareAcceleration
 }
 
 func readEnv(cfg *Config) error {
 	if err := cleanenv.ReadEnv(cfg); err != nil {
 		return err
 	}
-	if err := readHardwareAccelerationEnv(&cfg.Prefers); err != nil {
+	if err := readHardwareAccelerationEnv(&cfg.Preferences); err != nil {
 		return err
 	}
 	return readLoggingEnv(&cfg.Logging)
@@ -174,7 +176,7 @@ func LoadEnv() (*Config, error) {
 		return nil, fmt.Errorf("read env: %w", err)
 	}
 	cfg.Logging = cfg.Logging.Canonical()
-	logging.Info("config loaded from environment", "hasCurseforgeKey", cfg.Keys.CurseforgeApiKey != "", "hasModrinthKey", cfg.Keys.ModrinthApiKey != "", "minecraftDir", cfg.Prefers.MinecraftDir, "cacheDir", cfg.Runtime.CacheDir)
+	logging.Info("config loaded from environment", "hasCurseforgeKey", cfg.Keys.CurseForgeAPIKey != "", "hasModrinthKey", cfg.Keys.ModrinthAPIKey != "", "minecraftDir", cfg.Preferences.MinecraftDir, "cacheDir", cfg.Runtime.CacheDir)
 	return &cfg, nil
 }
 
@@ -226,6 +228,6 @@ func Save(cfg *Config) error {
 	}
 	cleanup = false
 
-	logging.Debug("config saved", "path", path, "hasCurseforgeKey", cfg.Keys.CurseforgeApiKey != "", "hasModrinthKey", cfg.Keys.ModrinthApiKey != "", "minecraftDir", cfg.Prefers.MinecraftDir)
+	logging.Debug("config saved", "path", path, "hasCurseforgeKey", cfg.Keys.CurseForgeAPIKey != "", "hasModrinthKey", cfg.Keys.ModrinthAPIKey != "", "minecraftDir", cfg.Preferences.MinecraftDir)
 	return nil
 }

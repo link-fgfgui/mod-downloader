@@ -31,8 +31,8 @@ func (s *userStore) upsertPinnedMod(p PinnedMod) error {
 	return err
 }
 
-func (s *userStore) getPinnedMod(platform, modID, mcVersion, modLoader string) (PinnedMod, bool, error) {
-	key := makePinnedModKey(platform, modID, mcVersion, modLoader)
+func (s *userStore) getPinnedMod(platform, modID, minecraftVersion, modLoader string) (PinnedMod, bool, error) {
+	key := makePinnedModKey(platform, modID, minecraftVersion, modLoader)
 	if key.Platform == "" || key.ModID == "" || key.MinecraftVersion == "" || key.ModLoader == "" {
 		return PinnedMod{}, false, nil
 	}
@@ -53,8 +53,8 @@ func (s *userStore) getPinnedMod(platform, modID, mcVersion, modLoader string) (
 	return p, true, nil
 }
 
-func (s *userStore) deletePinnedMod(platform, modID, mcVersion, modLoader string) error {
-	key := makePinnedModKey(platform, modID, mcVersion, modLoader)
+func (s *userStore) deletePinnedMod(platform, modID, minecraftVersion, modLoader string) error {
+	key := makePinnedModKey(platform, modID, minecraftVersion, modLoader)
 	if key.Platform == "" || key.ModID == "" || key.MinecraftVersion == "" || key.ModLoader == "" {
 		return nil
 	}

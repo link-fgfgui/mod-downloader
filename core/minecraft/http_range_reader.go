@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 link-fgfgui
 // SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
 
+// Package minecraft detects installed instances, parses mod JAR metadata and
+// resolves version manifests for both launchers and mod loaders.
 package minecraft
 
 import (
@@ -18,7 +20,9 @@ import (
 	"github.com/link-fgfgui/mod-downloader/core/networking"
 )
 
-type httpRangeReaderAt struct {
+// HTTPRangeReaderAt reads remote files through HTTP range requests without
+// downloading the whole file first.
+type HTTPRangeReaderAt struct {
 	client        *http.Client
 	url           string
 	size          int64
@@ -27,15 +31,19 @@ type httpRangeReaderAt struct {
 	rangeBytes    atomic.Int64
 }
 
-func NewHTTPRangeReaderAt(url string) (*httpRangeReaderAt, error) {
+// NewHTTPRangeReaderAt probes url and returns a reader using the default
+// timeout.
+func NewHTTPRangeReaderAt(url string) (*HTTPRangeReaderAt, error) {
 	return newHTTPRangeReaderAt(url, 0)
 }
 
-func NewHTTPRangeReaderAtWithTimeout(url string, timeout time.Duration) (*httpRangeReaderAt, error) {
+// NewHTTPRangeReaderAtWithTimeout probes url and returns a reader whose
+// requests must finish within timeout.
+func NewHTTPRangeReaderAtWithTimeout(url string, timeout time.Duration) (*HTTPRangeReaderAt, error) {
 	return newHTTPRangeReaderAt(url, timeout)
 }
 
-func newHTTPRangeReaderAt(url string, timeout time.Duration) (*httpRangeReaderAt, error) {
+func newHTTPRangeReaderAt(url string, timeout time.Duration) (*HTTPRangeReaderAt, error) {
 	url = strings.TrimSpace(url)
 	if url == "" {
 		return nil, fmt.Errorf("empty url")
@@ -65,7 +73,7 @@ func newHTTPRangeReaderAt(url string, timeout time.Duration) (*httpRangeReaderAt
 		return nil, err
 	}
 
-	return &httpRangeReaderAt{
+	return &HTTPRangeReaderAt{
 		client:   client,
 		url:      resolvedURL,
 		size:     size,
@@ -159,16 +167,18 @@ func newDeadlineRequest(method string, url string, deadline time.Time) (*http.Re
 	return req, cancel, nil
 }
 
-func (r *httpRangeReaderAt) Size() int64 {
+// Size returns the remote file size.
+func (r *HTTPRangeReaderAt) Size() int64 {
 	return r.size
 }
 
 // RangeStats reports the number of range reads and payload bytes fetched.
-func (r *httpRangeReaderAt) RangeStats() (int64, int64) {
+func (r *HTTPRangeReaderAt) RangeStats() (int64, int64) {
 	return r.rangeRequests.Load(), r.rangeBytes.Load()
 }
 
-func (r *httpRangeReaderAt) ReadAt(p []byte, off int64) (int, error) {
+// ReadAt implements io.ReaderAt over HTTP range requests.
+func (r *HTTPRangeReaderAt) ReadAt(p []byte, off int64) (int, error) {
 	if !r.deadline.IsZero() && time.Now().After(r.deadline) {
 		return 0, context.DeadlineExceeded
 	}

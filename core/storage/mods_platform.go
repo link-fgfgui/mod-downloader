@@ -11,7 +11,9 @@ import (
 	"github.com/link-fgfgui/mod-downloader/core/models"
 )
 
-func UpsertModPlatform(p models.ModProject) error {
+// UpsertModProject caches a project, preserving richer metadata when a sparse
+// search hit arrives for an already-known project.
+func UpsertModProject(p models.ModProject) error {
 	d, err := readyDB()
 	if err != nil {
 		return err
@@ -57,7 +59,8 @@ func UpsertModPlatform(p models.ModProject) error {
 	return nil
 }
 
-func GetModPlatform(platform, projectID string) (models.ModProject, bool) {
+// GetModProject returns the cached project for a platform and project ID.
+func GetModProject(platform, projectID string) (models.ModProject, bool) {
 	d, err := readyDB()
 	if err != nil {
 		return models.ModProject{}, false
@@ -81,7 +84,8 @@ func GetModPlatform(platform, projectID string) (models.ModProject, bool) {
 	return copyProject(p), true
 }
 
-func GetModPlatformBySlug(platform, slug string) (models.ModProject, bool) {
+// GetModProjectBySlug returns the cached project with the given platform slug.
+func GetModProjectBySlug(platform, slug string) (models.ModProject, bool) {
 	d, err := readyDB()
 	if err != nil {
 		return models.ModProject{}, false
@@ -112,7 +116,8 @@ func GetModPlatformBySlug(platform, slug string) (models.ModProject, bool) {
 	return copyProject(p), true
 }
 
-func TouchModPlatform(platform, projectID string, updatedAt int64) error {
+// TouchModProject updates a cached project's fetch timestamp.
+func TouchModProject(platform, projectID string, updatedAt int64) error {
 	d, err := readyDB()
 	if err != nil {
 		return err
@@ -141,6 +146,8 @@ func TouchModPlatform(platform, projectID string, updatedAt int64) error {
 
 // --- platform associations ---
 
+// UpsertPlatformAssociation stores or updates a CurseForge/Modrinth project
+// association.
 func UpsertPlatformAssociation(a PlatformAssociation) error {
 	d, err := readyDB()
 	if err != nil {
@@ -165,6 +172,8 @@ func UpsertPlatformAssociation(a PlatformAssociation) error {
 	return nil
 }
 
+// UpsertPlatformAssociationByProjects links a CurseForge project ID to a
+// Modrinth project ID.
 func UpsertPlatformAssociationByProjects(curseForgeProjectID, modrinthProjectID string) error {
 	d, err := readyDB()
 	if err != nil {
@@ -205,6 +214,8 @@ func UpsertPlatformAssociationByProjects(curseForgeProjectID, modrinthProjectID 
 	return nil
 }
 
+// GetAssociationByCurseForge returns the association keyed by a CurseForge
+// project ID.
 func GetAssociationByCurseForge(cfProjectID string) (PlatformAssociation, bool) {
 	cfProjectID = strings.TrimSpace(cfProjectID)
 	return getAssociationBy(func(a PlatformAssociation) bool {
@@ -212,6 +223,8 @@ func GetAssociationByCurseForge(cfProjectID string) (PlatformAssociation, bool) 
 	}, "curseforgeProjectID", cfProjectID)
 }
 
+// GetAssociationByModrinth returns the association keyed by a Modrinth project
+// ID.
 func GetAssociationByModrinth(mrProjectID string) (PlatformAssociation, bool) {
 	mrProjectID = strings.TrimSpace(mrProjectID)
 	return getAssociationBy(func(a PlatformAssociation) bool {
@@ -244,6 +257,8 @@ func getAssociationBy(match func(PlatformAssociation) bool, logKey string, logVa
 	return out, true
 }
 
+// GetLatestProjectBySHA1 returns the newest cached project version whose file
+// matches sha1.
 func GetLatestProjectBySHA1(platform, sha1 string) (models.ModVersion, bool) {
 	d, err := readyDB()
 	if err != nil {
@@ -327,6 +342,8 @@ func GetVersionBySHA1(platform, sha1 string) (models.ModVersion, bool) {
 	return best, true
 }
 
+// GetLocalMetadataMissCheckedAt returns when a local metadata lookup last
+// missed for the given provider identity.
 func GetLocalMetadataMissCheckedAt(provider, identity string) (int64, bool) {
 	d, err := readyDB()
 	if err != nil {
@@ -346,6 +363,7 @@ func GetLocalMetadataMissCheckedAt(provider, identity string) (int64, bool) {
 	return checkedAt, err == nil && found
 }
 
+// SetLocalMetadataMisses records local metadata lookup misses at checkedAt.
 func SetLocalMetadataMisses(provider string, identities []string, checkedAt int64) error {
 	d, err := readyDB()
 	if err != nil {
@@ -387,6 +405,8 @@ func makeLocalMetadataMissKey(provider, identity string) localMetadataMissKey {
 	}
 }
 
+// GetMinecraftReleaseVersions returns the cached release version IDs and their
+// fetch timestamp.
 func GetMinecraftReleaseVersions() ([]string, int64) {
 	d, err := readyDB()
 	if err != nil {
@@ -404,6 +424,8 @@ func GetMinecraftReleaseVersions() ([]string, int64) {
 	return versions, updatedAt
 }
 
+// SetMinecraftReleaseVersions caches the official release version IDs and
+// their fetch timestamp.
 func SetMinecraftReleaseVersions(versions []string, updatedAt int64) error {
 	d, err := readyDB()
 	if err != nil {

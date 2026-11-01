@@ -303,7 +303,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   async saveJijDetectionSettings() {
     set({ isSavingJijDetection: true, error: "" });
     try {
-      const view = await api.SaveJijDetectionSettings({ enableJijDetection: get().draftEnableJijDetection });
+      const view = await api.SaveJIJDetectionSettings({ enableJijDetection: get().draftEnableJijDetection });
       set({ settings: view, draftEnableJijDetection: view.enableJijDetection });
       return view;
     } finally {
@@ -377,7 +377,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     const clearModrinth = get().clearModrinthKey;
     set({ isSavingKeys: true, error: "" });
     try {
-      const view = await api.SaveApiKeys({
+      const view = await api.SaveAPIKeys({
         curseforgeApiKey: clearCurseforge ? "" : curseforgeDraft || apiKeyKeepSentinel,
         modrinthApiKey: clearModrinth ? "" : modrinthDraft || apiKeyKeepSentinel,
       });

@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 link-fgfgui
 // SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
 
+// Package global owns the process-wide Minecraft directory, version cache and
+// provider client singletons shared by every adapter.
 package global
 
 import (
@@ -14,32 +16,32 @@ import (
 )
 
 var (
-	mu                       sync.RWMutex
-	mcDir                    string
-	versionsMinecraftDir     string
-	versions                 []structs.VersionInfo
-	versionMap               map[string]structs.VersionInfo
-	minecraftReleaseVersions []string
-	curseforgeClient         *curseforge.Client
-	modrinthClient           *modrinth.Client
-	selectedVersionKey       string
-	selectedVersionDir       string
+	mu                          sync.RWMutex
+	minecraftDir                string
+	cachedVersionsMinecraftDir  string
+	versions                    []structs.VersionInfo
+	versionMap                  map[string]structs.VersionInfo
+	minecraftReleaseVersions    []string
+	curseforgeClient            *curseforge.Client
+	modrinthClient              *modrinth.Client
+	selectedVersionKey          string
+	selectedVersionMinecraftDir string
 )
 
 // GetMinecraftDir returns the currently selected .minecraft directory.
 func GetMinecraftDir() string {
 	mu.RLock()
 	defer mu.RUnlock()
-	logging.Debug("global minecraft dir read", "minecraftDir", mcDir)
-	return mcDir
+	logging.Debug("global minecraft dir read", "minecraftDir", minecraftDir)
+	return minecraftDir
 }
 
 // SetMinecraftDir sets the selected .minecraft directory.
 func SetMinecraftDir(dir string) {
 	mu.Lock()
 	defer mu.Unlock()
-	previous := mcDir
-	mcDir = dir
+	previous := minecraftDir
+	minecraftDir = dir
 	logging.Info("global minecraft dir set", "previousDir", previous, "minecraftDir", dir)
 }
 
@@ -47,7 +49,7 @@ func SetMinecraftDir(dir string) {
 func GetVersions() []structs.VersionInfo {
 	mu.RLock()
 	defer mu.RUnlock()
-	logging.Debug("global versions read", "minecraftDir", versionsMinecraftDir, "versionCount", len(versions))
+	logging.Debug("global versions read", "minecraftDir", cachedVersionsMinecraftDir, "versionCount", len(versions))
 	return versions
 }
 
@@ -55,8 +57,8 @@ func GetVersions() []structs.VersionInfo {
 func GetVersionsForDir(dir string) ([]structs.VersionInfo, bool) {
 	mu.RLock()
 	defer mu.RUnlock()
-	if versionsMinecraftDir == "" || versionsMinecraftDir != dir {
-		logging.Debug("global versions cache miss", "requestedDir", dir, "cacheDir", versionsMinecraftDir)
+	if cachedVersionsMinecraftDir == "" || cachedVersionsMinecraftDir != dir {
+		logging.Debug("global versions cache miss", "requestedDir", dir, "cacheDir", cachedVersionsMinecraftDir)
 		return nil, false
 	}
 	logging.Debug("global versions cache hit", "minecraftDir", dir, "versionCount", len(versions))
@@ -67,7 +69,7 @@ func GetVersionsForDir(dir string) ([]structs.VersionInfo, bool) {
 func SetVersions(v []structs.VersionInfo) {
 	mu.Lock()
 	defer mu.Unlock()
-	setVersionsLocked(mcDir, v)
+	setVersionsLocked(minecraftDir, v)
 }
 
 // SetVersionsForDir updates the cached version list for dir.
@@ -78,7 +80,7 @@ func SetVersionsForDir(dir string, v []structs.VersionInfo) {
 }
 
 func setVersionsLocked(dir string, v []structs.VersionInfo) {
-	versionsMinecraftDir = dir
+	cachedVersionsMinecraftDir = dir
 	versions = v
 	versionMap = make(map[string]structs.VersionInfo, len(v)*2)
 	for _, version := range v {
@@ -91,10 +93,10 @@ func setVersionsLocked(dir string, v []structs.VersionInfo) {
 	}
 	if len(v) == 0 {
 		selectedVersionKey = ""
-		selectedVersionDir = ""
-	} else if selectedVersionDir != dir {
+		selectedVersionMinecraftDir = ""
+	} else if selectedVersionMinecraftDir != dir {
 		selectedVersionKey = ""
-		selectedVersionDir = dir
+		selectedVersionMinecraftDir = dir
 	} else if selectedVersionKey != "" {
 		if _, ok := versionMap[selectedVersionKey]; !ok {
 			selectedVersionKey = ""
@@ -114,14 +116,16 @@ func versionKey(version structs.VersionInfo) string {
 func InvalidateVersions() {
 	mu.Lock()
 	defer mu.Unlock()
-	previousDir := versionsMinecraftDir
+	previousDir := cachedVersionsMinecraftDir
 	previousCount := len(versions)
-	versionsMinecraftDir = ""
+	cachedVersionsMinecraftDir = ""
 	versions = nil
 	versionMap = nil
 	logging.Info("global versions cache invalidated", "previousDir", previousDir, "previousVersionCount", previousCount)
 }
 
+// GetVersionByKey returns the cached version with the given ID or display
+// name.
 func GetVersionByKey(key string) (structs.VersionInfo, bool) {
 	mu.RLock()
 	defer mu.RUnlock()
@@ -130,27 +134,31 @@ func GetVersionByKey(key string) (structs.VersionInfo, bool) {
 	return version, ok
 }
 
+// GetSelectedVersion returns the selected instance, or the zero value when the
+// selection belongs to another Minecraft directory.
 func GetSelectedVersion() structs.VersionInfo {
 	mu.RLock()
 	defer mu.RUnlock()
-	if selectedVersionDir != mcDir || selectedVersionKey == "" {
-		logging.Debug("global selected version read", "hit", false, "key", selectedVersionKey, "minecraftDir", mcDir, "selectedDir", selectedVersionDir)
+	if selectedVersionMinecraftDir != minecraftDir || selectedVersionKey == "" {
+		logging.Debug("global selected version read", "hit", false, "key", selectedVersionKey, "minecraftDir", minecraftDir, "selectedDir", selectedVersionMinecraftDir)
 		return structs.VersionInfo{}
 	}
 	if version, ok := versionMap[selectedVersionKey]; ok {
 		logging.Debug("global selected version read", "hit", true, "key", selectedVersionKey, "id", version.ID, "name", version.Name, "modLoader", version.ModLoader)
 		return version
 	}
-	logging.Debug("global selected version read", "hit", false, "key", selectedVersionKey, "minecraftDir", mcDir)
+	logging.Debug("global selected version read", "hit", false, "key", selectedVersionKey, "minecraftDir", minecraftDir)
 	return structs.VersionInfo{}
 }
 
+// SetSelectedVersion records the selected instance and refreshes its cached
+// entry when the instance is already known.
 func SetSelectedVersion(version structs.VersionInfo) {
 	mu.Lock()
 	defer mu.Unlock()
 	previousKey := selectedVersionKey
 	selectedVersionKey = versionKey(version)
-	selectedVersionDir = mcDir
+	selectedVersionMinecraftDir = minecraftDir
 	if _, ok := versionMap[selectedVersionKey]; ok {
 		for i := range versions {
 			if versionKey(versions[i]) == selectedVersionKey {
@@ -165,7 +173,7 @@ func SetSelectedVersion(version structs.VersionInfo) {
 			versionMap[version.ID] = version
 		}
 	}
-	logging.Debug("global selected version set", "previousKey", previousKey, "key", selectedVersionKey, "minecraftDir", selectedVersionDir)
+	logging.Debug("global selected version set", "previousKey", previousKey, "key", selectedVersionKey, "minecraftDir", selectedVersionMinecraftDir)
 }
 
 // GetMinecraftReleaseVersions returns the cached official Minecraft release ids.
@@ -184,6 +192,7 @@ func SetMinecraftReleaseVersions(versions []string) {
 	logging.Info("global minecraft release versions set", "versionCount", len(versions))
 }
 
+// GetCurseForgeClient returns the configured CurseForge client, or nil.
 func GetCurseForgeClient() *curseforge.Client {
 	mu.RLock()
 	defer mu.RUnlock()
@@ -191,6 +200,7 @@ func GetCurseForgeClient() *curseforge.Client {
 	return curseforgeClient
 }
 
+// SetCurseForgeClient installs the process-wide CurseForge client.
 func SetCurseForgeClient(client *curseforge.Client) {
 	mu.Lock()
 	defer mu.Unlock()
@@ -198,6 +208,7 @@ func SetCurseForgeClient(client *curseforge.Client) {
 	logging.Info("global curseforge client set", "configured", client != nil)
 }
 
+// GetModrinthClient returns the configured Modrinth client, or nil.
 func GetModrinthClient() *modrinth.Client {
 	mu.RLock()
 	defer mu.RUnlock()
@@ -205,6 +216,7 @@ func GetModrinthClient() *modrinth.Client {
 	return modrinthClient
 }
 
+// SetModrinthClient installs the process-wide Modrinth client.
 func SetModrinthClient(client *modrinth.Client) {
 	mu.Lock()
 	defer mu.Unlock()

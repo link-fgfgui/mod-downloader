@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 link-fgfgui
 // SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
 
+// Package downloader owns the download queue, dependency expansion, retries
+// and optional-dependency reminders.
 package downloader
 
 import (
@@ -16,6 +18,8 @@ import (
 
 const discardBufferSize = 32 * 1024
 
+// DiscardFetchFromNetwork performs a background GET and discards the body so
+// the CDN can warm the artifact before the real download starts.
 func DiscardFetchFromNetwork(downloadURL string, curseForgeAPIKey string, userAgent ...string) {
 	downloadURL = strings.TrimSpace(downloadURL)
 	if downloadURL == "" {

@@ -12,8 +12,10 @@ import (
 	"sync/atomic"
 )
 
+// BackendKind identifies a file-transfer implementation.
 type BackendKind string
 
+// Supported transfer backends and their defaults.
 const (
 	BackendStdlib BackendKind = "stdlib"
 
@@ -23,6 +25,7 @@ const (
 	defaultFileMode    = 0o644
 )
 
+// Request describes one file download.
 type Request struct {
 	URL         string
 	Destination string
@@ -39,13 +42,16 @@ type Request struct {
 	OverwriteExisting    bool
 }
 
+// Progress is the byte-level snapshot reported during a transfer.
 type Progress struct {
 	BytesComplete int64
 	TotalBytes    int64
 }
 
+// ProgressCallback receives throttled transfer progress snapshots.
 type ProgressCallback func(Progress)
 
+// ProgressTracker atomically tracks transfer bytes and notifies the callback.
 type ProgressTracker struct {
 	complete atomic.Int64
 	total    atomic.Int64
@@ -53,10 +59,12 @@ type ProgressTracker struct {
 	callback ProgressCallback
 }
 
+// NewProgressTracker returns a tracker that reports to callback.
 func NewProgressTracker(callback ProgressCallback) *ProgressTracker {
 	return &ProgressTracker{callback: callback}
 }
 
+// Snapshot returns the current byte counts.
 func (p *ProgressTracker) Snapshot() Progress {
 	if p == nil {
 		return Progress{}
@@ -64,6 +72,7 @@ func (p *ProgressTracker) Snapshot() Progress {
 	return Progress{BytesComplete: p.complete.Load(), TotalBytes: p.total.Load()}
 }
 
+// Reset starts a new transfer of total bytes.
 func (p *ProgressTracker) Reset(total int64) {
 	if p == nil {
 		return
@@ -73,6 +82,7 @@ func (p *ProgressTracker) Reset(total int64) {
 	p.notify()
 }
 
+// SetComplete overwrites the completed byte count.
 func (p *ProgressTracker) SetComplete(complete int64) {
 	if p == nil {
 		return
@@ -81,6 +91,7 @@ func (p *ProgressTracker) SetComplete(complete int64) {
 	p.notify()
 }
 
+// AddComplete adds delta bytes to the completed count.
 func (p *ProgressTracker) AddComplete(delta int64) {
 	if p == nil || delta == 0 {
 		return
@@ -98,6 +109,8 @@ func (p *ProgressTracker) notify() {
 	}
 }
 
+// Result reports where a completed download was written and whether the
+// server honored ranged requests.
 type Result struct {
 	Path           string
 	BytesComplete  int64
@@ -105,11 +118,14 @@ type Result struct {
 	RangeSupported bool
 }
 
+// Backend is a pluggable file-transfer implementation.
 type Backend interface {
 	Kind() BackendKind
 	Download(context.Context, Request, *ProgressTracker) (Result, error)
 }
 
+// New returns the backend registered for kind, defaulting to the stdlib
+// backend for an empty value.
 func New(kind BackendKind) (Backend, error) {
 	switch BackendKind(strings.ToLower(strings.TrimSpace(string(kind)))) {
 	case "", BackendStdlib:

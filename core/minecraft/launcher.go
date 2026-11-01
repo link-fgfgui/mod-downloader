@@ -48,7 +48,7 @@ func launcherLayoutFor(root string) launcherLayout {
 
 type standardMinecraftLayout struct{}
 
-func (standardMinecraftLayout) Matches(root string) bool {
+func (standardMinecraftLayout) Matches(_ string) bool {
 	return false
 }
 
@@ -115,4 +115,39 @@ func (prismLayout) VersionDir(root string, version structs.VersionInfo) string {
 		return versionDir
 	}
 	return gameDir
+}
+
+// LoadGameDirVersions scans <gameDir>/versions and returns the instances whose
+// manifest declares a supported mod loader. It is the default
+// GameDirVersionLoader for LoadLauncherVersions.
+func LoadGameDirVersions(gameDir string) []structs.VersionInfo {
+	versionsDir := filepath.Join(gameDir, "versions")
+	entries, err := os.ReadDir(versionsDir)
+	if err != nil {
+		return nil
+	}
+	infos := make([]structs.VersionInfo, 0, len(entries))
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		versionID := entry.Name()
+		info, ok := CheckManifest(filepath.Join(versionsDir, versionID, versionID+".json"))
+		if !ok || !ValidInstance(info) {
+			continue
+		}
+		infos = append(infos, info)
+	}
+	return infos
+}
+
+// ValidInstance reports whether an entry is a modded instance the downloader
+// can install into.
+func ValidInstance(version structs.VersionInfo) bool {
+	switch strings.ToLower(strings.TrimSpace(version.ModLoader)) {
+	case "fabric", "forge", "neoforge":
+		return strings.TrimSpace(version.MinecraftVersion) != ""
+	default:
+		return false
+	}
 }

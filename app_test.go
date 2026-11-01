@@ -13,6 +13,7 @@ import (
 	"github.com/link-fgfgui/mod-downloader/core/appcore"
 	"github.com/link-fgfgui/mod-downloader/core/configs"
 	"github.com/link-fgfgui/mod-downloader/core/global"
+	"github.com/link-fgfgui/mod-downloader/core/host"
 	"github.com/link-fgfgui/mod-downloader/core/storage"
 	appstructs "github.com/link-fgfgui/mod-downloader/core/structs"
 	structs "github.com/link-fgfgui/mod-downloader/core/structs/minecraft"
@@ -22,7 +23,11 @@ const apiKeyKeepSentinel = appcore.APIKeyKeepSentinel
 
 func newTestApp(t *testing.T, cfg *configs.Config) *App {
 	t.Helper()
-	return &App{core: appcore.New(appcore.Options{Config: cfg, Runtime: appRuntimeOptions()})}
+	runtime := appcore.RuntimeOptions{}
+	if wd, err := os.Getwd(); err == nil {
+		runtime.DefaultCacheDir = wd
+	}
+	return &App{host: host.NewWithService(appcore.New(appcore.Options{Config: cfg, Runtime: runtime}))}
 }
 
 // Test-only shims around core helpers that are otherwise not exposed by App.
@@ -286,9 +291,9 @@ func TestMaskKey(t *testing.T) {
 func TestGetSettingsMasksKeys(t *testing.T) {
 	app := newTestApp(t, &configs.Config{
 		Keys: configs.APIKeys{
-			CurseforgeApiKey: "abcd1234wxyz",
+			CurseForgeAPIKey: "abcd1234wxyz",
 		},
-		Prefers: configs.Preferences{Theme: configs.ThemeSystem},
+		Preferences: configs.Preferences{Theme: configs.ThemeSystem},
 	})
 	sv := app.GetSettings()
 	if sv.Theme != "system" {
@@ -297,11 +302,11 @@ func TestGetSettingsMasksKeys(t *testing.T) {
 	if sv.AnimationDurationMultiplier != configs.DefaultAnimationDurationMultiplier {
 		t.Fatalf("AnimationDurationMultiplier = %v, want %v", sv.AnimationDurationMultiplier, configs.DefaultAnimationDurationMultiplier)
 	}
-	if !sv.HasCurseforgeKey {
-		t.Fatal("HasCurseforgeKey = false, want true")
+	if !sv.HasCurseForgeKey {
+		t.Fatal("HasCurseForgeKey = false, want true")
 	}
-	if sv.CurseforgeKeyMask != "abcd****wxyz" {
-		t.Fatalf("CurseforgeKeyMask = %q, want abcd****wxyz", sv.CurseforgeKeyMask)
+	if sv.CurseForgeKeyMask != "abcd****wxyz" {
+		t.Fatalf("CurseForgeKeyMask = %q, want abcd****wxyz", sv.CurseForgeKeyMask)
 	}
 	if sv.HasModrinthKey {
 		t.Fatal("HasModrinthKey = true, want false")
@@ -312,7 +317,7 @@ func TestGetSettingsMasksKeys(t *testing.T) {
 
 	appEmpty := newTestApp(t, &configs.Config{})
 	svEmpty := appEmpty.GetSettings()
-	if svEmpty.HasCurseforgeKey || svEmpty.CurseforgeKeyMask != "" {
+	if svEmpty.HasCurseForgeKey || svEmpty.CurseForgeKeyMask != "" {
 		t.Fatalf("empty key view = %#v", svEmpty)
 	}
 }
@@ -392,8 +397,8 @@ func TestSaveThemePersistsAndNormalizes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if loaded.Prefers.Theme.String() != "system" {
-		t.Fatalf("persisted theme = %q, want system", loaded.Prefers.Theme.String())
+	if loaded.Preferences.Theme.String() != "system" {
+		t.Fatalf("persisted theme = %q, want system", loaded.Preferences.Theme.String())
 	}
 }
 
@@ -427,7 +432,7 @@ func TestSaveLanguagePersistsAndNormalizes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := loaded.Prefers.Language.Normalized(); got != configs.LanguageChinese {
+	if got := loaded.Preferences.Language.Normalized(); got != configs.LanguageChinese {
 		t.Fatalf("persisted language = %q, want zh", got)
 	}
 }
@@ -468,12 +473,12 @@ func TestSaveAnimationSettingsPersistsAndNormalizes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if loaded.Prefers.NormalizedAnimationDurationMultiplier() != configs.MaxAnimationDurationMultiplier {
-		t.Fatalf("persisted animation multiplier = %v, want %v", loaded.Prefers.NormalizedAnimationDurationMultiplier(), configs.MaxAnimationDurationMultiplier)
+	if loaded.Preferences.NormalizedAnimationDurationMultiplier() != configs.MaxAnimationDurationMultiplier {
+		t.Fatalf("persisted animation multiplier = %v, want %v", loaded.Preferences.NormalizedAnimationDurationMultiplier(), configs.MaxAnimationDurationMultiplier)
 	}
 }
 
-func TestSaveApiKeysKeepSentinel(t *testing.T) {
+func TestSaveAPIKeysKeepSentinel(t *testing.T) {
 	oldwd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
@@ -489,23 +494,23 @@ func TestSaveApiKeysKeepSentinel(t *testing.T) {
 	})
 
 	app := newTestApp(t, &configs.Config{
-		Keys: configs.APIKeys{CurseforgeApiKey: "secret-key-1234"},
+		Keys: configs.APIKeys{CurseForgeAPIKey: "secret-key-1234"},
 	})
 
-	sv := app.SaveApiKeys(appstructs.SaveApiKeysRequest{CurseforgeApiKey: apiKeyKeepSentinel})
-	if !sv.HasCurseforgeKey {
+	sv := app.SaveAPIKeys(appstructs.SaveAPIKeysRequest{CurseForgeAPIKey: apiKeyKeepSentinel})
+	if !sv.HasCurseForgeKey {
 		t.Fatal("keep sentinel should preserve key")
 	}
-	if app.core.Config().Keys.CurseforgeApiKey != "secret-key-1234" {
-		t.Fatalf("key changed unexpectedly: %q", app.core.Config().Keys.CurseforgeApiKey)
+	if app.host.Config().Keys.CurseForgeAPIKey != "secret-key-1234" {
+		t.Fatalf("key changed unexpectedly: %q", app.host.Config().Keys.CurseForgeAPIKey)
 	}
 
-	sv = app.SaveApiKeys(appstructs.SaveApiKeysRequest{CurseforgeApiKey: ""})
-	if sv.HasCurseforgeKey {
+	sv = app.SaveAPIKeys(appstructs.SaveAPIKeysRequest{CurseForgeAPIKey: ""})
+	if sv.HasCurseForgeKey {
 		t.Fatal("empty key should clear")
 	}
-	if app.core.Config().Keys.CurseforgeApiKey != "" {
-		t.Fatalf("key not cleared: %q", app.core.Config().Keys.CurseforgeApiKey)
+	if app.host.Config().Keys.CurseForgeAPIKey != "" {
+		t.Fatalf("key not cleared: %q", app.host.Config().Keys.CurseForgeAPIKey)
 	}
 }
 

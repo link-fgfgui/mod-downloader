@@ -39,8 +39,13 @@ const maxBodyBytes = 4 << 20 // 4 MiB
 // and returns one result per payload in the same order.
 type AcceptFunc func([]appstructs.ExtensionProjectPayload) []appstructs.ModDownloadResult
 
+// Options configures the extension HTTP server.
 type Options struct {
 	Accept AcceptFunc
+	// Listener optionally supplies an already-bound socket. The single-instance
+	// guard binds the extension port before the window exists, so the HTTP
+	// server must serve on that listener instead of binding Addr again.
+	Listener net.Listener
 }
 
 // Server is the HTTP server accepting extension scan results.
@@ -85,9 +90,13 @@ func (s *Server) Start() error {
 		WriteTimeout:      15 * time.Second,
 	}
 
-	ln, err := net.Listen("tcp", s.addr)
-	if err != nil {
-		return fmt.Errorf("listen %s: %w", s.addr, err)
+	ln := s.options.Listener
+	if ln == nil {
+		var err error
+		ln, err = net.Listen("tcp", s.addr)
+		if err != nil {
+			return fmt.Errorf("listen %s: %w", s.addr, err)
+		}
 	}
 	s.listenAddr = ln.Addr().String()
 

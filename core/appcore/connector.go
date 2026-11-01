@@ -1,6 +1,9 @@
 // SPDX-FileCopyrightText: 2026 link-fgfgui
 // SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
 
+// Package appcore is the adapter-neutral business facade shared by the Wails
+// GUI and the tview TUI. It owns provider access, the download queue, storage
+// and settings normalization.
 package appcore
 
 import (
@@ -73,6 +76,8 @@ func normalizeLoader(loader string) string {
 	return strings.ToLower(strings.TrimSpace(loader))
 }
 
+// ToggleConnectorLoader switches the selected Forge/NeoForge instance between
+// its real loader and the virtual Fabric Connector view.
 func (s *Service) ToggleConnectorLoader() (structs.VersionInfo, error) {
 	selected := global.GetSelectedVersion()
 	if selected.ID == "" && selected.Name == "" {
