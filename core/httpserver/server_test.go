@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 link-fgfgui
+// SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
+
 package httpserver
 
 import (
@@ -13,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	appstructs "github.com/link-fgfgui/mod-downloader-core/structs"
+	appstructs "github.com/link-fgfgui/mod-downloader/core/structs"
 )
 
 func TestHealthEndpoint(t *testing.T) {
@@ -166,9 +169,9 @@ func TestRootAcceptsEmptyArray(t *testing.T) {
 // adapter must not reach into global, provider or storage state.
 func TestPackageStaysTransportOnly(t *testing.T) {
 	forbidden := map[string]bool{
-		"github.com/link-fgfgui/mod-downloader-core/global":    true,
-		"github.com/link-fgfgui/mod-downloader-core/providers": true,
-		"github.com/link-fgfgui/mod-downloader-core/storage":   true,
+		"github.com/link-fgfgui/mod-downloader/core/global":    true,
+		"github.com/link-fgfgui/mod-downloader/core/providers": true,
+		"github.com/link-fgfgui/mod-downloader/core/storage":   true,
 	}
 	files, err := filepath.Glob("*.go")
 	if err != nil {

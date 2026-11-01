@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 link-fgfgui
+// SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
+
 package minecraft
 
 import (
@@ -6,10 +9,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/link-fgfgui/mod-downloader-core/global"
-	"github.com/link-fgfgui/mod-downloader-core/logging"
-	"github.com/link-fgfgui/mod-downloader-core/networking"
-	structs "github.com/link-fgfgui/mod-downloader-core/structs/minecraft"
+	"github.com/link-fgfgui/mod-downloader/core/global"
+	"github.com/link-fgfgui/mod-downloader/core/logging"
+	"github.com/link-fgfgui/mod-downloader/core/networking"
+	structs "github.com/link-fgfgui/mod-downloader/core/structs/minecraft"
 )
 
 const minecraftVersionManifestURL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"

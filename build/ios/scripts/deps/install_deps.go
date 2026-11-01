@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 link-fgfgui
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // install_deps.go - iOS development dependency checker
 // This script checks for required iOS development tools.
 // It's designed to be portable across different shells by using Go instead of shell scripts.

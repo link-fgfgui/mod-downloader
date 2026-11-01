@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 link-fgfgui
+// SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
+
 package configs
 
 import (
@@ -163,8 +166,8 @@ func (p Preferences) EnableJijDetectionValue() bool {
 }
 
 // HardwareAccelerationValue reports whether the webview should force GPU
-// rendering. It is read before the Wails window exists, so changing it only
-// takes effect on the next launch.
+// rendering. It defaults to true and is read before the Wails window exists,
+// so changing it only takes effect on the next launch.
 func (p Preferences) HardwareAccelerationValue() bool {
 	if p.HardwareAcceleration == nil {
 		return DefaultHardwareAcceleration

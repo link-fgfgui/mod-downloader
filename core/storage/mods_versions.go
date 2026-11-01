@@ -1,11 +1,14 @@
+// SPDX-FileCopyrightText: 2026 link-fgfgui
+// SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
+
 package storage
 
 import (
 	"sort"
 	"strings"
 
-	"github.com/link-fgfgui/mod-downloader-core/logging"
-	"github.com/link-fgfgui/mod-downloader-core/models"
+	"github.com/link-fgfgui/mod-downloader/core/logging"
+	"github.com/link-fgfgui/mod-downloader/core/models"
 )
 
 func SetPlatformVersions(platform, projectID string, versions []models.ModVersion) error {

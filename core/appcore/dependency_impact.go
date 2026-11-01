@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 link-fgfgui
+// SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
+
 package appcore
 
 import (
@@ -5,11 +8,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/link-fgfgui/mod-downloader-core/global"
-	"github.com/link-fgfgui/mod-downloader-core/models"
-	"github.com/link-fgfgui/mod-downloader-core/storage"
-	appstructs "github.com/link-fgfgui/mod-downloader-core/structs"
-	mcstructs "github.com/link-fgfgui/mod-downloader-core/structs/minecraft"
+	"github.com/link-fgfgui/mod-downloader/core/global"
+	"github.com/link-fgfgui/mod-downloader/core/models"
+	"github.com/link-fgfgui/mod-downloader/core/storage"
+	appstructs "github.com/link-fgfgui/mod-downloader/core/structs"
+	mcstructs "github.com/link-fgfgui/mod-downloader/core/structs/minecraft"
 )
 
 var queueRestoredCachedDependency = func(s *Service, req appstructs.ModDownloadRequest) appstructs.ModDownloadResult {

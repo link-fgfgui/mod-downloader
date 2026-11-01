@@ -1,1 +1,1 @@
-export { App as api } from "../../bindings/mod-downloader";
+export { App as api } from "../../bindings/github.com/link-fgfgui/mod-downloader";

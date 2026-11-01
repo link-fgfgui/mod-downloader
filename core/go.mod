@@ -1,4 +1,4 @@
-module github.com/link-fgfgui/mod-downloader-core
+module github.com/link-fgfgui/mod-downloader/core
 
 go 1.24.0
 

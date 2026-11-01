@@ -12,19 +12,19 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as appcore$0 from "../github.com/link-fgfgui/mod-downloader-core/appcore/models.js";
+import * as appcore$0 from "./core/appcore/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as models$0 from "../github.com/link-fgfgui/mod-downloader-core/models/models.js";
+import * as models$0 from "./core/models/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as storage$0 from "../github.com/link-fgfgui/mod-downloader-core/storage/models.js";
+import * as storage$0 from "./core/storage/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as structs$0 from "../github.com/link-fgfgui/mod-downloader-core/structs/models.js";
+import * as structs$0 from "./core/structs/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as structs$1 from "../github.com/link-fgfgui/mod-downloader-core/structs/minecraft/models.js";
+import * as structs$1 from "./core/structs/minecraft/models.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports

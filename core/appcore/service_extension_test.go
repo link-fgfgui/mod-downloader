@@ -1,10 +1,13 @@
+// SPDX-FileCopyrightText: 2026 link-fgfgui
+// SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
+
 package appcore
 
 import (
 	"strings"
 	"testing"
 
-	appstructs "github.com/link-fgfgui/mod-downloader-core/structs"
+	appstructs "github.com/link-fgfgui/mod-downloader/core/structs"
 )
 
 func TestAcceptExtensionProjectsRejectsInvalidPayloads(t *testing.T) {

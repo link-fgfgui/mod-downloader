@@ -1,14 +1,17 @@
+// SPDX-FileCopyrightText: 2026 link-fgfgui
+// SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
+
 package appcore
 
 import (
 	"strings"
 
-	"github.com/link-fgfgui/mod-downloader-core/configs"
-	"github.com/link-fgfgui/mod-downloader-core/global"
-	"github.com/link-fgfgui/mod-downloader-core/logging"
-	"github.com/link-fgfgui/mod-downloader-core/minecraft"
-	"github.com/link-fgfgui/mod-downloader-core/storage"
-	appstructs "github.com/link-fgfgui/mod-downloader-core/structs"
+	"github.com/link-fgfgui/mod-downloader/core/configs"
+	"github.com/link-fgfgui/mod-downloader/core/global"
+	"github.com/link-fgfgui/mod-downloader/core/logging"
+	"github.com/link-fgfgui/mod-downloader/core/minecraft"
+	"github.com/link-fgfgui/mod-downloader/core/storage"
+	appstructs "github.com/link-fgfgui/mod-downloader/core/structs"
 )
 
 func (s *Service) GetPreferences() appstructs.AppPreferences {
@@ -171,7 +174,7 @@ func (s *Service) SaveJijDetectionSettings(req appstructs.SaveJijDetectionSettin
 }
 
 // SaveHardwareAccelerationSettings persists the webview GPU preference. The
-// value is consumed before wails.Run on the next launch; it cannot be applied
+// value is read while the app starts on the next launch; it cannot be applied
 // to the already-created webview at runtime.
 func (s *Service) SaveHardwareAccelerationSettings(req appstructs.SaveHardwareAccelerationSettingsRequest) appstructs.SettingsView {
 	if s.config == nil {

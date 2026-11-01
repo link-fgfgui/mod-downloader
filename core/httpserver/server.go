@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 link-fgfgui
+// SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
+
 // Package httpserver exposes a thin HTTP transport for scan results produced by
 // the mod-downloader browser extension.
 //
@@ -21,8 +24,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/link-fgfgui/mod-downloader-core/logging"
-	appstructs "github.com/link-fgfgui/mod-downloader-core/structs"
+	"github.com/link-fgfgui/mod-downloader/core/logging"
+	appstructs "github.com/link-fgfgui/mod-downloader/core/structs"
 )
 
 // DefaultAddr is the address the browser extension expects (see its manifest

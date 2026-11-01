@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 link-fgfgui
+// SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
+
 package providers
 
 import (
@@ -11,9 +14,9 @@ import (
 	"time"
 
 	modrinth "codeberg.org/jmansfield/go-modrinth/modrinth"
-	"github.com/link-fgfgui/mod-downloader-core/global"
-	"github.com/link-fgfgui/mod-downloader-core/models"
-	"github.com/link-fgfgui/mod-downloader-core/storage"
+	"github.com/link-fgfgui/mod-downloader/core/global"
+	"github.com/link-fgfgui/mod-downloader/core/models"
+	"github.com/link-fgfgui/mod-downloader/core/storage"
 	curseforge "github.com/sjet47/go-curseforge"
 	cfAPI "github.com/sjet47/go-curseforge/api"
 	cfSchema "github.com/sjet47/go-curseforge/schema"

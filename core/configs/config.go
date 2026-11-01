@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 link-fgfgui
+// SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
+
 package configs
 
 import (
@@ -6,7 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/link-fgfgui/mod-downloader-core/logging"
+	"github.com/link-fgfgui/mod-downloader/core/logging"
 
 	"github.com/BurntSushi/toml"
 	"github.com/ilyakaznacheev/cleanenv"
@@ -97,8 +100,8 @@ func LoadLogging() (LoggingConfig, error) {
 }
 
 // LoadHardwareAcceleration reads only the GPU preference so the Wails window
-// can be created with the right webview policy before the core starts. It
-// emits no logs because logging is not configured at this point in startup.
+// can be created with the right webview policy before the event loop starts.
+// It emits no logs because logging is not configured at this point in startup.
 func LoadHardwareAcceleration() bool {
 	var cfg hardwareAccelerationConfig
 	path, err := AppConfigPath()

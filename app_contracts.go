@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 link-fgfgui
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package main
 
 // ExportFavoritePackwizResult is adapter-specific because it reports a native

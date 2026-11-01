@@ -57,3 +57,25 @@ Take a moment to familiarize yourself with your project structure:
 4. When ready, build your application with `wails3 build`.
 
 Happy coding with Wails3! If you encounter any issues or have questions, don't hesitate to consult the documentation or reach out to the Wails community.
+
+## License
+
+The main program (everything outside `core/`) is free software licensed under
+the GNU General Public License, version 3 or (at your option) any later
+version.
+
+SPDX-License-Identifier: `GPL-3.0-or-later`
+
+See [LICENSE](LICENSE) for the full GPL-3.0 text.
+
+The `core/` directory is a separate Go module,
+`github.com/link-fgfgui/mod-downloader/core`, licensed under the GNU Lesser
+General Public License, version 3 or (at your option) any later version, with
+the LGPL-3.0 Linking Exception. The legacy
+`github.com/link-fgfgui/mod-downloader-core` module path is deprecated.
+
+SPDX-License-Identifier: `LGPL-3.0-or-later WITH LGPL-3.0-linking-exception`
+
+See [core/LICENSE](core/LICENSE) and [core/LICENSE.exception](core/LICENSE.exception).
+Every Go source file declares its applicable SPDX license identifier in its
+header.

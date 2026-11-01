@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 link-fgfgui
+// SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
+
 package minecraft
 
 import (
@@ -13,8 +16,8 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/link-fgfgui/mod-downloader-core/global"
-	structs "github.com/link-fgfgui/mod-downloader-core/structs/minecraft"
+	"github.com/link-fgfgui/mod-downloader/core/global"
+	structs "github.com/link-fgfgui/mod-downloader/core/structs/minecraft"
 )
 
 func TestFileHashesUsesRawSHA1AndWhitespaceNormalizedFingerprint(t *testing.T) {

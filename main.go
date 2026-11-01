@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 link-fgfgui
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //go:build !server
 
 package main
@@ -5,7 +8,7 @@ package main
 import (
 	"log"
 
-	"github.com/link-fgfgui/mod-downloader-core/configs"
+	"github.com/link-fgfgui/mod-downloader/core/configs"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -26,9 +29,12 @@ func main() {
 	})
 	appService.app = app
 
-	gpuPolicy := application.WebviewGpuPolicyNever
-	if configs.LoadHardwareAcceleration() {
-		gpuPolicy = application.WebviewGpuPolicyAlways
+	// Wails v3 defaults WebviewGpuPolicy to Always (the enum's zero value), so
+	// only opt out explicitly. A missing or unreadable config keeps GPU
+	// rendering enabled because DefaultHardwareAcceleration is true.
+	gpuPolicy := application.WebviewGpuPolicyAlways
+	if !configs.LoadHardwareAcceleration() {
+		gpuPolicy = application.WebviewGpuPolicyNever
 	}
 
 	app.Window.NewWithOptions(application.WebviewWindowOptions{

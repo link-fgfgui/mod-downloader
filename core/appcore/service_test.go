@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 link-fgfgui
+// SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
+
 package appcore
 
 import (
@@ -11,16 +14,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/link-fgfgui/mod-downloader-core/configs"
-	"github.com/link-fgfgui/mod-downloader-core/downloader"
-	"github.com/link-fgfgui/mod-downloader-core/global"
-	"github.com/link-fgfgui/mod-downloader-core/logging"
-	"github.com/link-fgfgui/mod-downloader-core/minecraft"
-	"github.com/link-fgfgui/mod-downloader-core/modbridge"
-	"github.com/link-fgfgui/mod-downloader-core/models"
-	"github.com/link-fgfgui/mod-downloader-core/providers"
-	"github.com/link-fgfgui/mod-downloader-core/storage"
-	appstructs "github.com/link-fgfgui/mod-downloader-core/structs"
+	"github.com/link-fgfgui/mod-downloader/core/configs"
+	"github.com/link-fgfgui/mod-downloader/core/downloader"
+	"github.com/link-fgfgui/mod-downloader/core/global"
+	"github.com/link-fgfgui/mod-downloader/core/logging"
+	"github.com/link-fgfgui/mod-downloader/core/minecraft"
+	"github.com/link-fgfgui/mod-downloader/core/modbridge"
+	"github.com/link-fgfgui/mod-downloader/core/models"
+	"github.com/link-fgfgui/mod-downloader/core/providers"
+	"github.com/link-fgfgui/mod-downloader/core/storage"
+	appstructs "github.com/link-fgfgui/mod-downloader/core/structs"
 )
 
 func TestMain(m *testing.M) {
@@ -467,8 +470,8 @@ func TestLoadMinecraftReleaseVersionsRefreshesExpiredCacheAndFallsBackOnError(t 
 
 func TestCoreDoesNotDependOnWailsRuntime(t *testing.T) {
 	packages := []string{
-		"github.com/link-fgfgui/mod-downloader-core/appcore",
-		"github.com/link-fgfgui/mod-downloader-core/httpserver",
+		"github.com/link-fgfgui/mod-downloader/core/appcore",
+		"github.com/link-fgfgui/mod-downloader/core/httpserver",
 	}
 	args := append([]string{"list", "-deps"}, packages...)
 	out, err := exec.Command("go", args...).Output()
@@ -476,8 +479,8 @@ func TestCoreDoesNotDependOnWailsRuntime(t *testing.T) {
 		t.Fatalf("go list deps failed: %v", err)
 	}
 	for _, pkg := range strings.Fields(string(out)) {
-		if pkg == "github.com/wailsapp/wails/v2/pkg/runtime" {
-			t.Fatalf("core dependency tree includes Wails runtime")
+		if strings.HasPrefix(pkg, "github.com/wailsapp/wails") {
+			t.Fatalf("core dependency tree includes Wails runtime: %s", pkg)
 		}
 	}
 }

@@ -1,13 +1,13 @@
-module mod-downloader
+module github.com/link-fgfgui/mod-downloader
 
 go 1.26.0
 
 require (
-	github.com/link-fgfgui/mod-downloader-core v0.0.0
+	github.com/link-fgfgui/mod-downloader/core v0.0.0
 	github.com/wailsapp/wails/v3 v3.0.0
 )
 
-replace github.com/link-fgfgui/mod-downloader-core => ./core
+replace github.com/link-fgfgui/mod-downloader/core => ./core
 
 require (
 	codeberg.org/jmansfield/go-modrinth v0.6.0 // indirect

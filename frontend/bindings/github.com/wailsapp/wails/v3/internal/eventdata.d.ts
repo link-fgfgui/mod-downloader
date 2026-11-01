@@ -7,13 +7,13 @@ import type { Events } from "@wailsio/runtime";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import type * as storage$0 from "../../../../link-fgfgui/mod-downloader-core/storage/models.js";
+import type * as storage$0 from "../../../../link-fgfgui/mod-downloader/core/storage/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import type * as structs$0 from "../../../../link-fgfgui/mod-downloader-core/structs/models.js";
+import type * as structs$0 from "../../../../link-fgfgui/mod-downloader/core/structs/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import type * as structs$1 from "../../../../link-fgfgui/mod-downloader-core/structs/minecraft/models.js";
+import type * as structs$1 from "../../../../link-fgfgui/mod-downloader/core/structs/minecraft/models.js";
 
 declare module "@wailsio/runtime" {
     namespace Events {

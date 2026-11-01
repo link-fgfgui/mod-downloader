@@ -1,4 +1,4 @@
-export type { ModProject, ModVersion, ModDependency } from "../bindings/github.com/link-fgfgui/mod-downloader-core/models/models";
+export type { ModProject, ModVersion, ModDependency } from "../bindings/github.com/link-fgfgui/mod-downloader/core/models/models";
 export type {
   FavoriteList,
   FavoriteListContents,
@@ -7,8 +7,8 @@ export type {
   FavoriteModEntry,
   PinnedMod,
   UsageStats,
-} from "../bindings/github.com/link-fgfgui/mod-downloader-core/storage/models";
-export type { VersionInfo, ModInfo, LocalModDependency, JijModInfo } from "../bindings/github.com/link-fgfgui/mod-downloader-core/structs/minecraft/models";
+} from "../bindings/github.com/link-fgfgui/mod-downloader/core/storage/models";
+export type { VersionInfo, ModInfo, LocalModDependency, JijModInfo } from "../bindings/github.com/link-fgfgui/mod-downloader/core/structs/minecraft/models";
 export type {
   AppPreferences,
   SettingsView,
@@ -35,11 +35,11 @@ export type {
   CachedDependencyCandidate,
   OptionalDependencyCandidate,
   OptionalDependencyReminder,
-} from "../bindings/github.com/link-fgfgui/mod-downloader-core/structs/models";
+} from "../bindings/github.com/link-fgfgui/mod-downloader/core/structs/models";
 export type {
   FavoriteBulkAddRequest,
   FavoriteBulkOperationResult,
   FavoriteCrossVersionCopyPreview,
   FavoriteCrossVersionCopyApplyResult,
-} from "../bindings/github.com/link-fgfgui/mod-downloader-core/appcore/models";
-export type { ExportFavoritePackwizResult } from "../bindings/mod-downloader/models";
+} from "../bindings/github.com/link-fgfgui/mod-downloader/core/appcore/models";
+export type { ExportFavoritePackwizResult } from "../bindings/github.com/link-fgfgui/mod-downloader/models";

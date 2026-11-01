@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 link-fgfgui
+// SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
+
 package downloader
 
 import (
@@ -15,14 +18,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/link-fgfgui/mod-downloader-core/downloader/filetransfer"
-	"github.com/link-fgfgui/mod-downloader-core/global"
-	"github.com/link-fgfgui/mod-downloader-core/logging"
-	"github.com/link-fgfgui/mod-downloader-core/minecraft"
-	"github.com/link-fgfgui/mod-downloader-core/modbridge"
-	"github.com/link-fgfgui/mod-downloader-core/models"
-	"github.com/link-fgfgui/mod-downloader-core/providers"
-	appstructs "github.com/link-fgfgui/mod-downloader-core/structs"
+	"github.com/link-fgfgui/mod-downloader/core/downloader/filetransfer"
+	"github.com/link-fgfgui/mod-downloader/core/global"
+	"github.com/link-fgfgui/mod-downloader/core/logging"
+	"github.com/link-fgfgui/mod-downloader/core/minecraft"
+	"github.com/link-fgfgui/mod-downloader/core/modbridge"
+	"github.com/link-fgfgui/mod-downloader/core/models"
+	"github.com/link-fgfgui/mod-downloader/core/providers"
+	appstructs "github.com/link-fgfgui/mod-downloader/core/structs"
 )
 
 type Events struct {

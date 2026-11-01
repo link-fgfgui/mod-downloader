@@ -24,6 +24,27 @@ type ViewTransitionDocument = Document & {
   startViewTransition?: (callback: () => void) => { finished: Promise<void> };
 };
 
+/**
+ * WebKitGTK crashes its web process when `startViewTransition()` is the first
+ * call that enables accelerated compositing: FrameRenderer::graphicsLayerFactory()
+ * hits WTFCrashWithInfo() because no layer tree host exists. That state is
+ * reachable whenever hardware acceleration is disabled (WebviewGpuPolicyNever)
+ * or DMA-BUF rendering is off, which Wails does automatically on NVIDIA.
+ *
+ * The theme cross-fade is cosmetic, so keep the fallback on WebKitGTK and apply
+ * the theme directly instead of taking down the whole web view.
+ *
+ * https://bugs.webkit.org/show_bug.cgi?id=321683
+ */
+export function supportsViewTransitions(): boolean {
+  if (typeof document === "undefined") return false;
+  if (typeof (document as ViewTransitionDocument).startViewTransition !== "function") return false;
+  if (typeof navigator === "undefined") return true;
+  const ua = navigator.userAgent;
+  const isWebKitGTK = /Linux/.test(ua) && /AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg|OPR/.test(ua);
+  return !isWebKitGTK;
+}
+
 let themeViewTransitionActive = false;
 
 export function applyThemePreference(preference: unknown) {
@@ -48,12 +69,7 @@ export function applyThemePreference(preference: unknown) {
   const nextResolved = resolveThemePreference(normalized);
   const currentlyDark = document.documentElement.classList.contains("dark");
   const themeChanged = (nextResolved === "dark") !== currentlyDark;
-  if (
-    themeChanged &&
-    !themeViewTransitionActive &&
-    typeof viewTransitionDocument.startViewTransition === "function" &&
-    !reduceMotion
-  ) {
+  if (themeChanged && !themeViewTransitionActive && supportsViewTransitions() && !reduceMotion) {
     themeViewTransitionActive = true;
     const transition = viewTransitionDocument.startViewTransition(apply);
     void transition.finished.finally(() => {

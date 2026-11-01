@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 link-fgfgui
+// SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
+
 package minecraft
 
 import (
@@ -5,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	structs "github.com/link-fgfgui/mod-downloader-core/structs/minecraft"
+	structs "github.com/link-fgfgui/mod-downloader/core/structs/minecraft"
 )
 
 // GameDirVersionLoader loads recognized version entries from a directory that
