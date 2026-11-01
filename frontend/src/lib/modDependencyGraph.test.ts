@@ -1,62 +1,89 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  buildModDependencyGraph,
   collectMatchingTreeKeys,
   collectRelatedTreeKeys,
   flattenModDependencyTree,
+  hydrateModDependencyGraph,
 } from "@/lib/modDependencyGraph";
+import type { ModDependencyGraph, ModGraphNode } from "@/types";
 
-const mods = [
-  {
-    id: "host",
-    name: "Host Mod",
-    path: "/mods/host.jar",
+const node = (
+  overrides: Partial<ModGraphNode> & Pick<ModGraphNode, "key" | "name">,
+): ModGraphNode => {
+  const { key, name, ...rest } = overrides;
+  return {
+    key,
+    name,
     enabled: true,
-    dependencies: [
-      { modId: "library", type: "required" },
-      { modId: "absent", type: "required" },
-      { modId: "optional-local", type: "optional" },
-      { modId: "optional-missing", type: "optional" },
-    ],
-    jijMods: [{ id: "nested", name: "Nested Bundled" }],
-  },
-  {
-    id: "library",
-    name: "Library",
-    path: "/mods/library.jar",
-    enabled: true,
-  },
-  {
-    id: "optional-local",
-    name: "Optional Local",
-    path: "/mods/optional.jar",
-    enabled: false,
-  },
-];
+    isRoot: false,
+    isJij: false,
+    isMissing: false,
+    isOptional: false,
+    searchText: name.toLowerCase(),
+    ...rest,
+  };
+};
+
+const graph: ModDependencyGraph = {
+  nodes: [
+    node({
+      key: "/mods/host.jar",
+      name: "Host Mod",
+      isRoot: true,
+      childKeys: ["missing:absent", "/mods/library.jar", "jij:/mods/host.jar:nested"],
+      searchText: "host mod",
+    }),
+    node({
+      key: "/mods/library.jar",
+      name: "Library",
+      parentKeys: ["/mods/host.jar"],
+      searchText: "library",
+    }),
+    node({
+      key: "missing:absent",
+      name: "absent",
+      isMissing: true,
+      searchText: "absent",
+    }),
+    node({
+      key: "jij:/mods/host.jar:nested",
+      name: "Nested Bundled",
+      isJij: true,
+      parentKeys: ["/mods/host.jar"],
+      searchText: "nested bundled",
+    }),
+  ],
+  roots: ["/mods/host.jar"],
+  missing: ["missing:absent"],
+};
 
 describe("modDependencyGraph", () => {
-  it("builds roots, missing leaves and JIJ children", () => {
-    const graph = buildModDependencyGraph(mods);
-    expect(graph.roots).toHaveLength(1);
-    expect(graph.roots[0].name).toBe("Host Mod");
-    expect(graph.missing.map((node) => node.name)).toEqual(["absent"]);
-    const children = graph.roots[0].children.map((node) => node.key);
-    expect(children).toContain("/mods/library.jar");
-    expect(children).toContain("missing:absent");
-    expect(children.some((key) => key.startsWith("jij:"))).toBe(true);
+  it("hydrates core's flat graph into nested children", () => {
+    const hydrated = hydrateModDependencyGraph(graph);
+    expect(hydrated.roots).toHaveLength(1);
+    expect(hydrated.roots[0].name).toBe("Host Mod");
+    expect(hydrated.missing.map((item) => item.name)).toEqual(["absent"]);
+    expect(hydrated.roots[0].children.map((item) => item.key)).toEqual([
+      "missing:absent",
+      "/mods/library.jar",
+      "jij:/mods/host.jar:nested",
+    ]);
   });
 
   it("flattens expanded branches and filters by visible keys", () => {
-    const graph = buildModDependencyGraph(mods);
-    const visible = collectMatchingTreeKeys(graph.roots, (node) => node.name.includes("Library"));
-    const rows = flattenModDependencyTree(graph.roots, new Set(), { visibleKeys: visible, forceExpand: true });
+    const hydrated = hydrateModDependencyGraph(graph);
+    const visible = collectMatchingTreeKeys(hydrated.roots, (item) => item.name.includes("Library"));
+    const rows = flattenModDependencyTree(hydrated.roots, new Set(), {
+      visibleKeys: visible,
+      forceExpand: true,
+    });
     expect(rows.map((row) => row.node.name)).toEqual(["Host Mod", "absent", "Library"]);
   });
 
   it("collects both directions around a selected node", () => {
-    const graph = buildModDependencyGraph(mods);
-    const relations = collectRelatedTreeKeys(graph.roots, "/mods/library.jar");
+    const hydrated = hydrateModDependencyGraph(graph);
+    const relations = collectRelatedTreeKeys(hydrated.roots, "/mods/library.jar");
     expect(relations.dependents.has("/mods/host.jar")).toBe(true);
     expect(relations.dependencies.size).toBe(0);
   });

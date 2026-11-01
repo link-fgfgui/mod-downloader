@@ -23,6 +23,7 @@ import (
 	"github.com/link-fgfgui/mod-downloader/core/configs"
 	"github.com/link-fgfgui/mod-downloader/core/downloader"
 	"github.com/link-fgfgui/mod-downloader/core/global"
+	"github.com/link-fgfgui/mod-downloader/core/internal/strutil"
 	"github.com/link-fgfgui/mod-downloader/core/logging"
 	"github.com/link-fgfgui/mod-downloader/core/minecraft"
 	"github.com/link-fgfgui/mod-downloader/core/modbridge"
@@ -356,12 +357,7 @@ func (s *Service) resolveRuntimePath(path string) string {
 }
 
 func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return strings.TrimSpace(value)
-		}
-	}
-	return ""
+	return strutil.FirstNonEmptyTrimmed(values...)
 }
 
 func (s *Service) effectiveCurseForgeAPIKey() string {
@@ -494,10 +490,7 @@ func FindVersionByKey(versions []structs.VersionInfo, key string) (structs.Versi
 }
 
 func versionInstanceKey(version structs.VersionInfo) string {
-	if strings.TrimSpace(version.ID) != "" {
-		return strings.TrimSpace(version.ID)
-	}
-	return strings.TrimSpace(version.Name)
+	return minecraft.VersionInstanceKey(version)
 }
 
 // ValidMinecraftInstance reports whether an instance has a supported loader and

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, Download, Loader2, ServerCrash } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -23,51 +23,34 @@ import {
 } from "@/components/ui/dialog";
 import { ModVersionList, type DependencyBreakDetail } from "@/components/ModVersionList";
 import { api } from "@/services/app";
-import {
-  findReverseDependents,
-  providedIdsOf,
-  type ReverseDependencyMatch,
-} from "@/lib/modDependencyGraph";
 import { hasMajorVersionChange, isVersionDowngrade } from "@/utils/versionCompare";
 import { useMinecraftStore } from "@/stores/minecraft";
-import type { DependencyPreflightResult, LocalModGroup, ModInfo, ModProject, ModVersion } from "@/types";
+import type {
+  DependencyPreflightResult,
+  LocalModGroup,
+  ModProject,
+  ModVersion,
+  ReverseDependencyMatch,
+} from "@/types";
 
 type DependencyPreflightEntry = NonNullable<DependencyPreflightResult["entries"]>[number];
-
-const EMPTY_MODS: ModInfo[] = [];
 
 interface ManageVersionDialogProps {
   open: boolean;
   group: LocalModGroup | null;
+  dependents: ReverseDependencyMatch[];
   onOpenChange: (open: boolean) => void;
   onQueued: () => void;
   onError: (error: unknown) => void;
   onNotify: (key: string, color?: "success" | "error") => void;
 }
 
-const onlineProjectFromGroup = (group: LocalModGroup): ModProject => {
-  const mod = group.primary;
-  const platform = mod.onlinePlatform || "";
-  const projectId = mod.onlineProjectId || "";
-  return {
-    id: `${platform.toLowerCase()}:${projectId}`,
-    platform,
-    projectId,
-    slug: mod.onlineSlug || "",
-    title: group.displayName,
-    icon: "",
-    iconUrl: mod.iconUrl || "",
-    description: mod.description || "",
-    downloads: 0,
-    categories: group.categories ?? [],
-    updatedAt: 0,
-    cachedAt: 0,
-  };
-};
+const onlineProjectFromGroup = (group: LocalModGroup): ModProject => group.onlineProject;
 
 export function ManageVersionDialog({
   open,
   group,
+  dependents,
   onOpenChange,
   onQueued,
   onError,
@@ -76,7 +59,6 @@ export function ManageVersionDialog({
   const { t } = useTranslation();
   const minecraftVersion = useMinecraftStore((state) => state.minecraftVersion);
   const modLoader = useMinecraftStore((state) => state.modLoader);
-  const mods = useMinecraftStore((state) => state.selected?.mods ?? EMPTY_MODS);
   const hasSelectedInstance = useMinecraftStore((state) => Boolean(state.selected?.id || state.selected?.name));
   const [versions, setVersions] = useState<ModVersion[]>([]);
   const [loading, setLoading] = useState(false);
@@ -120,17 +102,9 @@ export function ManageVersionDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canReplace, group, minecraftVersion, modLoader, open]);
 
-  const dependents: ReverseDependencyMatch[] = useMemo(() => {
-    if (!group) return [];
-    const providedIds: string[] = [];
-    for (const mod of group.strong || []) providedIds.push(...providedIdsOf(mod));
-    const groupPaths = new Set((group.strong || []).map((mod) => mod.path));
-    return findReverseDependents(mods, providedIds, { excludePaths: groupPaths, requireEnabled: true });
-  }, [group, mods]);
-
   const dependentMods = dependents.map((match) => match.name).filter(Boolean);
   const dependencyDetails: DependencyBreakDetail[] = dependents.flatMap((match) =>
-    match.requirements.map((requirement) => ({
+    (match.requirements ?? []).map((requirement) => ({
       name: match.name,
       modId: requirement.modId,
       version: requirement.version,

@@ -421,7 +421,7 @@ func TestSaveLanguagePersistsAndNormalizes(t *testing.T) {
 	if got := app.SaveLanguage("zh-CN"); got != "zh" {
 		t.Fatalf("SaveLanguage(zh-CN) = %q, want zh", got)
 	}
-	if got := app.GetPreferences().Language; got != "zh" {
+	if got := app.service().GetPreferences().Language; got != "zh" {
 		t.Fatalf("GetPreferences().Language = %q, want zh", got)
 	}
 	if got := app.GetSettings().Language; got != "zh" {

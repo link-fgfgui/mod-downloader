@@ -43,25 +43,26 @@ import type {
 } from "@/types";
 import { cn } from "@/lib/utils";
 import { scaledDuration } from "@/lib/animations";
+import { DownloadStatus } from "@/lib/downloadStatus";
 
 type DependencyPreflightEntry = NonNullable<import("@/types").DependencyPreflightResult["entries"]>[number];
 
 function resultStateIcon(state: ModDownloadButtonState | undefined, busy: boolean) {
   if (busy) return <Loader2 className="size-4 animate-spin" />;
   switch (state?.status) {
-    case "installed":
+    case DownloadStatus.Installed:
       return <CheckCircle2 className="size-4" />;
-    case "update":
+    case DownloadStatus.Update:
       return <RefreshCw className="size-4" />;
-    case "conflict":
-    case "incompatible":
+    case DownloadStatus.Conflict:
+    case DownloadStatus.Incompatible:
       return <AlertTriangle className="size-4" />;
-    case "metadataLoading":
+    case DownloadStatus.MetadataLoading:
       return <Loader2 className="size-4 animate-spin" />;
-    case "metadataFailed":
+    case DownloadStatus.MetadataFailed:
       return <AlertCircle className="size-4" />;
-    case "noSelectedVersion":
-    case "invalidRequest":
+    case DownloadStatus.NoSelectedVersion:
+    case DownloadStatus.InvalidRequest:
       return <Ban className="size-4" />;
     default:
       return <Download className="size-4" />;
@@ -70,19 +71,19 @@ function resultStateIcon(state: ModDownloadButtonState | undefined, busy: boolea
 
 const statusLabelKey = (status: string | undefined) => {
   switch (status) {
-    case "installed":
+    case DownloadStatus.Installed:
       return "versions.installed";
-    case "update":
+    case DownloadStatus.Update:
       return "download.confirmReplace.updateTitle";
-    case "conflict":
+    case DownloadStatus.Conflict:
       return "download.confirmReplace.conflictTitle";
-    case "incompatible":
+    case DownloadStatus.Incompatible:
       return "download.confirmReplace.incompatibleTitle";
-    case "noSelectedVersion":
+    case DownloadStatus.NoSelectedVersion:
       return "download.errors.noSelectedVersion";
-    case "metadataLoading":
+    case DownloadStatus.MetadataLoading:
       return "download.status.metadataLoading";
-    case "metadataFailed":
+    case DownloadStatus.MetadataFailed:
       return "download.status.metadataFailed";
     default:
       return "download.status.download";
@@ -281,9 +282,9 @@ export function DownloadPage() {
 
   const confirmTitleKey = () => {
     switch (confirmDialog.status) {
-      case "update":
+      case DownloadStatus.Update:
         return "download.confirmReplace.updateTitle";
-      case "incompatible":
+      case DownloadStatus.Incompatible:
         return "download.confirmReplace.incompatibleTitle";
       default:
         return "download.confirmReplace.conflictTitle";
@@ -292,9 +293,9 @@ export function DownloadPage() {
 
   const confirmBodyKey = () => {
     switch (confirmDialog.status) {
-      case "update":
+      case DownloadStatus.Update:
         return "download.confirmReplace.updateBody";
-      case "incompatible":
+      case DownloadStatus.Incompatible:
         return "download.confirmReplace.incompatibleBody";
       default:
         return "download.confirmReplace.conflictBody";
@@ -305,7 +306,7 @@ export function DownloadPage() {
     switch (entry.status) {
       case "missing":
         return { icon: <Download className="size-4 text-sky-500" />, label: t("download.preflight.status.missing") };
-      case "conflict":
+      case DownloadStatus.Conflict:
         return { icon: <AlertTriangle className="size-4 text-destructive" />, label: t("download.preflight.status.conflict") };
       default:
         return { icon: <CheckCircle2 className="size-4 text-emerald-500" />, label: t("download.preflight.status.fulfilled") };
@@ -438,7 +439,7 @@ export function DownloadPage() {
                       <Button
                         type="button"
                         size="icon-sm"
-                        variant={state?.status === "conflict" || state?.status === "incompatible" ? "destructive" : "outline"}
+                        variant={state?.status === DownloadStatus.Conflict || state?.status === DownloadStatus.Incompatible ? "destructive" : "outline"}
                         className="shrink-0"
                         disabled={!state || Boolean(state.disabled) || busy}
                         aria-label={t(statusLabelKey(state?.status))}
@@ -637,13 +638,13 @@ export function DownloadPage() {
             <DialogTitle>{t(confirmTitleKey())}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 text-sm">
-            {confirmDialog.status === "conflict" && confirmDialog.conflictFileName ? (
+            {confirmDialog.status === DownloadStatus.Conflict && confirmDialog.conflictFileName ? (
               <div className="font-medium">
                 {t("download.confirmReplace.conflictFile", { file: confirmDialog.conflictFileName })}
               </div>
             ) : null}
             <p>{t(confirmBodyKey())}</p>
-            {confirmDialog.status === "conflict" ? (
+            {confirmDialog.status === DownloadStatus.Conflict ? (
               <p className="text-xs text-muted-foreground">{t("download.confirmReplace.conflictHint")}</p>
             ) : null}
           </div>

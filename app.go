@@ -37,10 +37,6 @@ func NewApp() *App {
 	return &App{}
 }
 
-func (a *App) GetAppVersion() string {
-	return currentAppVersion()
-}
-
 func (a *App) ServiceStartup(ctx context.Context, _ application.ServiceOptions) error {
 	a.host = host.New(host.Options{
 		Version:               currentAppVersion(),
@@ -163,14 +159,6 @@ func (a *App) ReorderFavoriteLists(ids []string) bool {
 	return a.service().ReorderFavoriteLists(ids)
 }
 
-func (a *App) ListFavoriteMods(listID string) []storage.FavoriteMod {
-	return a.service().ListFavoriteMods(listID)
-}
-
-func (a *App) ListFavoriteContents(listID string) storage.FavoriteListContents {
-	return a.service().ListFavoriteContents(listID)
-}
-
 // ListFavoriteOverview returns the scope-filtered, core-ordered favorites
 // projection. The frontend renders pinned/ungrouped as-is.
 func (a *App) ListFavoriteOverview(minecraftVersion string, modLoader string) appview.FavoriteOverview {
@@ -204,14 +192,6 @@ func (a *App) ApplyFavoriteListCrossVersionCopy(req appcore.FavoriteCrossVersion
 
 func (a *App) AddFavoriteListReference(parentListID, childListID string) storage.FavoriteListRef {
 	return a.service().AddFavoriteListReference(parentListID, childListID)
-}
-
-func (a *App) RemoveFavoriteListReference(parentListID, childListID string) bool {
-	return a.service().RemoveFavoriteListReference(parentListID, childListID)
-}
-
-func (a *App) ListFavoriteListRefs(parentListID string) []storage.FavoriteListRef {
-	return a.service().ListFavoriteListRefs(parentListID)
 }
 
 func (a *App) RemoveFavoriteMod(listID, platform, modID, mcVersion, modLoader string) bool {
@@ -250,10 +230,6 @@ func (a *App) ExportFavoriteListPackwizZip(listID, minecraftVersion, modLoader, 
 
 func (a *App) GetMinecraftReleaseVersions() []string {
 	return a.service().GetMinecraftReleaseVersions()
-}
-
-func (a *App) GetPreferences() appstructs.AppPreferences {
-	return a.service().GetPreferences()
 }
 
 // GetSettings returns a read-only view of the current settings.
@@ -456,11 +432,12 @@ func (a *App) RefreshSelectedVersionMods() structs.VersionInfo {
 	return a.service().RefreshSelectedVersionMods()
 }
 
-// GetLocalModGroups returns the core-built Manage projection for one instance.
-// Grouping, JIJ de-duplication, search text and loader compatibility all live
-// in core so the GUI and TUI render the same rows.
-func (a *App) GetLocalModGroups(versionKey string, modLoader string) []appview.LocalModGroup {
-	return a.service().GetLocalModGroups(versionKey, modLoader)
+// GetLocalModView returns the core-built Manage projection for one instance:
+// grouped rows, the dependency forest and reverse dependents. Grouping, JIJ
+// de-duplication, search text and loader compatibility all live in core so the
+// GUI and TUI render the same rows.
+func (a *App) GetLocalModView(versionKey string, modLoader string) appview.LocalModView {
+	return a.service().GetLocalModView(versionKey, modLoader)
 }
 
 func (a *App) ToggleConnectorLoader() (structs.VersionInfo, error) {

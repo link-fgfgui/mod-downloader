@@ -710,6 +710,35 @@ func isJarEnabled(name string) bool {
 	return !strings.HasSuffix(strings.ToLower(name), ".jar.disabled")
 }
 
+// IsModJarName reports whether name has a .jar or .jar.disabled suffix.
+func IsModJarName(name string) bool {
+	return isModJar(name)
+}
+
+// IsDisabledModName reports whether name ends with the community .jar.disabled
+// suffix.
+func IsDisabledModName(name string) bool {
+	return !isJarEnabled(name)
+}
+
+// DisableModPath returns path with the .disabled suffix, leaving an already
+// disabled path unchanged.
+func DisableModPath(path string) string {
+	if IsDisabledModName(path) {
+		return path
+	}
+	return path + ".disabled"
+}
+
+// EnableModPath removes a trailing .disabled suffix, leaving an enabled path
+// unchanged.
+func EnableModPath(path string) string {
+	if strings.HasSuffix(strings.ToLower(path), ".disabled") {
+		return path[:len(path)-len(".disabled")]
+	}
+	return path
+}
+
 // FileSHA1 returns the lowercase SHA1 of a file, or "" when it cannot be
 // read.
 func FileSHA1(path string) string {

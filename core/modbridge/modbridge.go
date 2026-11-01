@@ -13,7 +13,6 @@ import (
 	"archive/zip"
 	"errors"
 	"fmt"
-	"net/url"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -21,6 +20,7 @@ import (
 	"time"
 
 	"github.com/link-fgfgui/mod-downloader/core/global"
+	"github.com/link-fgfgui/mod-downloader/core/internal/netutil"
 	"github.com/link-fgfgui/mod-downloader/core/logging"
 	"github.com/link-fgfgui/mod-downloader/core/minecraft"
 	"github.com/link-fgfgui/mod-downloader/core/models"
@@ -33,13 +33,15 @@ import (
 
 // Button status constants shared by downloader and modbridge.
 const (
-	BtnStatusNew             = "new"          // No same modId in instance -> standard download
-	BtnStatusInstalled       = "installed"    // Installed and same sha1 as latest -> disabled
-	BtnStatusUpdate          = "update"       // Same modId same project but not latest -> update
-	BtnStatusConflict        = "conflict"     // Same modId but not from this project's versions -> switch source
-	BtnStatusIncompatible    = "incompatible" // Requested version declares an incompatible installed project
-	BtnStatusMetadataLoading = "metadataLoading"
-	BtnStatusMetadataFailed  = "metadataFailed"
+	BtnStatusNew               = "new"          // No same modId in instance -> standard download
+	BtnStatusInstalled         = "installed"    // Installed and same sha1 as latest -> disabled
+	BtnStatusUpdate            = "update"       // Same modId same project but not latest -> update
+	BtnStatusConflict          = "conflict"     // Same modId but not from this project's versions -> switch source
+	BtnStatusIncompatible      = "incompatible" // Requested version declares an incompatible installed project
+	BtnStatusMetadataLoading   = "metadataLoading"
+	BtnStatusMetadataFailed    = "metadataFailed"
+	BtnStatusNoSelectedVersion = "noSelectedVersion" // Adapter-side disabled state when no instance is selected
+	BtnStatusInvalidRequest    = "invalidRequest"    // Adapter-side disabled state for an invalid search request
 )
 
 const (
@@ -1057,11 +1059,7 @@ func parseRemoteModJar(downloadURL string, modLoader string) ([]mcstructs.ModInf
 }
 
 func remoteHost(rawURL string) string {
-	parsed, err := url.Parse(rawURL)
-	if err != nil {
-		return ""
-	}
-	return parsed.Host
+	return netutil.RemoteHost(rawURL)
 }
 
 // --- private helpers ---
@@ -1163,19 +1161,7 @@ func hasIncompatibleDependency(deps []models.ModDependency) bool {
 }
 
 func projectTitle(project models.ModProject, fallback string) string {
-	if title := strings.TrimSpace(project.Title); title != "" {
-		return title
-	}
-	if slug := strings.TrimSpace(project.Slug); slug != "" {
-		return slug
-	}
-	if projectID := strings.TrimSpace(project.ProjectID); projectID != "" {
-		return projectID
-	}
-	if fallback = strings.TrimSpace(fallback); fallback != "" {
-		return fallback
-	}
-	return "Mod"
+	return models.ProjectDisplayTitle(project, fallback)
 }
 
 func projectVersionSHA1Set(versions []models.ModVersion) map[string]bool {
@@ -1214,10 +1200,7 @@ func selectedVersionModsDir(selected mcstructs.VersionInfo) string {
 }
 
 func versionInstanceID(version mcstructs.VersionInfo) string {
-	if strings.TrimSpace(version.ID) != "" {
-		return strings.TrimSpace(version.ID)
-	}
-	return strings.TrimSpace(version.Name)
+	return minecraft.VersionInstanceKey(version)
 }
 
 func cleanPath(path string) string {

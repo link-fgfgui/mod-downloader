@@ -158,7 +158,7 @@ func TestBuildLocalModGroupsDisplayNameFallbacks(t *testing.T) {
 	}
 }
 
-func TestGetLocalModGroupsUsesSelectedVersion(t *testing.T) {
+func TestGetLocalModViewUsesSelectedVersion(t *testing.T) {
 	global.SetMinecraftDir("")
 	global.SetVersions(nil)
 	t.Cleanup(func() {
@@ -180,7 +180,7 @@ func TestGetLocalModGroupsUsesSelectedVersion(t *testing.T) {
 	global.SetSelectedVersion(version)
 
 	service := New(Options{})
-	groups := service.GetLocalModGroups("inst", "")
+	groups := service.GetLocalModView("inst", "").Groups
 	if len(groups) != 2 {
 		t.Fatalf("group count = %d, want 2", len(groups))
 	}
@@ -192,7 +192,7 @@ func TestGetLocalModGroupsUsesSelectedVersion(t *testing.T) {
 	}
 }
 
-func TestGetLocalModGroupsFallsBackForStaleVersionKey(t *testing.T) {
+func TestGetLocalModViewFallsBackForStaleVersionKey(t *testing.T) {
 	global.SetMinecraftDir("")
 	global.SetVersions(nil)
 	t.Cleanup(func() {
@@ -209,8 +209,56 @@ func TestGetLocalModGroupsFallsBackForStaleVersionKey(t *testing.T) {
 	global.SetVersions([]mcstructs.VersionInfo{version})
 	global.SetSelectedVersion(version)
 
-	groups := New(Options{}).GetLocalModGroups("removed-instance", "")
+	groups := New(Options{}).GetLocalModView("removed-instance", "").Groups
 	if len(groups) != 1 || groups[0].Primary.ID != "sodium" {
 		t.Fatalf("stale key should fall back to the selected instance, got %+v", groups)
+	}
+}
+
+func TestGetLocalModViewBuildsGraphAndDependents(t *testing.T) {
+	global.SetMinecraftDir("")
+	global.SetVersions(nil)
+	t.Cleanup(func() {
+		global.SetMinecraftDir("")
+		global.SetVersions(nil)
+	})
+
+	version := mcstructs.VersionInfo{
+		ID:        "inst",
+		Name:      "inst",
+		ModLoader: "Fabric",
+		Mods: []mcstructs.ModInfo{
+			{ID: "library", Name: "Library", FileName: "library.jar", Path: "/mods/library.jar", Enabled: true},
+			{
+				ID:       "user",
+				Name:     "User",
+				FileName: "user.jar",
+				Path:     "/mods/user.jar",
+				Enabled:  true,
+				Dependencies: []mcstructs.LocalModDependency{
+					{ModID: "library", Type: "required"},
+				},
+			},
+		},
+	}
+	global.SetVersions([]mcstructs.VersionInfo{version})
+	global.SetSelectedVersion(version)
+
+	view := New(Options{}).GetLocalModView("inst", "")
+	if len(view.Groups) != 2 {
+		t.Fatalf("group count = %d, want 2", len(view.Groups))
+	}
+	if len(view.Graph.Roots) != 1 || view.Graph.Roots[0] != "/mods/user.jar" {
+		t.Fatalf("graph roots = %#v, want user jar", view.Graph.Roots)
+	}
+	var libraryRowKey string
+	for _, group := range view.Groups {
+		if group.Primary.ID == "library" {
+			libraryRowKey = group.RowKey
+		}
+	}
+	dependents := view.Dependents[libraryRowKey]
+	if len(dependents) != 1 || dependents[0].Name != "User" {
+		t.Fatalf("dependents[%q] = %#v, want User", libraryRowKey, dependents)
 	}
 }

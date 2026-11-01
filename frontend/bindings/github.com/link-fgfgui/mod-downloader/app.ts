@@ -101,10 +101,6 @@ export function ExportFavoriteListPackwizZip(listID: string, minecraftVersion: s
     return $Call.ByID(387069411, listID, minecraftVersion, modLoader, locale);
 }
 
-export function GetAppVersion(): $CancellablePromise<string> {
-    return $Call.ByID(1780012486);
-}
-
 export function GetDownloadQueueState(): $CancellablePromise<view$0.DownloadQueueState> {
     return $Call.ByID(223140799);
 }
@@ -114,12 +110,13 @@ export function GetDownloadStates(req: structs$0.DownloadStatesRequest): $Cancel
 }
 
 /**
- * GetLocalModGroups returns the core-built Manage projection for one instance.
- * Grouping, JIJ de-duplication, search text and loader compatibility all live
- * in core so the GUI and TUI render the same rows.
+ * GetLocalModView returns the core-built Manage projection for one instance:
+ * grouped rows, the dependency forest and reverse dependents. Grouping, JIJ
+ * de-duplication, search text and loader compatibility all live in core so the
+ * GUI and TUI render the same rows.
  */
-export function GetLocalModGroups(versionKey: string, modLoader: string): $CancellablePromise<view$0.LocalModGroup[] | null> {
-    return $Call.ByID(43243938, versionKey, modLoader);
+export function GetLocalModView(versionKey: string, modLoader: string): $CancellablePromise<view$0.LocalModView> {
+    return $Call.ByID(810391675, versionKey, modLoader);
 }
 
 export function GetMinecraftDir(): $CancellablePromise<string> {
@@ -132,10 +129,6 @@ export function GetMinecraftReleaseVersions(): $CancellablePromise<string[] | nu
 
 export function GetPinnedModVersion(platform: string, modID: string, minecraftVersion: string, modLoader: string): $CancellablePromise<storage$0.PinnedMod> {
     return $Call.ByID(1887872057, platform, modID, minecraftVersion, modLoader);
-}
-
-export function GetPreferences(): $CancellablePromise<structs$0.AppPreferences> {
-    return $Call.ByID(633658819);
 }
 
 /**
@@ -173,10 +166,6 @@ export function InstallOptionalDependencies(id: string): $CancellablePromise<str
     return $Call.ByID(752248097, id);
 }
 
-export function ListFavoriteContents(listID: string): $CancellablePromise<storage$0.FavoriteListContents> {
-    return $Call.ByID(1441335991, listID);
-}
-
 /**
  * ListFavoriteContentsForScope returns a list's contents filtered to one scope.
  */
@@ -184,16 +173,8 @@ export function ListFavoriteContentsForScope(listID: string, minecraftVersion: s
     return $Call.ByID(585695510, listID, minecraftVersion, modLoader);
 }
 
-export function ListFavoriteListRefs(parentListID: string): $CancellablePromise<storage$0.FavoriteListRef[] | null> {
-    return $Call.ByID(884444067, parentListID);
-}
-
 export function ListFavoriteLists(): $CancellablePromise<storage$0.FavoriteList[] | null> {
     return $Call.ByID(2562687970);
-}
-
-export function ListFavoriteMods(listID: string): $CancellablePromise<storage$0.FavoriteMod[] | null> {
-    return $Call.ByID(67585452, listID);
 }
 
 /**
@@ -254,10 +235,6 @@ export function RefreshVersions(): $CancellablePromise<structs$1.VersionInfo[] |
 
 export function RemoveDownload(id: string): $CancellablePromise<boolean> {
     return $Call.ByID(3155670617, id);
-}
-
-export function RemoveFavoriteListReference(parentListID: string, childListID: string): $CancellablePromise<boolean> {
-    return $Call.ByID(1099987430, parentListID, childListID);
 }
 
 export function RemoveFavoriteMod(listID: string, platform: string, modID: string, mcVersion: string, modLoader: string): $CancellablePromise<boolean> {

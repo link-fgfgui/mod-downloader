@@ -9,25 +9,12 @@ import type { VersionInfo } from "@/types";
 export const defaultModLoader = "Fabric";
 export const modLoaderOptions = ["Fabric", "Forge", "NeoForge"];
 
-type VersionInfoSnapshot = Partial<VersionInfo> & {
-  ID?: string;
-  Name?: string;
-  MinecraftVersion?: string;
-  ModLoader?: string;
-};
+type VersionInfoSnapshot = Partial<VersionInfo>;
 
 type VersionField = "id" | "name" | "minecraftVersion" | "modLoader";
 
-const UPPER_KEYS: Record<VersionField, string> = {
-  id: "ID",
-  name: "Name",
-  minecraftVersion: "MinecraftVersion",
-  modLoader: "ModLoader",
-};
-
-const valueOf = (source: VersionInfoSnapshot | null | undefined, lowerKey: VersionField) => {
-  const upperKey = UPPER_KEYS[lowerKey];
-  const value = source?.[lowerKey] ?? (upperKey ? source?.[upperKey as keyof VersionInfoSnapshot] : undefined);
+const valueOf = (source: VersionInfoSnapshot | null | undefined, key: VersionField) => {
+  const value = source?.[key];
   return typeof value === "string" ? value : "";
 };
 

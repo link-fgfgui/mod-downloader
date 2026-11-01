@@ -6,15 +6,6 @@
 import * as models$0 from "../models/models.js";
 
 /**
- * AppPreferences is the persisted preference subset exposed to clients.
- */
-export interface AppPreferences {
-    "theme": string;
-    "language": string;
-    "animationDurationMultiplier": number;
-}
-
-/**
  * BatchDownloadRequest queues several projects for the same instance.
  */
 export interface BatchDownloadRequest {
@@ -137,11 +128,16 @@ export interface IncompatibleLocalMod {
 
 /**
  * LocalModBatchOperationRequest asks the core to enable, disable, delete or
- * rename the local JARs at Paths.
+ * rename the local JARs at Paths. TargetDir optionally scopes the operation to
+ * an explicit mods directory (the CLI one-shot commands); when empty the
+ * selected GUI/TUI instance is used.
  */
 export interface LocalModBatchOperationRequest {
     "paths": string[] | null;
     "action": string;
+    "targetDir"?: string;
+    "minecraftVersion"?: string;
+    "modLoader"?: string;
 }
 
 /**

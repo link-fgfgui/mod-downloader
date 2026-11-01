@@ -1497,3 +1497,39 @@ func TestWaitForDownloadTracksItsOwnQueueEntry(t *testing.T) {
 	}
 	Shutdown()
 }
+
+func TestShouldPreserveDisabled(t *testing.T) {
+	if shouldPreserveDisabled(nil) {
+		t.Fatal("nil paths must not preserve disabled state")
+	}
+	if !shouldPreserveDisabled([]global.LocalModFilePath{{Path: "/mods/a.jar.disabled"}}) {
+		t.Fatal("single disabled path should preserve disabled state")
+	}
+	if shouldPreserveDisabled([]global.LocalModFilePath{
+		{Path: "/mods/a.jar.disabled"},
+		{Path: "/mods/b.jar"},
+	}) {
+		t.Fatal("mixed enabled/disabled paths must keep the new jar enabled")
+	}
+}
+
+func TestApplyPreservedDisabledState(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sodium.jar")
+	if err := os.WriteFile(path, []byte("jar"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got := applyPreservedDisabledState(path, true)
+	if got != path+".disabled" {
+		t.Fatalf("applyPreservedDisabledState() = %q, want %q", got, path+".disabled")
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("enabled jar still exists: %v", err)
+	}
+	if _, err := os.Stat(got); err != nil {
+		t.Fatalf("disabled jar missing: %v", err)
+	}
+	if got := applyPreservedDisabledState(path, false); got != path {
+		t.Fatalf("disabled preservation off returned %q", got)
+	}
+}

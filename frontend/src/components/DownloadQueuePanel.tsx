@@ -28,6 +28,7 @@ import {
   scaledDuration,
 } from "@/lib/animations";
 import { formatBytes, formatSpeed, progressPercent } from "@/lib/format";
+import { DownloadStatus } from "@/lib/downloadStatus";
 import { useDownloadQueueStore } from "@/stores/downloadQueue";
 import type { DownloadQueueItem, OptionalDependencyCandidate } from "@/types";
 import { cn } from "@/lib/utils";
@@ -56,12 +57,12 @@ function statusIcon(status: string) {
 
 function optionalStatusIcon(status: string) {
   switch (status) {
-    case "installed":
+    case DownloadStatus.Installed:
       return <Check className="size-4 text-emerald-500" />;
-    case "update":
+    case DownloadStatus.Update:
       return <RefreshCw className="size-4 text-sky-500" />;
-    case "conflict":
-    case "incompatible":
+    case DownloadStatus.Conflict:
+    case DownloadStatus.Incompatible:
       return <CircleAlert className="size-4 text-destructive" />;
     default:
       return <Download className="size-4 text-muted-foreground" />;

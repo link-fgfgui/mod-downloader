@@ -8,8 +8,7 @@ import type { LocalModGroup } from "@/types";
 import { pinyinInitialsOf } from "@/utils/modSearchText";
 
 export function groupRowKey(group: LocalModGroup) {
-  const mod = group.primary;
-  return [mod.id, mod.sha1, mod.path, mod.fileName].filter(Boolean).join("|");
+  return group.rowKey;
 }
 
 export function strongModIds(group: LocalModGroup) {

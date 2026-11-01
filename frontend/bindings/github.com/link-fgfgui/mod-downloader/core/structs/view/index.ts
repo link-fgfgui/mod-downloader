@@ -6,6 +6,7 @@ export type {
     DownloadQueueState,
     FavoriteOverview,
     LocalModGroup,
+    LocalModView,
     ModDownloadButtonState,
     OptionalDependencyCandidate,
     OptionalDependencyReminder,

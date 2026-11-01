@@ -86,6 +86,32 @@ type FavoriteMod struct {
 	UpdatedAt        int64    `json:"updatedAt"`
 }
 
+// NormalizeFavoriteKeyPart lower-cases and trims one favorite scope dimension.
+func NormalizeFavoriteKeyPart(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
+// NormalizeFavoriteMinecraftVersion trims a Minecraft version for scope
+// comparison without lower-casing it.
+func NormalizeFavoriteMinecraftVersion(value string) string {
+	return strings.TrimSpace(value)
+}
+
+// FavoriteModKey is the stable UI selection/dedup key for one favorite entry.
+func FavoriteModKey(mod FavoriteMod) string {
+	return strings.Join([]string{
+		NormalizeFavoriteKeyPart(mod.Platform),
+		NormalizeFavoriteKeyPart(mod.ModID),
+		NormalizeFavoriteMinecraftVersion(mod.MinecraftVersion),
+		NormalizeFavoriteKeyPart(mod.ModLoader),
+	}, "|")
+}
+
+// HasFavoriteScope reports whether both scope dimensions are set.
+func HasFavoriteScope(minecraftVersion, modLoader string) bool {
+	return strings.TrimSpace(minecraftVersion) != "" && strings.TrimSpace(modLoader) != ""
+}
+
 // FavoriteModEntry is a favorite mod together with the list it was inherited
 // from when resolving referenced lists.
 type FavoriteModEntry struct {

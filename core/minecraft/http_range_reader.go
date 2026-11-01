@@ -10,12 +10,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
 
+	"github.com/link-fgfgui/mod-downloader/core/internal/netutil"
 	"github.com/link-fgfgui/mod-downloader/core/logging"
 	"github.com/link-fgfgui/mod-downloader/core/networking"
 )
@@ -241,11 +241,7 @@ func (r *HTTPRangeReaderAt) ReadAt(p []byte, off int64) (int, error) {
 }
 
 func remoteHost(rawURL string) string {
-	parsed, err := url.Parse(rawURL)
-	if err != nil {
-		return ""
-	}
-	return parsed.Host
+	return netutil.RemoteHost(rawURL)
 }
 
 func readHTTPRangeBody(body io.Reader, p []byte, want int) (int, error) {

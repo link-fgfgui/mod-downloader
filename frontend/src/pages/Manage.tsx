@@ -60,7 +60,7 @@ import {
   collectMatchingTreeKeys,
   collectRelatedTreeKeys,
   flattenModDependencyTree,
-  buildModDependencyGraph,
+  hydrateModDependencyGraph,
 } from "@/lib/modDependencyGraph";
 import {
   groupRowKey,
@@ -85,7 +85,7 @@ import { useDownloadSearchStore } from "@/stores/downloadSearch";
 import { useSettingsStore } from "@/stores/settings";
 import { matchesSearchExpression } from "@/utils/searchExpression";
 import type { FavoriteModDraft } from "@/stores/favorites";
-import type { LocalModGroup, ModInfo } from "@/types";
+import type { LocalModGroup, LocalModView, ModInfo } from "@/types";
 import { cn } from "@/lib/utils";
 
 const EMPTY_MODS: ModInfo[] = [];
@@ -138,28 +138,29 @@ export function ManagePage() {
 
   const selectedVersionKey = selectedInstance?.id || selectedInstance?.name || "";
   const groupsKey = `${selectedVersionKey}\u0000${selectedLoader}`;
-  const [groupState, setGroupState] = useState<{ key: string; groups: LocalModGroup[] }>({
+  const [modViewState, setModViewState] = useState<{ key: string; view: LocalModView | null }>({
     key: "",
-    groups: [],
+    view: null,
   });
 
-  // Groups are built by core; refetch whenever the scanned mods or the active
-  // loader change so the incompatible partition always reflects core's verdict.
-  // The key guard hides the previous instance's rows while the new set loads.
+  // Groups, dependency forest and reverse dependents are built by core in one
+  // scan; refetch whenever the scanned mods or the active loader change so the
+  // incompatible partition always reflects core's verdict. The key guard hides
+  // the previous instance's rows while the new set loads.
   useEffect(() => {
     if (!selectedVersionKey) {
-      setGroupState({ key: groupsKey, groups: [] });
+      setModViewState({ key: groupsKey, view: null });
       return;
     }
     let cancelled = false;
     void api
-      .GetLocalModGroups(selectedVersionKey, selectedLoader)
+      .GetLocalModView(selectedVersionKey, selectedLoader)
       .then((result) => {
-        if (!cancelled) setGroupState({ key: groupsKey, groups: result ?? [] });
+        if (!cancelled) setModViewState({ key: groupsKey, view: result ?? null });
       })
       .catch((error) => {
         if (cancelled) return;
-        setGroupState({ key: groupsKey, groups: [] });
+        setModViewState({ key: groupsKey, view: null });
         toast.error(`${t("manage.operationFailed")}: ${errorMessage(error)}`);
       });
     return () => {
@@ -279,7 +280,7 @@ export function ManagePage() {
     return () => window.clearTimeout(timer);
   }, [searchInput]);
 
-  const allGroups = groupState.key === groupsKey ? groupState.groups : [];
+  const allGroups = modViewState.key === groupsKey ? (modViewState.view?.groups ?? []) : [];
   const filteredGroups = useMemo(
     () =>
       allGroups.filter((group) => {
@@ -411,7 +412,7 @@ export function ManagePage() {
   };
 
   const canReplaceVersion = (group: LocalModGroup) =>
-    Boolean(group.primary.onlinePlatform && group.primary.onlineProjectId && hasSelectedInstance);
+    Boolean(group.canReplaceVersion && hasSelectedInstance);
 
   const searchVersion = (group: LocalModGroup) => {
     const searchStore = useDownloadSearchStore.getState();
@@ -420,7 +421,10 @@ export function ManagePage() {
     void navigate("/download");
   };
 
-  const graph = useMemo(() => buildModDependencyGraph(mods), [mods]);
+  const graph = useMemo(
+    () => hydrateModDependencyGraph(modViewState.key === groupsKey ? modViewState.view?.graph : null),
+    [groupsKey, modViewState],
+  );
   const treeVisibleKeys = useMemo(() => {
     if (!hasActiveFilter) return null;
     return collectMatchingTreeKeys(graph.roots, (node) => {
@@ -784,7 +788,7 @@ export function ManagePage() {
               const node = row.node;
               const status = treeStatus(node);
               const StatusIcon = status.icon;
-              const group = treeGroupFor(node.path);
+              const group = treeGroupFor(node.path ?? "");
               return (
                 <div
                   key={row.key}
@@ -1127,6 +1131,11 @@ export function ManagePage() {
       <ManageVersionDialog
         open={versionOpen}
         group={versionGroup}
+        dependents={
+          versionGroup && modViewState.key === groupsKey
+            ? (modViewState.view?.dependents?.[versionGroup.rowKey] ?? [])
+            : []
+        }
         onOpenChange={setVersionOpen}
         onQueued={() => setReplacementQueued(true)}
         onError={handleError}

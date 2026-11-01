@@ -171,6 +171,9 @@ func (s *Service) LocalModsInDir(dir, minecraftVersion, modLoader string) ([]str
 // selected mod files and returns the refreshed instance.
 func (s *Service) ApplyLocalModBatchOperation(req appstructs.LocalModBatchOperationRequest) (structs.VersionInfo, error) {
 	action := strings.ToLower(strings.TrimSpace(req.Action))
+	if targetDir := strings.TrimSpace(req.TargetDir); targetDir != "" {
+		return s.applyLocalModBatchOperationInDir(req, action, targetDir)
+	}
 	selected := global.GetSelectedVersion()
 	if selected.ID == "" && selected.Name == "" {
 		return structs.VersionInfo{}, errors.New("no selected version")
@@ -191,6 +194,35 @@ func (s *Service) ApplyLocalModBatchOperation(req appstructs.LocalModBatchOperat
 	}
 	s.recordLocalModUsage(ops)
 	return s.refreshChangedLocalMods(ops), nil
+}
+
+// applyLocalModBatchOperationInDir runs the same validation and index updates
+// for a one-shot adapter that has an explicit mods directory instead of a
+// selected launcher instance (the CLI).
+func (s *Service) applyLocalModBatchOperationInDir(req appstructs.LocalModBatchOperationRequest, action, targetDir string) (structs.VersionInfo, error) {
+	dir := s.resolveRuntimePath(targetDir)
+	if strings.TrimSpace(dir) == "" {
+		return structs.VersionInfo{}, errors.New("empty target mods directory")
+	}
+	ops, err := planLocalModBatchOperations(req.Paths, action, dir, global.GetMinecraftDir())
+	if err != nil {
+		return structs.VersionInfo{}, err
+	}
+	if err := applyLocalModFileOperations(ops); err != nil {
+		return structs.VersionInfo{}, err
+	}
+	s.recordLocalModUsage(ops)
+	minecraftVersion := firstNonEmpty(req.MinecraftVersion, s.options.Runtime.MinecraftVersion)
+	modLoader := firstNonEmpty(req.ModLoader, s.options.Runtime.ModLoader)
+	mods, err := s.LocalModsInDir(dir, minecraftVersion, modLoader)
+	if err != nil {
+		return structs.VersionInfo{}, err
+	}
+	return structs.VersionInfo{
+		Mods:             mods,
+		MinecraftVersion: minecraftVersion,
+		ModLoader:        modLoader,
+	}, nil
 }
 
 func (s *Service) refreshChangedLocalMods(ops []localModFileOperation) structs.VersionInfo {
@@ -372,18 +404,18 @@ func planLocalModBatchOperations(paths []string, action string, modsDir string, 
 		op := localModFileOperation{action: fileAction, source: source}
 		switch fileAction {
 		case LocalModBatchActionEnable:
-			if !localModPathDisabled(source) {
+			if !minecraft.IsDisabledModName(source) {
 				continue
 			}
-			op.target = strings.TrimSuffix(source, ".disabled")
+			op.target = minecraft.EnableModPath(source)
 			if err := validateLocalModRenameTarget(source, op.target, targets); err != nil {
 				return nil, err
 			}
 		case LocalModBatchActionDisable:
-			if localModPathDisabled(source) {
+			if minecraft.IsDisabledModName(source) {
 				continue
 			}
-			op.target = source + ".disabled"
+			op.target = minecraft.DisableModPath(source)
 			if err := validateLocalModRenameTarget(source, op.target, targets); err != nil {
 				return nil, err
 			}
@@ -469,12 +501,11 @@ func validateLocalModRenameTarget(source string, target string, plannedTargets m
 }
 
 func isLocalModJarPath(path string) bool {
-	lower := strings.ToLower(path)
-	return strings.HasSuffix(lower, ".jar") || strings.HasSuffix(lower, ".jar.disabled")
+	return minecraft.IsModJarName(path)
 }
 
 func localModPathDisabled(path string) bool {
-	return strings.HasSuffix(strings.ToLower(path), ".jar.disabled")
+	return minecraft.IsDisabledModName(path)
 }
 
 func pathInsideDir(path string, dir string) bool {

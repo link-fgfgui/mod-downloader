@@ -11,17 +11,17 @@ import (
 )
 
 var expectedAppMethods = []string{
-	"GetAppVersion", "GetStartupStatus", "Quit",
+	"GetStartupStatus", "Quit",
 	"SearchMods", "ListMatchingProjectVersions", "LookupProjectBySlug",
 	"GetPinnedModVersion", "PinModVersion", "ListPinnedMods", "UnpinMod",
 	"ListFavoriteLists", "CreateFavoriteList", "RenameFavoriteList", "DeleteFavoriteList",
-	"UpdateFavoriteListMetadata", "ReorderFavoriteLists", "ListFavoriteMods", "ListFavoriteContents",
+	"UpdateFavoriteListMetadata", "ReorderFavoriteLists",
 	"ListFavoriteOverview", "ListFavoriteContentsForScope",
 	"AddFavoriteMod", "AddFavoriteModsToLists", "CopyFavoriteListToList",
 	"PreviewFavoriteListCrossVersionCopy", "ApplyFavoriteListCrossVersionCopy",
-	"AddFavoriteListReference", "RemoveFavoriteListReference", "ListFavoriteListRefs",
+	"AddFavoriteListReference",
 	"RemoveFavoriteMod", "ExportFavoriteListPackwizZip",
-	"GetMinecraftReleaseVersions", "GetPreferences", "GetSettings", "ChooseCacheDir",
+	"GetMinecraftReleaseVersions", "GetSettings", "ChooseCacheDir",
 	"SaveTheme", "SaveLanguage", "SaveAnimationSettings", "SaveSimpleModeSettings",
 	"SaveUnusedDependencyCleanupSettings", "SaveMCIMSettings", "SaveJIJDetectionSettings",
 	"SavePreferredReleaseTypeSettings", "SaveHardwareAccelerationSettings", "SaveNetworkSettings",
@@ -31,14 +31,14 @@ var expectedAppMethods = []string{
 	"DismissOptionalDependencyReminder", "ClearOptionalDependencyReminders", "InstallOptionalDependencies",
 	"AnalyzeBatchIncompatibleConflicts", "GetDownloadStates",
 	"ChooseMinecraftDir", "GetMinecraftDir", "ValidateMinecraftDir", "GetVersions",
-	"GetSelectedVersion", "RefreshVersions", "RefreshSelectedVersionMods", "GetLocalModGroups", "SelectVersion",
+	"GetSelectedVersion", "RefreshVersions", "RefreshSelectedVersionMods", "GetLocalModView", "SelectVersion",
 	"ToggleConnectorLoader", "ApplyLocalModBatchOperation", "AnalyzeLocalModDisableImpact",
 	"OpenLocalModLocation", "ScanUnusedDependencies",
 }
 
 func TestAppBindingContract(t *testing.T) {
-	if len(expectedAppMethods) != 73 {
-		t.Fatalf("contract contains %d business methods, want 73", len(expectedAppMethods))
+	if len(expectedAppMethods) != 67 {
+		t.Fatalf("contract contains %d business methods, want 67", len(expectedAppMethods))
 	}
 	expected := make(map[string]bool, len(expectedAppMethods)+2)
 	for _, name := range expectedAppMethods {

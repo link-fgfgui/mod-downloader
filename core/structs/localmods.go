@@ -4,10 +4,15 @@
 package structs
 
 // LocalModBatchOperationRequest asks the core to enable, disable, delete or
-// rename the local JARs at Paths.
+// rename the local JARs at Paths. TargetDir optionally scopes the operation to
+// an explicit mods directory (the CLI one-shot commands); when empty the
+// selected GUI/TUI instance is used.
 type LocalModBatchOperationRequest struct {
-	Paths  []string `json:"paths"`
-	Action string   `json:"action"`
+	Paths            []string `json:"paths"`
+	Action           string   `json:"action"`
+	TargetDir        string   `json:"targetDir,omitempty"`
+	MinecraftVersion string   `json:"minecraftVersion,omitempty"`
+	ModLoader        string   `json:"modLoader,omitempty"`
 }
 
 // UnusedDependencyScanRequest scopes an unused-dependency scan. Paths that are

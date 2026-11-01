@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { MinecraftTargetFields } from "@/components/MinecraftTargetFields";
-import { modLoaderOptions, useMinecraftStore } from "@/stores/minecraft";
+import { defaultModLoader, modLoaderOptions, useMinecraftStore } from "@/stores/minecraft";
 import { useFavoritesStore } from "@/stores/favorites";
 import { errorMessage } from "@/lib/format";
 import type { FavoriteCrossVersionCopyPreview, FavoriteList } from "@/types";
@@ -45,7 +45,7 @@ export function CrossVersionCopyDialog({ open, list, onOpenChange, onMessage }: 
   useEffect(() => {
     if (!open || !list) return;
     setMinecraftVersion(selectedVersion);
-    setModLoader(selectedLoader || "Fabric");
+    setModLoader(selectedLoader || defaultModLoader);
     setIgnoreConflicts(false);
     setPreview(null);
     setPreviewing(false);

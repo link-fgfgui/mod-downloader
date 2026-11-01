@@ -19,6 +19,8 @@ import (
 	"unicode"
 
 	"github.com/BurntSushi/toml"
+
+	"github.com/link-fgfgui/mod-downloader/core/internal/strutil"
 )
 
 // Packwiz metadata constants.
@@ -328,11 +330,5 @@ func hexSHA256(data []byte) string {
 }
 
 func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		value = strings.TrimSpace(value)
-		if value != "" {
-			return value
-		}
-	}
-	return ""
+	return strutil.FirstNonEmptyTrimmed(values...)
 }

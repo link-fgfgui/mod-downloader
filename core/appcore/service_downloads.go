@@ -8,6 +8,7 @@ import (
 	"errors"
 
 	"github.com/link-fgfgui/mod-downloader/core/downloader"
+	"github.com/link-fgfgui/mod-downloader/core/modbridge"
 	"github.com/link-fgfgui/mod-downloader/core/storage"
 	appstructs "github.com/link-fgfgui/mod-downloader/core/structs"
 	appview "github.com/link-fgfgui/mod-downloader/core/structs/view"
@@ -130,7 +131,7 @@ func (s *Service) InstallOptionalDependencies(id string) []appstructs.ModDownloa
 // would introduce into the selected instance.
 func (s *Service) AnalyzeBatchIncompatibleConflicts(req appstructs.BatchDownloadRequest) appstructs.BatchIncompatibleAnalysis {
 	req = s.applyRuntimeBatchDownloadRequest(req)
-	return downloader.AnalyzeBatchIncompatibleConflicts(req)
+	return modbridge.AnalyzeBatchIncompatibleConflicts(req)
 }
 
 // GetDownloadStates returns download button states for the requested projects.

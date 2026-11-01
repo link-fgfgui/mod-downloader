@@ -4,6 +4,13 @@ import { toast } from "sonner";
 import i18n from "@/i18n";
 import { api } from "@/services/app";
 import { appEventNames, onAppEvent } from "@/services/events";
+import {
+  ConfirmStatuses,
+  DownloadErrorKeys,
+  DownloadStatus,
+  MetadataRetryStatuses,
+  SearchPageSize,
+} from "@/lib/downloadStatus";
 import { useMinecraftStore, selectHasSelectedInstance } from "@/stores/minecraft";
 import type {
   BatchIncompatibleAnalysis,
@@ -13,8 +20,6 @@ import type {
   ModProject,
   ModVersion,
 } from "@/types";
-
-export const searchPageSize = 10;
 
 type DependencyPreflightEntry = NonNullable<DependencyPreflightResult["entries"]>[number];
 type BatchIncompatibleConflict = NonNullable<BatchIncompatibleAnalysis["conflicts"]>[number];
@@ -28,15 +33,11 @@ export function projectKey(result: ModProject): string {
   return result.id || `${result.platform}:${modIDFromResult(result)}`;
 }
 
-const downloadErrorKeys: Record<string, string> = {
-  "invalid request": "invalidRequest",
-  "no matching version": "noMatchingVersion",
-  "missing download url": "missingDownloadUrl",
-  "no selected version": "noSelectedVersion",
-};
-
 function disabledStates(results: ModProject[], status: string): ModDownloadButtonState[] {
-  const icon = status === "noSelectedVersion" ? "noSelectedVersion" : "invalidRequest";
+  const icon =
+    status === DownloadStatus.NoSelectedVersion
+      ? DownloadStatus.NoSelectedVersion
+      : DownloadStatus.InvalidRequest;
   return results.map((result) => ({
     key: modIDFromResult(result) || result.id || result.projectId || "",
     status,
@@ -231,9 +232,9 @@ export const useDownloadSearchStore = create<SearchState>((set, get) => ({
         version: currentTarget.minecraftVersion,
         modLoader: currentTarget.modLoader,
         offset,
-        limit: searchPageSize,
+        limit: SearchPageSize,
       });
-      if (get().activeRequestId === requestId) nextOffset = offset + searchPageSize;
+      if (get().activeRequestId === requestId) nextOffset = offset + SearchPageSize;
     } catch (error) {
       if (get().activeRequestId === requestId) {
         const message = error instanceof Error ? error.message : String(error);
@@ -276,11 +277,11 @@ export const useDownloadSearchStore = create<SearchState>((set, get) => ({
     const results = get().results;
     const currentTarget = target();
     if (!currentTarget.minecraftVersion || !currentTarget.modLoader) {
-      set({ downloadStates: disabledStates(results, "invalidRequest") });
+      set({ downloadStates: disabledStates(results, DownloadStatus.InvalidRequest) });
       return;
     }
     if (!currentTarget.hasSelectedInstance) {
-      set({ downloadStates: disabledStates(results, "noSelectedVersion") });
+      set({ downloadStates: disabledStates(results, DownloadStatus.NoSelectedVersion) });
       return;
     }
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -310,11 +311,11 @@ export const useDownloadSearchStore = create<SearchState>((set, get) => ({
       return;
     }
     if (get().downloadingKeys[key]) return;
-    if (status === "metadataLoading" || status === "metadataFailed") {
+    if (MetadataRetryStatuses.has(status || "")) {
       await get().refreshDownloadStates();
       return;
     }
-    if (confirm && ["update", "conflict", "incompatible"].includes(status || "")) {
+    if (confirm && ConfirmStatuses.has(status || "")) {
       set({ confirmDialog: { show: true, status: status || "", result: result ?? null, key, conflictFileName: conflictFileName || "" } });
       return;
     }
@@ -518,7 +519,7 @@ export const useDownloadSearchStore = create<SearchState>((set, get) => ({
         const results = update.append ? [...appendBase, ...incoming] : incoming;
         set({
           results,
-          hasMore: incoming.length >= searchPageSize,
+          hasMore: incoming.length >= SearchPageSize,
           searching: update.append ? get().searching : update.loading,
           loadingMore: update.append ? update.loading : get().loadingMore,
         });
@@ -640,7 +641,7 @@ async function doInstall(
       modLoader: currentTarget.modLoader,
     });
     if (res?.skipped) {
-      const errorKey = downloadErrorKeys[res.reason];
+      const errorKey = DownloadErrorKeys[res.reason];
       toast.error(i18n.t(errorKey ? `download.errors.${errorKey}` : "download.errors.generic"));
     } else {
       toast.success(i18n.t("download.queued"));

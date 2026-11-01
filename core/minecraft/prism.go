@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/link-fgfgui/mod-downloader/core/internal/strutil"
 	structs "github.com/link-fgfgui/mod-downloader/core/structs/minecraft"
 )
 
@@ -149,7 +150,7 @@ func prismVersionInfoFromPack(instanceDir string) (structs.VersionInfo, bool) {
 	modLoader := ""
 	for _, component := range pack.Components {
 		uid := strings.ToLower(strings.TrimSpace(component.UID))
-		version := firstNonEmpty(component.Version, component.CachedVersion)
+		version := strutil.FirstNonEmptyTrimmed(component.Version, component.CachedVersion)
 		switch {
 		case uid == "net.minecraft":
 			minecraftVersion = version
@@ -185,15 +186,6 @@ func prismSyntheticVersionFolder(minecraftVersion, modLoader string) string {
 	default:
 		return strings.TrimSpace(minecraftVersion)
 	}
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if value = strings.TrimSpace(value); value != "" {
-			return value
-		}
-	}
-	return ""
 }
 
 // VersionFolderName returns the version folder name (the directory under

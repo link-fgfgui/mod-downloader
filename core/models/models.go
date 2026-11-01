@@ -149,3 +149,21 @@ func ParseVersionKey(id string) (string, string, string) {
 
 	return platform, projectID, versionID
 }
+
+// ProjectDisplayTitle returns the first non-blank human-facing project name,
+// falling back to "Mod" so callers never render an empty title.
+func ProjectDisplayTitle(project ModProject, fallback string) string {
+	if title := strings.TrimSpace(project.Title); title != "" {
+		return title
+	}
+	if slug := strings.TrimSpace(project.Slug); slug != "" {
+		return slug
+	}
+	if projectID := strings.TrimSpace(project.ProjectID); projectID != "" {
+		return projectID
+	}
+	if fallback = strings.TrimSpace(fallback); fallback != "" {
+		return fallback
+	}
+	return "Mod"
+}

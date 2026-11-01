@@ -20,6 +20,7 @@ import (
 
 	"github.com/link-fgfgui/mod-downloader/core/downloader/filetransfer"
 	"github.com/link-fgfgui/mod-downloader/core/global"
+	"github.com/link-fgfgui/mod-downloader/core/internal/strutil"
 	"github.com/link-fgfgui/mod-downloader/core/logging"
 	"github.com/link-fgfgui/mod-downloader/core/minecraft"
 	"github.com/link-fgfgui/mod-downloader/core/modbridge"
@@ -718,12 +719,6 @@ func InstallOptionalDependenciesWithUserAgent(ctx context.Context, id string, cu
 	return results
 }
 
-// AnalyzeBatchIncompatibleConflicts checks a batch of results for local
-// incompatible mods before queuing.
-func AnalyzeBatchIncompatibleConflicts(req appstructs.BatchDownloadRequest) appstructs.BatchIncompatibleAnalysis {
-	return modbridge.AnalyzeBatchIncompatibleConflicts(req)
-}
-
 // GetDownloadStates returns the projected download button state for each
 // requested result, invoking onBackfillComplete when remote metadata backfill
 // finishes.
@@ -768,12 +763,7 @@ func projectVersionJobKey(version models.ModVersion) string {
 }
 
 func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return value
-		}
-	}
-	return ""
+	return strutil.FirstNonEmpty(values...)
 }
 
 func enqueueDownload(ctx context.Context, job downloadJob, events Events) (string, bool) {
@@ -1096,6 +1086,7 @@ func tryHardlinkInstall(job downloadJob) (bool, bool) {
 			return true, false
 		}
 	}
+	preserveDisabled := shouldPreserveDisabled(existing)
 
 	if downloadTargetExists(finalPath) && !pathInLocalModPaths(finalPath, existing) {
 		logging.Info("hardlink skipped because target file already exists", "path", finalPath, "versionID", job.Version.ID)
@@ -1112,6 +1103,7 @@ func tryHardlinkInstall(job downloadJob) (bool, bool) {
 			logging.Warn("hardlink creation failed, falling back to download", "src", srcPath, "dst", finalPath, "error", err)
 			return false, false
 		}
+		finalPath = applyPreservedDisabledState(finalPath, preserveDisabled)
 		logging.Info("mod installed via hardlink/copy", "src", srcPath, "dst", finalPath, "versionID", job.Version.ID)
 		go DiscardFetchFromNetwork(job.Version.DownloadURL, job.CurseForgeAPIKey, job.UserAgent)
 		upsertDownloadedMod(finalPath, job)
@@ -1149,6 +1141,7 @@ func tryHardlinkInstall(job downloadJob) (bool, bool) {
 		_ = os.Remove(tempPath)
 		return true, false
 	}
+	preserveDisabled = shouldPreserveDisabled(parsedExisting)
 	archiveSupersededModJars(parsedExisting)
 	if downloadTargetExists(finalPath) {
 		logging.Info("hardlink skipped because target file already exists", "path", finalPath, "versionID", job.Version.ID)
@@ -1159,6 +1152,7 @@ func tryHardlinkInstall(job downloadJob) (bool, bool) {
 		_ = os.Remove(tempPath)
 		return false, false
 	}
+	finalPath = applyPreservedDisabledState(finalPath, preserveDisabled)
 	logging.Info("mod installed via hardlink (local parse path)", "src", srcPath, "dst", finalPath, "versionID", job.Version.ID)
 	go DiscardFetchFromNetwork(job.Version.DownloadURL, job.CurseForgeAPIKey, job.UserAgent)
 	upsertDownloadedMod(finalPath, job)
@@ -1177,6 +1171,37 @@ func alreadyInstalled(existing []global.LocalModFilePath, latestSHA1 string) boo
 		}
 	}
 	return false
+}
+
+// shouldPreserveDisabled reports whether every physical jar being replaced is
+// disabled. The install paths archive the old jars and write an enabled file,
+// so adapters used to re-apply the disabled suffix themselves (CLI upgrade did
+// this after InstallModToDirAndWait). Keeping the rule here makes GUI version
+// replacement behave the same as the CLI.
+func shouldPreserveDisabled(paths []global.LocalModFilePath) bool {
+	if len(paths) == 0 {
+		return false
+	}
+	for _, p := range paths {
+		if !minecraft.IsDisabledModName(strings.TrimSpace(p.Path)) {
+			return false
+		}
+	}
+	return true
+}
+
+// applyPreservedDisabledState renames a freshly installed jar to its disabled
+// form when the replaced jar was disabled.
+func applyPreservedDisabledState(path string, preserve bool) string {
+	if !preserve || minecraft.IsDisabledModName(path) {
+		return path
+	}
+	disabledPath := minecraft.DisableModPath(path)
+	if err := os.Rename(path, disabledPath); err != nil {
+		logging.Warn("preserve disabled mod state failed", "path", path, "target", disabledPath, "error", err)
+		return path
+	}
+	return disabledPath
 }
 
 func archiveSupersededModJars(paths []global.LocalModFilePath) {
@@ -1413,19 +1438,7 @@ func incompatiblePathsFromConflicts(conflicts []appstructs.IncompatibleConflict,
 }
 
 func displayProjectTitle(project models.ModProject, fallback string) string {
-	if title := strings.TrimSpace(project.Title); title != "" {
-		return title
-	}
-	if slug := strings.TrimSpace(project.Slug); slug != "" {
-		return slug
-	}
-	if projectID := strings.TrimSpace(project.ProjectID); projectID != "" {
-		return projectID
-	}
-	if fallback = strings.TrimSpace(fallback); fallback != "" {
-		return fallback
-	}
-	return "Mod"
+	return models.ProjectDisplayTitle(project, fallback)
 }
 
 func hydrateDownloadDependencies(req appstructs.ModDownloadRequest, version models.ModVersion) models.ModVersion {
@@ -1480,6 +1493,7 @@ func downloadModToTarget(ctx context.Context, job downloadJob, existing []global
 		_ = os.Remove(tempPath)
 		return false, nil
 	}
+	preserveDisabled := shouldPreserveDisabled(existing)
 	archiveSupersededModJars(existing)
 	if downloadTargetExists(finalPath) {
 		logging.Info("download skipped because target file already exists after archiving superseded jars", "path", finalPath, "versionID", job.Version.ID)
@@ -1489,6 +1503,7 @@ func downloadModToTarget(ctx context.Context, job downloadJob, existing []global
 	if err := os.Rename(tempPath, finalPath); err != nil {
 		return false, err
 	}
+	finalPath = applyPreservedDisabledState(finalPath, preserveDisabled)
 	upsertDownloadedMod(finalPath, job)
 	return true, nil
 }
@@ -1519,6 +1534,7 @@ func downloadModWithLocalParse(ctx context.Context, job downloadJob, events Even
 		_ = os.Remove(tempPath)
 		return false, nil
 	}
+	preserveDisabled := shouldPreserveDisabled(existing)
 	archiveSupersededModJars(existing)
 
 	finalPath := filepath.Join(job.TargetDir, filepath.Base(tempPath))
@@ -1530,6 +1546,7 @@ func downloadModWithLocalParse(ctx context.Context, job downloadJob, events Even
 	if err := os.Rename(tempPath, finalPath); err != nil {
 		return false, err
 	}
+	finalPath = applyPreservedDisabledState(finalPath, preserveDisabled)
 	upsertDownloadedMod(finalPath, job)
 	return true, nil
 }

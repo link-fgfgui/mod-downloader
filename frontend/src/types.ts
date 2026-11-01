@@ -10,7 +10,6 @@ export type {
 } from "../bindings/github.com/link-fgfgui/mod-downloader/core/storage/models";
 export type { VersionInfo, ModInfo, LocalModDependency, JIJModInfo } from "../bindings/github.com/link-fgfgui/mod-downloader/core/structs/minecraft/models";
 export type {
-  AppPreferences,
   StartupStatus,
   SearchModsRequest,
   DownloadFailedEvent,
@@ -30,8 +29,15 @@ export type {
   CachedDependencyCandidate,
 } from "../bindings/github.com/link-fgfgui/mod-downloader/core/structs/models";
 export type {
+  Graph as ModDependencyGraph,
+  Node as ModGraphNode,
+  Requirement as ModRequirement,
+  ReverseDependencyMatch,
+} from "../bindings/github.com/link-fgfgui/mod-downloader/core/modgraph/models";
+export type {
   FavoriteOverview,
   LocalModGroup,
+  LocalModView,
   SettingsView,
   SearchModsUpdate,
   DownloadQueueState,

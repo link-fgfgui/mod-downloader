@@ -71,7 +71,7 @@ func VerifyLocalMods(modsDir string, mods []structs.ModInfo, minecraftVersion, m
 				provided[jijID] = true
 			}
 		}
-		path := resolveLocalModPath(modsDir, mod)
+		path := ResolveLocalModPath(modsDir, mod)
 		if path == "" {
 			continue
 		}
@@ -102,7 +102,7 @@ func VerifyLocalMods(modsDir string, mods []structs.ModInfo, minecraftVersion, m
 	// matching what a single-file parse would report.
 	pathToMod := make(map[string]structs.ModInfo, len(jarPaths))
 	for _, mod := range mods {
-		path := resolveLocalModPath(modsDir, mod)
+		path := ResolveLocalModPath(modsDir, mod)
 		if path == "" {
 			continue
 		}
@@ -187,7 +187,8 @@ func loadersCompatible(loaders []string, instanceLoader string) bool {
 	return false
 }
 
-func resolveLocalModPath(modsDir string, mod structs.ModInfo) string {
+// ResolveLocalModPath returns the absolute jar path for a scanned local mod.
+func ResolveLocalModPath(modsDir string, mod structs.ModInfo) string {
 	path := strings.TrimSpace(mod.Path)
 	if path == "" {
 		if strings.TrimSpace(mod.FileName) == "" {

@@ -6,6 +6,9 @@
 import * as models$0 from "../../models/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as modgraph$0 from "../../modgraph/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as storage$0 from "../../storage/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -72,6 +75,19 @@ export interface LocalModGroup {
     "loaders"?: string[] | null;
     "searchText": string;
     "incompatible": boolean;
+    "rowKey": string;
+    "canReplaceVersion": boolean;
+    "onlineProject": models$0.ModProject;
+}
+
+/**
+ * LocalModView is the full Manage projection for one instance: grouped rows,
+ * the dependency forest and the reverse-dependent index keyed by group row key.
+ */
+export interface LocalModView {
+    "groups": LocalModGroup[] | null;
+    "graph": modgraph$0.Graph;
+    "dependents"?: { [_ in string]?: modgraph$0.ReverseDependencyMatch[] | null } | null;
 }
 
 /**

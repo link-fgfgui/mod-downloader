@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/link-fgfgui/mod-downloader/core/internal/strutil"
 	"github.com/link-fgfgui/mod-downloader/core/logging"
 	"github.com/link-fgfgui/mod-downloader/core/modbridge"
 	"github.com/link-fgfgui/mod-downloader/core/models"
@@ -253,11 +254,5 @@ func favoriteDisplayName(item storage.FavoriteMod) string {
 }
 
 func firstNonEmptyString(values ...string) string {
-	for _, value := range values {
-		value = strings.TrimSpace(value)
-		if value != "" {
-			return value
-		}
-	}
-	return ""
+	return strutil.FirstNonEmptyTrimmed(values...)
 }
