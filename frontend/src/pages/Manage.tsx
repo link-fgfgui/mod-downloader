@@ -74,8 +74,11 @@ import {
   strongModIds,
   type ModGroup,
 } from "@/lib/modGroups";
+import { useFlipListAnimation } from "@/hooks/useFlipListAnimation";
+import { useFlipTreeAnimation } from "@/hooks/useFlipTreeAnimation";
 import { useLocalModSelection } from "@/hooks/useLocalModSelection";
 import { useUnusedDependencies } from "@/hooks/useUnusedDependencies";
+import { scaledDuration } from "@/lib/animations";
 import { useDownloadQueueStore } from "@/stores/downloadQueue";
 import {
   selectHasSelectedInstance,
@@ -147,6 +150,10 @@ export function ManagePage() {
   const viewModeRef = useRef<HTMLDivElement | null>(null);
   const listModeRef = useRef<HTMLButtonElement | null>(null);
   const treeModeRef = useRef<HTMLButtonElement | null>(null);
+  const treeScrollRef = useRef<HTMLDivElement | null>(null);
+  const listScrollRef = useRef<HTMLDivElement | null>(null);
+  const [exitingGroupKeys, setExitingGroupKeys] = useState<Set<string>>(new Set());
+  const [listExiting, setListExiting] = useState(false);
   const [viewIndicator, setViewIndicator] = useState({ left: 0, width: 0 });
   const [incompatibleExpanded, setIncompatibleExpanded] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
@@ -188,6 +195,7 @@ export function ManagePage() {
     batchOperation,
     isBatchBusy,
     pendingTogglePath,
+    getPendingDeleteGroups,
     deleteDialog,
     setDeleteDialog,
     pendingDeleteCount,
@@ -292,13 +300,6 @@ export function ManagePage() {
   const compatible = sortedGroups.filter((group) => !isGroupIncompatible(group, selectedLoader));
   const incompatible = sortedGroups.filter((group) => isGroupIncompatible(group, selectedLoader));
   const hasActiveFilter = appliedSearch !== "" || enabledFilter !== "all";
-
-  const availableGroups = useMemo(() => {
-    const rows: Array<ModGroup | "incompatible-toggle"> = [...compatible];
-    if (incompatible.length > 0) rows.push("incompatible-toggle");
-    if (incompatibleExpanded) rows.push(...incompatible);
-    return rows;
-  }, [compatible, incompatible, incompatibleExpanded]);
 
   // Only groups the user can currently see participate in batch actions, so a
   // search/status filter never silently operates on hidden rows. The tree view
@@ -416,6 +417,41 @@ export function ManagePage() {
     [graph.roots, selectedTreeKey],
   );
 
+  useFlipTreeAnimation(treeScrollRef);
+  useFlipListAnimation(listScrollRef);
+
+  const wait = (ms: number) =>
+    ms > 0 ? new Promise<void>((resolve) => window.setTimeout(resolve, ms)) : Promise.resolve();
+
+  // Play the row/container exit before the store refreshes. The delete dialog
+  // itself closes only after the operation, so the exit never fights the
+  // dialog's own close animation.
+  const handleConfirmDelete = async () => {
+    const groups = getPendingDeleteGroups();
+    const duration = scaledDuration(0.14) * 1000;
+    if (groups.length > 1) {
+      setListExiting(true);
+      await wait(duration);
+      await confirmDelete();
+      setListExiting(false);
+      return;
+    }
+    if (groups.length === 1) {
+      const key = groupRowKey(groups[0]);
+      setExitingGroupKeys((current) => new Set(current).add(key));
+      await wait(duration);
+      await confirmDelete();
+      setExitingGroupKeys((current) => {
+        if (!current.has(key)) return current;
+        const next = new Set(current);
+        next.delete(key);
+        return next;
+      });
+      return;
+    }
+    await confirmDelete();
+  };
+
   const treeGroupFor = (path: string) =>
     allGroups.find((group) => group.strong.some((mod) => (mod.path || "") === path)) || null;
 
@@ -456,6 +492,147 @@ export function ManagePage() {
   };
 
   const selectionActions = manageSelectionActions(selectedGroups, clearSelection);
+
+  const renderGroupCard = (group: ModGroup) => {
+    const key = groupRowKey(group);
+    const selected = selectedKeys.has(key);
+    const unused = candidateFor(group);
+    const categories = modCategories(group);
+    const groupAction = group.primary.enabled ? "disable" : "enable";
+    return (
+      <div
+        key={key}
+        data-flip-key={key}
+        className={cn(
+          "md-row-interactive flex w-full min-w-0 cursor-pointer items-center gap-3 rounded-xl border bg-card p-3 shadow-sm",
+          selected
+            ? "border-primary/50 bg-primary/10 shadow-sm hover:bg-primary/15"
+            : "hover:border-foreground/20 hover:bg-accent/60 hover:shadow-md",
+          isGroupIncompatible(group, selectedLoader) && "opacity-80",
+          exitingGroupKeys.has(key) && "md-row-exiting",
+        )}
+        onClick={(event) => toggleSelection(group, event)}
+      >
+        <div className={cn("flex size-5 shrink-0 items-center justify-center rounded border transition-colors duration-md", selected ? "border-primary bg-primary text-primary-foreground" : "border-input")}>
+          {selected ? <Eye className="size-3.5 animate-in fade-in-0 zoom-in-50 duration-md-fast" /> : null}
+        </div>
+        <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted/40">
+          {group.primary.onlineMetadataLoading ? (
+            <Loader2 className="size-5 animate-spin text-muted-foreground" />
+          ) : group.primary.iconUrl ? (
+            <img src={group.primary.iconUrl} alt="" className="size-full object-cover" />
+          ) : (
+            <Package className="size-6 text-muted-foreground" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="truncate text-sm font-semibold">{displayModName(group)}</span>
+            {hasGroupedDetails(group) ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="outline" className="shrink-0">{group.strong.length + group.jij.length}</Badge>
+                </TooltipTrigger>
+                <TooltipContent className="whitespace-pre-line">{groupTooltip(group)}</TooltipContent>
+              </Tooltip>
+            ) : null}
+            {unused ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="outline" className="shrink-0 border-amber-500/40 text-amber-700 dark:text-amber-300">
+                    {t("manage.unused.chip")}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent className="whitespace-pre-line">{tooltipFor(group)}</TooltipContent>
+              </Tooltip>
+            ) : null}
+          </div>
+          <div className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+            <span className="truncate">{strongModIds(group).join(", ")}</span>
+            {group.primary.version ? (
+              <>
+                <span className="shrink-0">·</span>
+                <button
+                  type="button"
+                  className="group/version shrink-0 transition-[color,opacity] duration-fast active:opacity-60 disabled:no-underline"
+                  disabled={!canReplaceVersion(group)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    openVersion(group);
+                  }}
+                >
+                  <span className="underline-offset-2 group-hover/version:underline">
+                    {group.primary.version}
+                  </span>
+                </button>
+              </>
+            ) : null}
+            {group.primary.fileName || group.primary.path ? (
+              <span className="truncate">· {group.primary.fileName || group.primary.path}</span>
+            ) : null}
+          </div>
+          {categories.length ? (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {categories.slice(0, 3).map((category) => (
+                <Badge key={category} variant="secondary" className="max-w-32 truncate text-[0.65rem]">
+                  {category}
+                </Badge>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                size="icon-sm"
+                variant="secondary"
+                disabled={!canFavoriteGroup(group)}
+                aria-label={t("favorites.addToFavorites")}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  openFavorites([group]);
+                }}
+              >
+                <ListPlus className="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{t("favorites.addToFavorites")}</TooltipContent>
+          </Tooltip>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className={group.primary.enabled ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300"}
+            disabled={isBatchBusy}
+            onClick={(event) => {
+              event.stopPropagation();
+              void toggleGroup(group);
+            }}
+          >
+                      {pendingTogglePath === group.primary.path ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <span
+                          key={String(group.primary.enabled)}
+                          className="inline-flex animate-in fade-in-0 zoom-in-75 duration-md-fast"
+                        >
+                          {group.primary.enabled ? (
+                            <ToggleRight className="size-4" />
+                          ) : (
+                            <ToggleLeft className="size-4" />
+                          )}
+                        </span>
+                      )}
+            <span className="hidden sm:inline">
+              {t(groupAction === "disable" ? "manage.disableSelected" : "manage.enableSelected")}
+            </span>
+          </Button>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="relative mx-auto flex h-full w-full max-w-6xl flex-col overflow-hidden p-6">
@@ -562,7 +739,11 @@ export function ManagePage() {
           {t("manage.noInstance")}
         </div>
       ) : viewMode === "tree" ? (
-        <div className="mt-4 min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-xl border bg-card/40 animate-in fade-in-0 slide-in-from-right-2 duration-200">
+        <div
+          ref={treeScrollRef}
+          data-tree-scroll
+          className="relative mt-4 min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-xl border bg-card/40 animate-in fade-in-0 slide-in-from-right-2 duration-md"
+        >
           {graph.missing.length ? (
             <div className="border-b border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
               {t("manage.tree.missingDep", { n: graph.missing.length })}
@@ -582,6 +763,8 @@ export function ManagePage() {
               return (
                 <div
                   key={row.key}
+                  data-tree-key={row.key}
+                  data-tree-depth={row.depth}
                   className={cn(
                     "md-row-interactive flex min-h-14 items-center gap-2 border-b px-3 py-2 last:border-b-0",
                     selectedTreeKey === node.key
@@ -621,11 +804,11 @@ export function ManagePage() {
                       <StatusIcon className={cn("size-5 shrink-0", status.color)} />
                     )}
                     <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-1">
+                      <span className="flex items-center gap-1" data-tree-label>
                         <span className="truncate text-sm font-medium">{node.name}</span>
                         {node.version ? <span className="truncate text-xs text-muted-foreground">· {node.version}</span> : null}
                       </span>
-                      <span className="block truncate text-xs text-muted-foreground">
+                      <span className="block truncate text-xs text-muted-foreground" data-tree-meta>
                         {node.isMissing
                           ? t("manage.tree.missingNode")
                           : node.isJij
@@ -641,7 +824,9 @@ export function ManagePage() {
                     </span>
                   </button>
                   {node.isRoot ? <Badge variant="outline">{t("manage.tree.root")}</Badge> : null}
-                  <Badge variant="secondary" className={status.color}>{status.label}</Badge>
+                  <Badge variant="secondary" className={status.color} data-tree-status>
+                    {status.label}
+                  </Badge>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button type="button" size="icon-sm" variant="ghost" aria-label={t("manage.tree.actions.menu")}>
@@ -673,168 +858,47 @@ export function ManagePage() {
             })
           )}
         </div>
-      ) : availableGroups.length === 0 ? (
+      ) : sortedGroups.length === 0 ? (
         <div className="mt-6 flex min-h-64 flex-col items-center justify-center gap-2 rounded-xl border border-dashed text-muted-foreground">
           <Package className="size-10" />
           <span className="text-sm">{hasActiveFilter ? t("manage.search.empty") : t("manage.noMods")}</span>
         </div>
       ) : (
-        <div className="mt-4 min-h-0 flex-1 overflow-y-auto overflow-x-hidden animate-in fade-in-0 slide-in-from-left-2 duration-200">
+        <div
+          ref={listScrollRef}
+          className={cn(
+            "relative mt-4 min-h-0 flex-1 overflow-y-auto overflow-x-hidden transition-[opacity,transform] duration-md-fast animate-in fade-in-0 slide-in-from-left-2",
+            listExiting && "pointer-events-none translate-y-1 opacity-0",
+          )}
+        >
           <div className={cn("grid gap-2", selectedGroups.length > 0 && "pb-24")}>
-            {availableGroups.map((row) => {
-              if (row === "incompatible-toggle") {
-                return (
-                  <button
-                    key="incompatible-toggle"
-                    type="button"
-                    className="md-row-interactive flex w-full min-w-0 items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-left hover:bg-amber-500/20"
-                    onClick={() => setIncompatibleExpanded((value) => !value)}
-                  >
-                    <AlertTriangle className="size-5 text-amber-600 dark:text-amber-400" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-semibold">
-                        {t("manage.incompatible.title", { n: incompatible.length })}
-                      </span>
-                      <span className="block text-xs text-muted-foreground">
-                        {t(incompatibleExpanded ? "manage.incompatible.expanded" : "manage.incompatible.collapsed")}
-                      </span>
-                    </span>
-                    <ChevronDown className={cn("size-4 transition-transform", incompatibleExpanded && "rotate-180")} />
-                  </button>
-                );
-              }
-
-              const group = row;
-              const key = groupRowKey(group);
-              const selected = selectedKeys.has(key);
-              const unused = candidateFor(group);
-              const categories = modCategories(group);
-              const groupAction = group.primary.enabled ? "disable" : "enable";
-              return (
-                <div
-                  key={key}
-                  className={cn(
-                    "md-row-interactive flex w-full min-w-0 cursor-pointer items-center gap-3 rounded-xl border bg-card p-3 shadow-sm",
-                    selected
-                      ? "border-primary/50 bg-primary/10 shadow-sm hover:bg-primary/15"
-                      : "hover:border-foreground/20 hover:bg-accent/60 hover:shadow-md",
-                    isGroupIncompatible(group, selectedLoader) && "opacity-80",
-                  )}
-                  onClick={(event) => toggleSelection(group, event)}
+            {compatible.map(renderGroupCard)}
+            {incompatible.length > 0 ? (
+              <>
+                <button
+                  key="incompatible-toggle"
+                  type="button"
+                  className="md-row-interactive flex w-full min-w-0 items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-left hover:bg-amber-500/20"
+                  onClick={() => setIncompatibleExpanded((value) => !value)}
                 >
-                  <div className={cn("flex size-5 shrink-0 items-center justify-center rounded border transition-colors duration-md", selected ? "border-primary bg-primary text-primary-foreground" : "border-input")}>
-                    {selected ? <Eye className="size-3.5 animate-in fade-in-0 zoom-in-50 duration-150" /> : null}
-                  </div>
-                  <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted/40">
-                    {group.primary.onlineMetadataLoading ? (
-                      <Loader2 className="size-5 animate-spin text-muted-foreground" />
-                    ) : group.primary.iconUrl ? (
-                      <img src={group.primary.iconUrl} alt="" className="size-full object-cover" />
-                    ) : (
-                      <Package className="size-6 text-muted-foreground" />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="truncate text-sm font-semibold">{displayModName(group)}</span>
-                      {hasGroupedDetails(group) ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Badge variant="outline" className="shrink-0">{group.strong.length + group.jij.length}</Badge>
-                          </TooltipTrigger>
-                          <TooltipContent className="whitespace-pre-line">{groupTooltip(group)}</TooltipContent>
-                        </Tooltip>
-                      ) : null}
-                      {unused ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Badge variant="outline" className="shrink-0 border-amber-500/40 text-amber-700 dark:text-amber-300">
-                              {t("manage.unused.chip")}
-                            </Badge>
-                          </TooltipTrigger>
-                          <TooltipContent className="whitespace-pre-line">{tooltipFor(group)}</TooltipContent>
-                        </Tooltip>
-                      ) : null}
-                    </div>
-                    <div className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-                      <span className="truncate">{strongModIds(group).join(", ")}</span>
-                      {group.primary.version ? (
-                        <>
-                          <span className="shrink-0">·</span>
-                          <button
-                            type="button"
-                            className="group/version shrink-0 transition-[color,opacity] duration-fast active:opacity-60 disabled:no-underline"
-                            disabled={!canReplaceVersion(group)}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              openVersion(group);
-                            }}
-                          >
-                            <span className="underline-offset-2 group-hover/version:underline">
-                              {group.primary.version}
-                            </span>
-                          </button>
-                        </>
-                      ) : null}
-                      {group.primary.fileName || group.primary.path ? (
-                        <span className="truncate">· {group.primary.fileName || group.primary.path}</span>
-                      ) : null}
-                    </div>
-                    {categories.length ? (
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {categories.slice(0, 3).map((category) => (
-                          <Badge key={category} variant="secondary" className="max-w-32 truncate text-[0.65rem]">
-                            {category}
-                          </Badge>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          type="button"
-                          size="icon-sm"
-                          variant="secondary"
-                          disabled={!canFavoriteGroup(group)}
-                          aria-label={t("favorites.addToFavorites")}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            openFavorites([group]);
-                          }}
-                        >
-                          <ListPlus className="size-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>{t("favorites.addToFavorites")}</TooltipContent>
-                    </Tooltip>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      className={group.primary.enabled ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300"}
-                      disabled={isBatchBusy}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        void toggleGroup(group);
-                      }}
-                    >
-                      {pendingTogglePath === group.primary.path ? (
-                        <Loader2 className="size-4 animate-spin" />
-                      ) : group.primary.enabled ? (
-                        <ToggleRight className="size-4" />
-                      ) : (
-                        <ToggleLeft className="size-4" />
-                      )}
-                      <span className="hidden sm:inline">
-                        {t(groupAction === "disable" ? "manage.disableSelected" : "manage.enableSelected")}
-                      </span>
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
+                  <AlertTriangle className="size-5 text-amber-600 dark:text-amber-400" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold">
+                      {t("manage.incompatible.title", { n: incompatible.length })}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      {t(incompatibleExpanded ? "manage.incompatible.expanded" : "manage.incompatible.collapsed")}
+                    </span>
+                  </span>
+                  <ChevronDown className={cn("size-4 transition-transform", incompatibleExpanded && "rotate-180")} />
+                </button>
+                <AnimatedPresence open={incompatibleExpanded} mode="collapse" preserveContent>
+                  {incompatibleExpanded ? (
+                    <div className="grid gap-2 pt-2">{incompatible.map(renderGroupCard)}</div>
+                  ) : null}
+                </AnimatedPresence>
+              </>
+            ) : null}
           </div>
         </div>
       )}
@@ -852,8 +916,9 @@ export function ManagePage() {
             className="md-selection-toolbar flex max-w-full flex-wrap items-center justify-center gap-1.5 rounded-2xl border bg-popover/95 p-2 shadow-2xl backdrop-blur-md"
           >
             <span
+              key={selectedGroups.length}
               aria-hidden="true"
-              className="flex size-9 items-center justify-center rounded-full bg-sky-500/15 text-sm font-semibold text-sky-600 dark:text-sky-300"
+              className="flex size-9 animate-in items-center justify-center rounded-full bg-sky-500/15 text-sm font-semibold text-sky-600 zoom-in-75 fade-in-0 duration-md-fast tabular-nums dark:text-sky-300"
             >
               {selectedGroups.length}
             </span>
@@ -938,7 +1003,7 @@ export function ManagePage() {
               className="bg-destructive text-white hover:bg-destructive/90"
               onClick={(event) => {
                 event.preventDefault();
-                void confirmDelete();
+                void handleConfirmDelete();
               }}
             >
               {batchOperation === "delete" ? <Loader2 className="size-4 animate-spin" /> : null}

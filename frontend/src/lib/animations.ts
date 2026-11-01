@@ -5,18 +5,17 @@ export const minAnimationDurationMultiplier = 0.1;
 export const maxAnimationDurationMultiplier = 3;
 
 const baseDurations = {
+  press: 70,
   fast: 120,
   normal: 180,
   slow: 240,
+  emphasis: 320,
 };
 
 const routeEnterDuration = 0.18;
-const routeLeaveDuration = 0.1;
 const routeEnterOffset = 8;
-const routeLeaveOffset = -4;
+const queueExitDuration = 0.14;
 const finishGuardPaddingMs = 400;
-
-const routeLeaveClass = "route-leave-active";
 
 export type AnimationSettings = {
   animationDurationMultiplier?: number;
@@ -28,13 +27,20 @@ export function normalizeAnimationDurationMultiplier(value: unknown): number {
   return Math.min(maxAnimationDurationMultiplier, Math.max(minAnimationDurationMultiplier, numeric));
 }
 
+/**
+ * Writes both the raw multiplier and the resolved absolute durations. The
+ * absolute values keep existing utilities and GSAP working unchanged, while
+ * the multiplier lets CSS scale fixed-time effects (combobox close reasons,
+ * keyframe feedback, press feedback) without re-writing every rule.
+ */
 export function applyAnimationSettings(settings?: AnimationSettings | null) {
   if (typeof document === "undefined") return;
   const multiplier = normalizeAnimationDurationMultiplier(settings?.animationDurationMultiplier);
   const root = document.documentElement;
-  root.style.setProperty("--md-transition-fast", `${baseDurations.fast * multiplier}ms`);
-  root.style.setProperty("--md-transition-normal", `${baseDurations.normal * multiplier}ms`);
-  root.style.setProperty("--md-transition-slow", `${baseDurations.slow * multiplier}ms`);
+  root.style.setProperty("--md-motion-multiplier", String(multiplier));
+  for (const [name, base] of Object.entries(baseDurations)) {
+    root.style.setProperty(`--md-transition-${name}`, `${base * multiplier}ms`);
+  }
 }
 
 export function prefersReducedMotion(): boolean {
@@ -43,9 +49,19 @@ export function prefersReducedMotion(): boolean {
 
 function animationMultiplier(): number {
   if (typeof document === "undefined") return 1;
-  const normal = document.documentElement.style.getPropertyValue("--md-transition-normal");
-  const normalMs = Number.parseFloat(normal);
-  return Number.isFinite(normalMs) && normalMs > 0 ? normalMs / baseDurations.normal : 1;
+  const root = document.documentElement;
+  // The multiplier is the source of truth. Never parse the absolute duration
+  // variables here: they may be calc() expressions once CSS takes over.
+  const explicit = Number.parseFloat(root.style.getPropertyValue("--md-motion-multiplier"));
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  if (typeof window !== "undefined") {
+    const computed = Number.parseFloat(
+      window.getComputedStyle(root).getPropertyValue("--md-motion-multiplier"),
+    );
+    if (Number.isFinite(computed) && computed > 0) return computed;
+  }
+  const normal = Number.parseFloat(root.style.getPropertyValue("--md-transition-normal"));
+  return Number.isFinite(normal) && normal > 0 ? normal / baseDurations.normal : 1;
 }
 
 export function scaledDuration(baseSeconds: number): number {
@@ -53,18 +69,27 @@ export function scaledDuration(baseSeconds: number): number {
   return Math.max(0, baseSeconds * animationMultiplier());
 }
 
-// Route stage entrance is intentionally small and self-contained. It is the
-// single GSAP entry point the pages use; page-specific animation work can build
-// on the same timing helpers in a later stage.
-export function animateRouteEnter(element: Element | null) {
+/** Same as scaledDuration but in milliseconds, for timers that mirror a CSS transition. */
+export function scaledDurationMs(baseSeconds: number): number {
+  return Math.round(scaledDuration(baseSeconds) * 1000);
+}
+
+export type RouteDirection = 1 | -1 | 0;
+
+/**
+ * Route stage entrance. Direction-aware: navigating down the sidebar list
+ * enters from below, navigating up enters from above. Only the page stage is
+ * animated; the fixed sidebar, queue FAB and toaster stay put.
+ */
+export function animateRouteEnter(element: Element | null, direction: RouteDirection = 1) {
   if (!element) return () => {};
   const duration = scaledDuration(routeEnterDuration);
   if (duration === 0) return () => {};
   gsap.killTweensOf(element);
-  element.classList.remove(routeLeaveClass);
+  const offset = direction < 0 ? -routeEnterOffset : routeEnterOffset;
   const tween = gsap.fromTo(
     element,
-    { opacity: 0, y: routeEnterOffset },
+    { opacity: 0, y: offset },
     { opacity: 1, y: 0, duration, ease: "expo.out", clearProps: "opacity,transform" },
   );
   return () => {
@@ -87,7 +112,7 @@ export function animateQueuePanel(element: Element | null) {
 
 export function animateQueueExit(element: Element | null): Promise<void> {
   if (!element) return Promise.resolve();
-  const duration = scaledDuration(routeLeaveDuration);
+  const duration = scaledDuration(queueExitDuration);
   if (duration === 0) return Promise.resolve();
   return new Promise((resolve) => {
     gsap.to(element, {
@@ -105,4 +130,28 @@ export function animateQueueExit(element: Element | null): Promise<void> {
   });
 }
 
-export { routeLeaveClass, routeEnterOffset, routeLeaveOffset, finishGuardPaddingMs };
+/** FAB / floating control exit: scale down and fade, then unmount. */
+export function animateScaleExit(
+  element: Element | null,
+  options?: { scale?: number; y?: number; baseDuration?: number },
+): Promise<void> {
+  if (!element) return Promise.resolve();
+  const duration = scaledDuration(options?.baseDuration ?? 0.16);
+  if (duration === 0) return Promise.resolve();
+  return new Promise((resolve) => {
+    gsap.to(element, {
+      opacity: 0,
+      scale: options?.scale ?? 0.75,
+      y: options?.y ?? 0,
+      duration,
+      ease: "power1.in",
+      onComplete: () => {
+        gsap.set(element, { clearProps: "opacity,transform" });
+        resolve();
+      },
+      onInterrupt: resolve,
+    });
+  });
+}
+
+export { routeEnterOffset, finishGuardPaddingMs };

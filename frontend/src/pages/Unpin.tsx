@@ -17,6 +17,8 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { usePinnedModsStore } from "@/stores/pinnedMods";
+import { scaledDuration } from "@/lib/animations";
+import { cn } from "@/lib/utils";
 import type { PinnedMod } from "@/types";
 
 const pinKey = (pin: PinnedMod) =>
@@ -31,8 +33,13 @@ export function UnpinPage() {
   const unpinAll = usePinnedModsStore((state) => state.unpinAll);
   const error = usePinnedModsStore((state) => state.error);
   const [pending, setPending] = useState<Set<string>>(new Set());
+  const [exitingKeys, setExitingKeys] = useState<Set<string>>(new Set());
+  const [listExiting, setListExiting] = useState(false);
   const [confirmAll, setConfirmAll] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
+
+  const wait = (ms: number) =>
+    ms > 0 ? new Promise<void>((resolve) => window.setTimeout(resolve, ms)) : Promise.resolve();
 
   useEffect(() => {
     void refresh();
@@ -42,6 +49,8 @@ export function UnpinPage() {
     const key = pinKey(pin);
     if (pending.has(key)) return;
     setPending((current) => new Set(current).add(key));
+    setExitingKeys((current) => new Set(current).add(key));
+    await wait(scaledDuration(0.14) * 1000);
     try {
       const removed = await unpin(pin);
       if (removed) toast.success(t("unpin.removed"));
@@ -55,6 +64,12 @@ export function UnpinPage() {
         next.delete(key);
         return next;
       });
+      setExitingKeys((current) => {
+        if (!current.has(key)) return current;
+        const next = new Set(current);
+        next.delete(key);
+        return next;
+      });
     }
   };
 
@@ -62,6 +77,8 @@ export function UnpinPage() {
     if (bulkBusy) return;
     setConfirmAll(false);
     setBulkBusy(true);
+    setListExiting(true);
+    await wait(scaledDuration(0.14) * 1000);
     try {
       const failed = await unpinAll();
       if (failed > 0) toast.warning(t("unpin.unpinAllPartial", { failed }));
@@ -70,6 +87,7 @@ export function UnpinPage() {
       toast.error(error instanceof Error ? error.message : String(error));
     } finally {
       setBulkBusy(false);
+      setListExiting(false);
     }
   };
 
@@ -93,12 +111,17 @@ export function UnpinPage() {
       {error ? <div className="rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive">{error}</div> : null}
 
       {!loading && pins.length === 0 ? (
-        <div className="flex min-h-64 flex-col items-center justify-center gap-3 rounded-xl border border-dashed text-muted-foreground">
+        <div className="flex min-h-64 animate-in flex-col items-center justify-center gap-3 rounded-xl border border-dashed text-muted-foreground fade-in-0 zoom-in-95 duration-md">
           <PinOffIcon className="size-10" />
           <span className="text-sm">{t("unpin.empty")}</span>
         </div>
       ) : pins.length === 0 ? null : (
-        <div className="overflow-x-auto rounded-xl border">
+        <div
+          className={cn(
+            "overflow-x-auto rounded-xl border transition-[opacity,transform] duration-md-fast",
+            listExiting && "pointer-events-none translate-y-1 opacity-0",
+          )}
+        >
           <Table className="min-w-[42rem]">
             <TableHeader>
               <TableRow>
@@ -112,9 +135,16 @@ export function UnpinPage() {
             </TableHeader>
             <TableBody>
               {pins.map((pin) => {
-                const busy = pending.has(pinKey(pin));
+                const key = pinKey(pin);
+                const busy = pending.has(key);
                 return (
-                  <TableRow key={pin.id || pinKey(pin)} className="animate-in fade-in-0 duration-150">
+                  <TableRow
+                    key={pin.id || key}
+                    className={cn(
+                      "animate-in fade-in-0 duration-md-fast",
+                      exitingKeys.has(key) && "md-row-exiting",
+                    )}
+                  >
                     <TableCell>{pin.platform}</TableCell>
                     <TableCell className="font-medium">{pin.modId}</TableCell>
                     <TableCell className="max-w-52 truncate font-mono text-xs">{pin.versionId}</TableCell>

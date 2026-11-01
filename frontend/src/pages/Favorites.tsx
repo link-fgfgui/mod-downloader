@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Archive,
   Copy,
@@ -68,6 +68,8 @@ import {
 import { useMinecraftStore } from "@/stores/minecraft";
 import { useSettingsStore } from "@/stores/settings";
 import { errorMessage } from "@/lib/format";
+import { scaledDuration } from "@/lib/animations";
+import { useFlipListAnimation } from "@/hooks/useFlipListAnimation";
 import type { FavoriteList, FavoriteModEntry, ModProject } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -148,7 +150,15 @@ export function FavoritesPage() {
   const [pinItem, setPinItem] = useState<FavoriteModEntry | null>(null);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [draggedListId, setDraggedListId] = useState("");
-  const [dropTargetId, setDropTargetId] = useState("");
+  const [dragOver, setDragOver] = useState<{ id: string; position: "before" | "after" } | null>(null);
+  const [exitingKeys, setExitingKeys] = useState<Set<string>>(new Set());
+  const [listRemoving, setListRemoving] = useState(false);
+  const listRef = useRef<HTMLDivElement | null>(null);
+
+  useFlipListAnimation(listRef);
+
+  const wait = (ms: number) =>
+    ms > 0 ? new Promise<void>((resolve) => window.setTimeout(resolve, ms)) : Promise.resolve();
 
   useEffect(() => {
     setDisplayScope(minecraftVersion, modLoader);
@@ -362,6 +372,10 @@ export function FavoritesPage() {
       setSelectedKeys(new Set());
       return;
     }
+    // Batch removal only fades the container; animating dozens of rows would
+    // cost more than it communicates.
+    setListRemoving(true);
+    await wait(scaledDuration(0.15) * 1000);
     try {
       await removeMany(removable);
       toast.success(t("favorites.removed"));
@@ -369,10 +383,32 @@ export function FavoritesPage() {
       toast.error(t("favorites.operationFailed") + ": " + errorMessage(error));
     }
     setSelectedKeys(new Set());
+    setListRemoving(false);
+  };
+
+  // Single-row removal plays the row exit first, then updates the store.
+  const handleRemoveItem = async (item: FavoriteModEntry) => {
+    const key = favoriteModKey(item);
+    setExitingKeys((current) => new Set(current).add(key));
+    await wait(scaledDuration(0.15) * 1000);
+    try {
+      const removed = await removeMod(item);
+      if (removed) toast.success(t("favorites.removed"));
+    } catch (error) {
+      toast.error(t("favorites.operationFailed") + ": " + errorMessage(error));
+    } finally {
+      setExitingKeys((current) => {
+        if (!current.has(key)) return current;
+        const next = new Set(current);
+        next.delete(key);
+        return next;
+      });
+    }
   };
 
   const onDragStart = (event: React.DragEvent, list: FavoriteList) => {
     setDraggedListId(list.id);
+    setDragOver(null);
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", list.id);
   };
@@ -380,7 +416,12 @@ export function FavoritesPage() {
   const onDragOver = (event: React.DragEvent, listId: string) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
-    if (draggedListId && draggedListId !== listId) setDropTargetId(listId);
+    if (!draggedListId || draggedListId === listId) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const position = event.clientY < rect.top + rect.height / 2 ? "before" : "after";
+    setDragOver((current) =>
+      current?.id === listId && current.position === position ? current : { id: listId, position },
+    );
   };
 
   const moveList = async (sourceId: string, pinned: boolean) => {
@@ -397,15 +438,17 @@ export function FavoritesPage() {
     pinned: boolean,
   ) => {
     event.preventDefault();
-    setDropTargetId("");
+    const position = dragOver?.id === targetListId ? dragOver.position : "before";
+    setDragOver(null);
     const sourceId = draggedListId;
     setDraggedListId("");
     if (!sourceId || sourceId === targetListId) return;
     const moved = await moveList(sourceId, pinned);
     if (!moved) return;
     const ids = sectionLists.map((list) => list.id).filter((id) => id !== sourceId);
-    const targetIndex = ids.indexOf(targetListId);
+    let targetIndex = ids.indexOf(targetListId);
     if (targetIndex < 0) return;
+    if (position === "after") targetIndex += 1;
     ids.splice(targetIndex, 0, sourceId);
     await reorderLists(ids);
   };
@@ -414,7 +457,7 @@ export function FavoritesPage() {
     event.preventDefault();
     const sourceId = draggedListId;
     setDraggedListId("");
-    setDropTargetId("");
+    setDragOver(null);
     if (!sourceId) return;
     await moveList(sourceId, pinned);
   };
@@ -436,11 +479,13 @@ export function FavoritesPage() {
     return (
       <div
         key={list.id}
+        data-list-id={list.id}
+        data-flip-key={list.id}
         draggable
         onDragStart={(event) => onDragStart(event, list)}
         onDragEnd={() => {
           setDraggedListId("");
-          setDropTargetId("");
+          setDragOver(null);
         }}
         onDragOver={(event) => {
           event.stopPropagation();
@@ -451,12 +496,22 @@ export function FavoritesPage() {
           void onDrop(event, list.id, sectionLists, pinned);
         }}
         className={cn(
-          "group relative flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors",
+          "group relative flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-[background-color,color,opacity,transform] duration-md-fast",
           selected ? "bg-primary/10 text-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
-          dropTargetId === list.id && "ring-2 ring-primary/50",
+          draggedListId === list.id && "scale-[0.98] opacity-40",
         )}
         onClick={() => void selectList(list.id)}
       >
+        {dragOver?.id === list.id ? (
+          <span
+            aria-hidden="true"
+            data-drop-indicator={dragOver.position}
+            className={cn(
+              "md-drop-line pointer-events-none absolute inset-x-0",
+              dragOver.position === "before" ? "-top-[5px]" : "-bottom-[5px]",
+            )}
+          />
+        ) : null}
         <GripVertical className="size-3.5 shrink-0 cursor-grab text-muted-foreground/60" />
         <span className="flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted/40">
           {iconUrl ? <img src={iconUrl} alt="" className="size-full object-cover" /> : <ListMusic className="size-3.5" />}
@@ -525,30 +580,31 @@ export function FavoritesPage() {
           {lists.length === 0 ? (
             <div className="py-10 text-center text-sm text-muted-foreground">{t("favorites.empty.noLists")}</div>
           ) : (
-            <>
+            // Pinned and normal lists share one parent so React can move a row
+            // between sections without remounting it, which lets FLIP animate
+            // the pin/unpin flight.
+            <div ref={listRef} className="relative grid gap-2">
               {pinnedLists.length ? (
-                <section
-                  className="mb-2"
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={(event) => void onSectionDrop(event, true)}
-                >
-                  <div className="flex items-center gap-1 px-2 py-1 text-[0.7rem] font-bold uppercase tracking-wide text-muted-foreground">
+                <>
+                  <div
+                    className="flex items-center gap-1 px-2 py-1 text-[0.7rem] font-bold uppercase tracking-wide text-muted-foreground animate-in fade-in-0 slide-in-from-top-1 duration-md-fast"
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={(event) => void onSectionDrop(event, true)}
+                  >
                     <Pin className="size-3" /> {t("favorites.sections.pinned")}
                   </div>
                   {pinnedLists.map((list) => renderListRow(list, pinnedLists, true))}
-                </section>
+                </>
               ) : null}
-              <section
-                className="mb-2"
+              <div
+                className="flex items-center gap-1 px-2 py-1 text-[0.7rem] font-bold uppercase tracking-wide text-muted-foreground"
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={(event) => void onSectionDrop(event, false)}
               >
-                <div className="flex items-center gap-1 px-2 py-1 text-[0.7rem] font-bold uppercase tracking-wide text-muted-foreground">
-                  <Star className="size-3" /> {t("favorites.sections.lists")}
-                </div>
-                {ungroupedLists.map((list) => renderListRow(list, ungroupedLists, false))}
-              </section>
-            </>
+                <Star className="size-3" /> {t("favorites.sections.lists")}
+              </div>
+              {ungroupedLists.map((list) => renderListRow(list, ungroupedLists, false))}
+            </div>
           )}
         </div>
       </aside>
@@ -608,7 +664,13 @@ export function FavoritesPage() {
             <span className="text-sm">{t("favorites.empty.noItems")}</span>
           </div>
         ) : (
-          <div className="mt-3 min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-1">
+          <div
+            key={selectedListId}
+            className={cn(
+              "mt-3 min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-1 animate-in fade-in-0 slide-in-from-bottom-1 duration-md transition-[opacity,transform]",
+              listRemoving && "pointer-events-none translate-y-1 opacity-0",
+            )}
+          >
             <div className={cn("grid gap-2", selectedItems.length > 0 && "pb-24")}>
               {items.map((item) => {
                 const key = favoriteModKey(item);
@@ -622,6 +684,7 @@ export function FavoritesPage() {
                         ? "border-primary/50 bg-primary/10 shadow-sm hover:bg-primary/15"
                         : "hover:border-foreground/20 hover:bg-accent/60 hover:shadow-md",
                       item.referenced && "border-l-4 border-l-cyan-500",
+                      exitingKeys.has(key) && "md-row-exiting",
                     )}
                     onClick={(event) => {
                       if (!item.referenced) toggleItem(item, event);
@@ -631,7 +694,7 @@ export function FavoritesPage() {
                       {item.referenced ? (
                         <Link2 className="size-3 text-cyan-600 dark:text-cyan-400" />
                       ) : selected ? (
-                        <Eye className="size-3.5 animate-in fade-in-0 zoom-in-50 duration-150" />
+                        <Eye className="size-3.5 animate-in fade-in-0 zoom-in-50 duration-md-fast" />
                       ) : null}
                     </div>
                     <button
@@ -669,13 +732,7 @@ export function FavoritesPage() {
                         aria-label={t("favorites.actions.removeSelected")}
                         onClick={(event) => {
                           event.stopPropagation();
-                          void removeMod(item)
-                            .then((removed) => {
-                              if (removed) toast.success(t("favorites.removed"));
-                            })
-                            .catch((error: unknown) => {
-                              toast.error(t("favorites.operationFailed") + ": " + errorMessage(error));
-                            });
+                          void handleRemoveItem(item);
                         }}
                       >
                         <Trash2 className="size-4" />
@@ -697,8 +754,9 @@ export function FavoritesPage() {
           >
             <div className="md-selection-toolbar flex max-w-full flex-wrap items-center justify-center gap-1.5 rounded-2xl border bg-popover/95 p-2 shadow-2xl backdrop-blur-md">
               <span
+                key={selectedItems.length}
                 aria-label={t("manage.selectedCount", { n: selectedItems.length })}
-                className="flex size-9 items-center justify-center rounded-full bg-sky-500/15 text-sm font-semibold text-sky-600 dark:text-sky-300"
+                className="flex size-9 animate-in items-center justify-center rounded-full bg-sky-500/15 text-sm font-semibold text-sky-600 zoom-in-75 fade-in-0 duration-md-fast tabular-nums dark:text-sky-300"
               >
                 {selectedItems.length}
               </span>

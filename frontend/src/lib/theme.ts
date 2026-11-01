@@ -20,6 +20,12 @@ export function resolveThemePreference(preference: unknown): "dark" | "light" {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
+type ViewTransitionDocument = Document & {
+  startViewTransition?: (callback: () => void) => { finished: Promise<void> };
+};
+
+let themeViewTransitionActive = false;
+
 export function applyThemePreference(preference: unknown) {
   stopListeningSystemTheme?.();
   stopListeningSystemTheme = null;
@@ -31,7 +37,31 @@ export function applyThemePreference(preference: unknown) {
     document.documentElement.classList.toggle("dark", resolved === "dark");
     document.documentElement.style.colorScheme = resolved;
   };
-  apply();
+
+  // Cross-fade the whole page only when the resolved theme actually changes.
+  // Loading settings re-applies the same preference on every visit, and
+  // starting a no-op transition there would interrupt an in-flight one.
+  const viewTransitionDocument = document as ViewTransitionDocument;
+  const reduceMotion =
+    typeof window !== "undefined" &&
+    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  const nextResolved = resolveThemePreference(normalized);
+  const currentlyDark = document.documentElement.classList.contains("dark");
+  const themeChanged = (nextResolved === "dark") !== currentlyDark;
+  if (
+    themeChanged &&
+    !themeViewTransitionActive &&
+    typeof viewTransitionDocument.startViewTransition === "function" &&
+    !reduceMotion
+  ) {
+    themeViewTransitionActive = true;
+    const transition = viewTransitionDocument.startViewTransition(apply);
+    void transition.finished.finally(() => {
+      themeViewTransitionActive = false;
+    });
+  } else {
+    apply();
+  }
 
   if (normalized !== themeSystem || typeof window === "undefined" || !window.matchMedia) return;
   const query = window.matchMedia("(prefers-color-scheme: dark)");

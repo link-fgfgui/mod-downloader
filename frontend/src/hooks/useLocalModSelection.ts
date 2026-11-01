@@ -305,6 +305,7 @@ export function useLocalModSelection(options: UseLocalModSelectionOptions) {
       closeDisableImpactDialog,
       toggleGroup,
       openDeleteDialog,
+      getPendingDeleteGroups: () => pendingDeleteGroups.current,
       confirmDelete,
       closeDeleteDialog,
       applyBatchOperation,

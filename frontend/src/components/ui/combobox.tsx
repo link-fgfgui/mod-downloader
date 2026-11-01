@@ -183,7 +183,13 @@ export function Combobox({
     // feedback is triggered twice in a row.
     window.setTimeout(() => {
       setFeedback(kind);
-      feedbackTimer.current = window.setTimeout(() => setFeedback(null), 380);
+      // Match the longer of the two feedback keyframes (320ms confirm), scaled
+      // by the animation speed multiplier, so the attribute is not cleared
+      // while the CSS animation is still running.
+      feedbackTimer.current = window.setTimeout(
+        () => setFeedback(null),
+        scaledDuration(0.38) * 1000 + 20,
+      );
     }, 20);
   };
 
@@ -407,7 +413,7 @@ export function Combobox({
     "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
     "disabled:cursor-not-allowed disabled:opacity-50",
     "dark:bg-input/30 dark:hover:bg-input/50",
-    "active:scale-[0.985] active:duration-75 active:ease-[var(--md-ease-in)]",
+    "active:scale-[0.985] active:duration-md-press active:ease-[var(--md-ease-in)]",
     size === "sm" ? "h-8 py-1" : "h-9 py-2",
     !value && "text-muted-foreground",
     className,

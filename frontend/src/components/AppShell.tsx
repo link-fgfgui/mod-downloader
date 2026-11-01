@@ -8,6 +8,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { animateRouteEnter } from "@/lib/animations";
+import { navigationDirection } from "@/lib/navigation";
 import { resolveThemePreference } from "@/lib/theme";
 import { useDownloadQueueStore } from "@/stores/downloadQueue";
 import { useMinecraftStore } from "@/stores/minecraft";
@@ -24,6 +25,7 @@ export function AppShell({ extensionServerError }: { extensionServerError?: stri
   const location = useLocation();
   const navigate = useNavigate();
   const stageRef = useRef<HTMLDivElement | null>(null);
+  const previousPathRef = useRef<string | null>(null);
   const [extensionWarningDismissed, setExtensionWarningDismissed] = useState(false);
   const showExtensionWarning = Boolean(extensionServerError) && !extensionWarningDismissed;
   const themePreference = useSettingsStore((state) => state.settings?.theme ?? "dark");
@@ -37,7 +39,13 @@ export function AppShell({ extensionServerError }: { extensionServerError?: stri
     };
   }, []);
 
-  useEffect(() => animateRouteEnter(stageRef.current), [location.pathname]);
+  useEffect(() => {
+    const direction = navigationDirection(previousPathRef.current, location.pathname);
+    previousPathRef.current = location.pathname;
+    // Returning the cleanup kills the previous tween, so rapid navigation
+    // never stacks entrances.
+    return animateRouteEnter(stageRef.current, direction);
+  }, [location.pathname]);
 
   useEffect(() => {
     const onGlobalEscape = (event: KeyboardEvent) => {

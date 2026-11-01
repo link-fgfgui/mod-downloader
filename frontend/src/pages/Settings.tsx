@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { AnimatedPresence } from "@/components/AnimatedPresence";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
@@ -145,7 +146,7 @@ export function SettingsPage() {
           <span
             key={displaySaveState}
             aria-live="polite"
-            className="flex items-center gap-1.5 animate-in fade-in-0 slide-in-from-top-1 duration-150"
+            className="flex items-center gap-1.5 animate-in fade-in-0 slide-in-from-top-1 duration-md-fast"
           >
             {displaySaveState === "saving" ? <Loader2 className="size-3.5 animate-spin" /> : null}
             {displaySaveState === "saved" ? <Check className="size-3.5 text-emerald-500" /> : null}
@@ -164,8 +165,16 @@ export function SettingsPage() {
       </div>
 
       {loading ? <Progress value={undefined} className="h-0.5 animate-pulse" /> : null}
-      {persistError ? <div className="rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive">{t("settings.saveFailed", { reason: persistError })}</div> : null}
-      {!persistError && autoSaveError ? <div className="rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive">{autoSaveError}</div> : null}
+      <AnimatedPresence open={Boolean(persistError)} mode="collapse" preserveContent>
+        <div className="mb-2 rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive">
+          {t("settings.saveFailed", { reason: persistError })}
+        </div>
+      </AnimatedPresence>
+      <AnimatedPresence open={!persistError && Boolean(autoSaveError)} mode="collapse" preserveContent>
+        <div className="mb-2 rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive">
+          {autoSaveError}
+        </div>
+      </AnimatedPresence>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="grid content-start gap-4">
@@ -402,7 +411,11 @@ export function SettingsPage() {
                   }}
                 />
               </label>
-              {draft.draftAdaptiveFileConcurrency ? (
+              <AnimatedPresence
+                open={draft.draftAdaptiveFileConcurrency}
+                mode="collapse"
+                preserveContent
+              >
                 <NumberField
                   label={t("settings.network.targetDownloadRateMiB")}
                   value={draft.draftTargetDownloadRateMiB}
@@ -414,7 +427,7 @@ export function SettingsPage() {
                     scheduleAutoSave("network", 800);
                   }}
                 />
-              ) : null}
+              </AnimatedPresence>
               <NumberField
                 label={t("settings.network.concurrentDownloads")}
                 value={draft.draftConcurrentDownloads}

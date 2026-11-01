@@ -13,6 +13,7 @@ import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { scaledDuration } from "@/lib/animations";
 import { hasMajorVersionChange, isVersionDowngrade } from "@/utils/versionCompare";
 import type { ModVersion } from "@/types";
 
@@ -67,7 +68,7 @@ export function ModVersionList({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8">
+      <div className="flex animate-in items-center justify-center p-8 fade-in-0 duration-md">
         <Loader2 className="size-6 animate-spin text-muted-foreground" />
       </div>
     );
@@ -133,8 +134,8 @@ export function ModVersionList({
   };
 
   return (
-    <div className="max-h-[calc(100vh-10rem)] overflow-y-auto px-4 pb-4">
-      {versions.map((version) => {
+    <div className="max-h-[calc(100vh-10rem)] animate-in overflow-y-auto px-4 pb-4 fade-in-0 duration-md">
+      {versions.map((version, index) => {
         const id = versionId(version);
         const installed = isInstalled(version);
         const pinned = isPinned(version);
@@ -167,7 +168,8 @@ export function ModVersionList({
         return (
           <div
             key={id}
-            className={`flex items-center gap-3 border-b py-3 last:border-b-0 ${installed ? "bg-emerald-500/10" : ""}`}
+            style={{ animationDelay: `${scaledDuration(Math.min(index, 9) * 0.012)}s` }}
+            className={`flex animate-in items-center gap-3 border-b py-3 fade-in-0 fill-mode-both duration-md-fast last:border-b-0 ${installed ? "bg-emerald-500/10" : ""}`}
           >
             <Tooltip>
               <TooltipTrigger asChild>

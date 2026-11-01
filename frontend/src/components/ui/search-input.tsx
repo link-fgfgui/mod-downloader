@@ -61,7 +61,7 @@ const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
           className={cn(
             "absolute top-1/2 right-1.5 flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground",
             "transition-[opacity,transform,translate,scale,background-color,color] duration-md ease-[var(--md-ease-spring)]",
-            "hover:bg-accent hover:text-foreground active:scale-90 active:duration-75",
+            "hover:bg-accent hover:text-foreground active:scale-90 active:duration-md-press",
             hasValue
               ? "translate-x-0 scale-100 opacity-100"
               : "pointer-events-none translate-x-4 scale-50 opacity-0",

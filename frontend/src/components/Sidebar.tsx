@@ -13,15 +13,18 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { VersionPicker } from "@/components/VersionPicker";
+import { navOrder, type NavPath } from "@/lib/navigation";
 
-const navItems = [
-  { to: "/", labelKey: "nav.home", icon: Home },
-  { to: "/download", labelKey: "nav.download", icon: Download },
-  { to: "/manage", labelKey: "nav.manage", icon: ListChecks },
-  { to: "/favorites", labelKey: "nav.favorites", icon: ListMusic },
-  { to: "/unpin", labelKey: "nav.unpin", icon: PinOff },
-  { to: "/settings", labelKey: "nav.settings", icon: Cog },
-];
+const navMeta: Record<NavPath, { labelKey: string; icon: typeof Home }> = {
+  "/": { labelKey: "nav.home", icon: Home },
+  "/download": { labelKey: "nav.download", icon: Download },
+  "/manage": { labelKey: "nav.manage", icon: ListChecks },
+  "/favorites": { labelKey: "nav.favorites", icon: ListMusic },
+  "/unpin": { labelKey: "nav.unpin", icon: PinOff },
+  "/settings": { labelKey: "nav.settings", icon: Cog },
+};
+
+const navItems = navOrder.map((to) => ({ to, ...navMeta[to] }));
 
 const NAV_ITEM_HEIGHT = 40;
 const NAV_ITEM_GAP = 4;

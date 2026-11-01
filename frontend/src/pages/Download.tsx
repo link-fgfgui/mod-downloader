@@ -42,6 +42,7 @@ import type {
   ModVersion,
 } from "@/types";
 import { cn } from "@/lib/utils";
+import { scaledDuration } from "@/lib/animations";
 
 type DependencyPreflightEntry = NonNullable<import("@/types").DependencyPreflightResult["entries"]>[number];
 
@@ -163,6 +164,16 @@ export function DownloadPage() {
   const [dirInvalid, setDirInvalid] = useState(false);
   const resultsScrollRef = useRef<HTMLDivElement | null>(null);
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
+  // Track where the current batch starts so only newly appended rows stagger
+  // in. Mutating during render keeps the value correct for the same commit
+  // that mounts the new rows (an effect would arrive one frame late).
+  const batchRef = useRef({ length: 0, start: 0 });
+  if (results.length < batchRef.current.length) {
+    batchRef.current = { length: results.length, start: 0 };
+  } else if (results.length > batchRef.current.length) {
+    batchRef.current = { length: results.length, start: batchRef.current.length };
+  }
+  const batchStart = batchRef.current.start;
 
   useEffect(() => {
     useDownloadSearchStore.getState().start();
@@ -330,7 +341,7 @@ export function DownloadPage() {
       </form>
 
       {error ? (
-        <div className="mb-3 rounded-md border border-destructive/30 bg-destructive/5 p-2 text-sm text-destructive animate-in fade-in-0 slide-in-from-top-1 duration-200">
+        <div className="mb-3 rounded-md border border-destructive/30 bg-destructive/5 p-2 text-sm text-destructive animate-in fade-in-0 slide-in-from-top-1 duration-md">
           {t("download.searchFailed", { reason: error })}
         </div>
       ) : null}
@@ -341,7 +352,7 @@ export function DownloadPage() {
           <span className="text-sm">{t("search.action")}…</span>
         </div>
       ) : showEmpty ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 pb-24 text-center animate-in fade-in-0 duration-200">
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 pb-24 text-center animate-in fade-in-0 duration-md">
           <div className="flex size-16 items-center justify-center rounded-full bg-primary/10 text-primary">
             {showNoResults ? <AlertCircle className="size-8" /> : <Search className="size-8" />}
           </div>
@@ -353,18 +364,20 @@ export function DownloadPage() {
           </p>
         </div>
       ) : (
-        <div ref={resultsScrollRef} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-1 animate-in fade-in-0 duration-200">
+        <div ref={resultsScrollRef} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-1 animate-in fade-in-0 duration-md">
           <div className={cn("grid gap-2", selectedResults.length > 0 && "pb-24")}>
             {results.map((result, index) => {
               const state = stateFor(index);
               const key = projectKey(result);
               const selected = selectedKeys.has(key);
               const busy = busyFor(state);
+              const staggerIndex = Math.min(Math.max(0, index - batchStart), 8);
               return (
                 <div
                   key={result.id || `${result.platform}-${result.slug}-${index}`}
+                  style={{ animationDelay: `${scaledDuration(staggerIndex * 0.018)}s` }}
                   className={cn(
-                    "flex w-full min-w-0 cursor-pointer items-center gap-3 rounded-xl border bg-card p-3 shadow-sm transition-[background-color,border-color,box-shadow,color,opacity] duration-md ease-[var(--md-ease-out)] animate-in fade-in-0 slide-in-from-bottom-1 duration-200 active:opacity-80 active:duration-75",
+                    "flex w-full min-w-0 cursor-pointer items-center gap-3 rounded-xl border bg-card p-3 shadow-sm transition-[background-color,border-color,box-shadow,color,opacity] duration-md ease-[var(--md-ease-out)] animate-in fill-mode-both fade-in-0 slide-in-from-bottom-1 active:opacity-80 active:duration-md-press",
                     selected
                       ? "border-primary/50 bg-primary/10 shadow-sm hover:bg-primary/15"
                       : "hover:border-foreground/20 hover:bg-accent/60 hover:shadow-md",
@@ -372,7 +385,7 @@ export function DownloadPage() {
                   onClick={(event) => toggleSelection(result, event)}
                 >
                   <div className={cn("flex size-5 shrink-0 items-center justify-center rounded border transition-colors duration-md", selected ? "border-primary bg-primary text-primary-foreground" : "border-input")}>
-                    {selected ? <Check className="size-3.5 animate-in fade-in-0 zoom-in-50 duration-150" /> : null}
+                    {selected ? <Check className="size-3.5 animate-in fade-in-0 zoom-in-50 duration-md-fast" /> : null}
                   </div>
                   <button
                     type="button"
@@ -451,7 +464,12 @@ export function DownloadPage() {
                           });
                         }}
                       >
-                        {resultStateIcon(state, busy)}
+                        <span
+                          key={busy ? "busy" : state?.status ?? "idle"}
+                          className="inline-flex animate-in fade-in-0 zoom-in-75 duration-md-fast"
+                        >
+                          {resultStateIcon(state, busy)}
+                        </span>
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>{t(statusLabelKey(state?.status))}</TooltipContent>
@@ -481,36 +499,102 @@ export function DownloadPage() {
         </div>
       )}
 
-      <AnimatedPresence open={selectedResults.length > 0} mode="float" preserveContent className="absolute inset-x-6 bottom-4 z-10">
-        <div className="md-selection-toolbar flex flex-wrap items-center gap-2 rounded-2xl border bg-popover/95 p-2 shadow-2xl backdrop-blur">
-          <span className="px-2 text-xs text-muted-foreground">
-            {t("download.selection.count", { n: selectedResults.length })}
-          </span>
-          <Button type="button" size="sm" disabled={batchInstalling} onClick={() => void batchInstall(selectedResults)}>
-            {batchInstalling ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
-            {t("download.selection.downloadAll")}
-          </Button>
-          <Button type="button" size="sm" variant="secondary" onClick={() => openFavorites(selectedResults)}>
-            <ListPlus className="size-4" />
-            {t("favorites.addToFavorites")}
-          </Button>
-          <Button type="button" size="sm" variant="outline" onClick={() => void batchUnpin(selectedResults)}>
-            <PinOff className="size-4" />
-            {t("download.selection.unpin")}
-          </Button>
-          <Button type="button" size="sm" variant="ghost" onClick={() => void copyNames()}>
-            <Copy className="size-4" />
-            {t("download.selection.copyNames")}
-          </Button>
-          <Button type="button" size="sm" variant="ghost" className="ml-auto text-destructive" onClick={() => setSelectedKeys(new Set())}>
-            <X className="size-4" />
-            {t("download.selection.deselectAll")}
-          </Button>
-        </div>
-      </AnimatedPresence>
+      <div className="pointer-events-none absolute inset-x-6 bottom-4 z-10 flex justify-center">
+        <AnimatedPresence open={selectedResults.length > 0} mode="float" preserveContent className="pointer-events-auto max-w-full">
+          <div className="md-selection-toolbar flex max-w-full flex-wrap items-center justify-center gap-1.5 rounded-2xl border bg-popover/95 p-2 shadow-2xl backdrop-blur">
+            <span
+              key={selectedResults.length}
+              aria-label={t("download.selection.count", { n: selectedResults.length })}
+              className="flex size-9 animate-in items-center justify-center rounded-full bg-sky-500/15 text-sm font-semibold text-sky-600 zoom-in-75 fade-in-0 duration-md-fast tabular-nums dark:text-sky-300"
+            >
+              {selectedResults.length}
+            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="rounded-full bg-sky-500/15 text-sky-600 hover:bg-sky-500/25 dark:text-sky-300"
+                  disabled={batchInstalling}
+                  aria-label={t("download.selection.downloadAll")}
+                  onClick={() => void batchInstall(selectedResults)}
+                >
+                  {batchInstalling ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{t("download.selection.downloadAll")}</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="rounded-full bg-teal-500/15 text-teal-700 hover:bg-teal-500/25 dark:text-teal-300"
+                  aria-label={t("favorites.addToFavorites")}
+                  onClick={() => openFavorites(selectedResults)}
+                >
+                  <ListPlus className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{t("favorites.addToFavorites")}</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="rounded-full bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 dark:text-amber-300"
+                  aria-label={t("download.selection.unpin")}
+                  onClick={() => void batchUnpin(selectedResults)}
+                >
+                  <PinOff className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{t("download.selection.unpin")}</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="rounded-full bg-muted/70 text-foreground/70 hover:bg-muted hover:text-foreground"
+                  aria-label={t("download.selection.copyNames")}
+                  onClick={() => void copyNames()}
+                >
+                  <Copy className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{t("download.selection.copyNames")}</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="rounded-full border border-destructive/40 bg-transparent text-destructive hover:bg-destructive/10"
+                  aria-label={t("download.selection.deselectAll")}
+                  onClick={() => setSelectedKeys(new Set())}
+                >
+                  <X className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{t("download.selection.deselectAll")}</TooltipContent>
+            </Tooltip>
+          </div>
+        </AnimatedPresence>
+      </div>
 
-      {dirInvalid ? (
-        <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+      <AnimatedPresence
+        open={dirInvalid}
+        mode="float"
+        preserveContent
+        className="absolute inset-0 z-20 flex items-center justify-center bg-background/80 backdrop-blur-sm"
+      >
           <div className="mx-4 max-w-md rounded-xl border bg-card p-6 text-center shadow-xl">
             <FileWarning className="mx-auto size-12 text-amber-500" />
             <h2 className="mt-3 text-lg font-semibold">{t("download.selectDirTitle")}</h2>
@@ -529,8 +613,7 @@ export function DownloadPage() {
               {t("download.chooseDir")}
             </Button>
           </div>
-        </div>
-      ) : null}
+      </AnimatedPresence>
 
       <Dialog open={showVersionsOverlay} onOpenChange={(value) => (value ? undefined : closeVersionsOverlay())}>
         <DialogContent className="max-w-3xl gap-0 p-0">
@@ -664,12 +747,14 @@ export function DownloadPage() {
         onAdded={() => toast.success(t("favorites.added"))}
       />
 
-      {hasSelectedInstance ? null : (
-        <div className="pointer-events-none absolute bottom-20 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border bg-popover px-3 py-1 text-xs text-muted-foreground shadow">
-          <Lock className="size-3" />
-          {t("download.errors.noSelectedVersion")}
-        </div>
-      )}
+      <div className="pointer-events-none absolute inset-x-0 bottom-20 z-20 flex justify-center">
+        <AnimatedPresence open={!hasSelectedInstance} mode="float" preserveContent>
+          <div className="pointer-events-auto flex items-center gap-1 rounded-full border bg-popover px-3 py-1 text-xs text-muted-foreground shadow">
+            <Lock className="size-3" />
+            {t("download.errors.noSelectedVersion")}
+          </div>
+        </AnimatedPresence>
+      </div>
     </div>
   );
 }

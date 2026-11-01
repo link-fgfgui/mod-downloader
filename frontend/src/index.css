@@ -4,9 +4,14 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  /* Multiplier written by applyAnimationSettings. Everything that cannot use
+     an absolute millisecond variable scales its fixed base through this. */
+  --md-motion-multiplier: 1;
+  --md-transition-press: 70ms;
   --md-transition-fast: 120ms;
   --md-transition-normal: 180ms;
   --md-transition-slow: 240ms;
+  --md-transition-emphasis: 320ms;
   --md-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --md-ease-in: cubic-bezier(0.4, 0, 1, 1);
   --md-ease-spring: cubic-bezier(0.22, 1.2, 0.36, 1);
@@ -85,8 +90,43 @@ body { margin: 0; background: var(--background); color: var(--foreground); font-
 button, input, select { font: inherit; }
 
 @layer utilities {
+  /* Semantic durations. They set --tw-duration so tw-animate-css entrance and
+     exit animations (which read var(--tw-duration)) scale with the user's
+     speed setting, not just CSS transitions. */
+  .duration-md-press,
+  .duration-fast {
+    --tw-duration: var(--md-transition-press, 70ms);
+    --tw-animation-duration: var(--md-transition-press, 70ms);
+    transition-duration: var(--md-transition-press, 70ms);
+    animation-duration: var(--md-transition-press, 70ms);
+  }
+
+  .duration-md-fast {
+    --tw-duration: var(--md-transition-fast, 120ms);
+    --tw-animation-duration: var(--md-transition-fast, 120ms);
+    transition-duration: var(--md-transition-fast, 120ms);
+    animation-duration: var(--md-transition-fast, 120ms);
+  }
+
   .duration-md {
+    --tw-duration: var(--md-transition-normal, 180ms);
+    --tw-animation-duration: var(--md-transition-normal, 180ms);
     transition-duration: var(--md-transition-normal, 180ms);
+    animation-duration: var(--md-transition-normal, 180ms);
+  }
+
+  .duration-md-slow {
+    --tw-duration: var(--md-transition-slow, 240ms);
+    --tw-animation-duration: var(--md-transition-slow, 240ms);
+    transition-duration: var(--md-transition-slow, 240ms);
+    animation-duration: var(--md-transition-slow, 240ms);
+  }
+
+  .duration-md-emphasis {
+    --tw-duration: var(--md-transition-emphasis, 320ms);
+    --tw-animation-duration: var(--md-transition-emphasis, 320ms);
+    transition-duration: var(--md-transition-emphasis, 320ms);
+    animation-duration: var(--md-transition-emphasis, 320ms);
   }
 
   /* Shared hover treatment for clickable rows. Kept as a utility so hover,
@@ -102,7 +142,7 @@ button, input, select { font: inherit; }
 
   .md-row-interactive:active {
     transform: scale(0.997);
-    transition-duration: 70ms;
+    transition-duration: calc(70ms * var(--md-motion-multiplier));
     transition-timing-function: var(--md-ease-in, ease-in);
   }
 
@@ -116,14 +156,67 @@ button, input, select { font: inherit; }
 
   .md-pressable:active:not(:disabled) {
     transform: scale(0.94);
-    transition-duration: 70ms;
+    transition-duration: calc(70ms * var(--md-motion-multiplier));
     transition-timing-function: var(--md-ease-in, ease-in);
   }
 
-  .md-selection-toolbar {
-    transform-origin: bottom center;
+  /* Insertion line for native drag reordering: grows from the left in 120ms. */
+.md-drop-line {
+  height: 2px;
+  border-radius: 9999px;
+  background: var(--primary);
+  transform-origin: left center;
+  animation: md-drop-line calc(120ms * var(--md-motion-multiplier)) var(--md-ease-out, ease-out) both;
+}
+
+@keyframes md-drop-line {
+  from {
+    opacity: 0;
+    transform: scaleX(0.2);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+/* While GSAP drives a FLIP/enter tween, CSS must not also transition the
+   properties GSAP writes every frame, otherwise the two easings stack. */
+.md-flip-animating {
+  transition-property: background-color, border-color, box-shadow, color !important;
+}
+
+.md-row-exiting {
+  opacity: 0 !important;
+  transform: translateY(8px) !important;
+  transition-duration: calc(140ms * var(--md-motion-multiplier)) !important;
+  transition-timing-function: var(--md-ease-in, ease-in) !important;
+  pointer-events: none;
+}
+
+.md-selection-toolbar {
+  transform-origin: bottom center;
     will-change: opacity, transform, translate, scale;
   }
+}
+
+/* Lightweight stand-in for a collapsed/filtered tree row. Text only: no
+   buttons, menus or tooltips are cloned, so focus and event handlers cannot
+   leak into the ghost. */
+.md-tree-ghost {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-right: 0.75rem;
+  pointer-events: none;
+  overflow: hidden;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  will-change: opacity, transform;
 }
 
 /* Custom combobox ------------------------------------------------------- */
@@ -177,21 +270,21 @@ button, input, select { font: inherit; }
   clip-path: inset(0 0 0 0 round 10px);
   opacity: 0;
   transform: scale(0.992);
-  transition-duration: 140ms;
+  transition-duration: calc(140ms * var(--md-motion-multiplier));
 }
 
 .md-combobox-panel[data-close-reason="escape"][data-state="closed"] {
   clip-path: inset(0 0 0 0 round 10px);
   opacity: 0;
   transform: scale(0.97);
-  transition-duration: 150ms;
+  transition-duration: calc(150ms * var(--md-motion-multiplier));
 }
 
 .md-combobox-panel[data-close-reason="same"][data-state="closed"] {
   clip-path: inset(0 0 0 0 round 10px);
   opacity: 0;
   transform: translateY(3px) scale(0.965);
-  transition-duration: 160ms;
+  transition-duration: calc(160ms * var(--md-motion-multiplier));
   transition-timing-function: var(--md-ease-in, ease-in);
 }
 
@@ -222,11 +315,11 @@ button, input, select { font: inherit; }
 }
 
 [data-combobox-feedback="selected"] {
-  animation: md-combobox-confirm 320ms var(--md-ease-out, ease-out);
+  animation: md-combobox-confirm calc(320ms * var(--md-motion-multiplier)) var(--md-ease-out, ease-out);
 }
 
 [data-combobox-feedback="same"] {
-  animation: md-combobox-nudge 260ms var(--md-ease-out, ease-out);
+  animation: md-combobox-nudge calc(260ms * var(--md-motion-multiplier)) var(--md-ease-out, ease-out);
 }
 
 @keyframes md-progress-indeterminate {

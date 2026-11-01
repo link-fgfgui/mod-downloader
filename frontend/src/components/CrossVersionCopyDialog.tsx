@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Check, Eye, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { AnimatedPresence } from "@/components/AnimatedPresence";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -186,7 +187,8 @@ export function CrossVersionCopyDialog({ open, list, onOpenChange, onMessage }: 
             </Button>
           </div>
 
-          {preview ? (
+          <AnimatedPresence open={Boolean(preview)} mode="collapse" preserveContent>
+            {preview ? (
             <div className="grid gap-2">
               {preview.nameConflict ? (
                 <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
@@ -222,7 +224,8 @@ export function CrossVersionCopyDialog({ open, list, onOpenChange, onMessage }: 
                 ))}
               </div>
             </div>
-          ) : null}
+            ) : null}
+          </AnimatedPresence>
         </div>
         <DialogFooter>
           <Button type="button" variant="ghost" disabled={applying} onClick={() => onOpenChange(false)}>

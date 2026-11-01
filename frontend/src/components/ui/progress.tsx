@@ -20,7 +20,9 @@ function Progress({
       <ProgressPrimitive.Indicator
         data-slot="progress-indicator"
         className={cn(
-          "h-full flex-1 bg-primary transition-all",
+          // Only transform animates. transition-all would also tween layout and
+          // color changes on every high-frequency progress event.
+          "h-full flex-1 bg-primary transition-transform duration-md ease-[var(--md-ease-out)]",
           indeterminate ? "w-2/5 animate-progress-indeterminate" : "w-full"
         )}
         style={indeterminate ? undefined : { transform: `translateX(-${100 - (value ?? 0)}%)` }}

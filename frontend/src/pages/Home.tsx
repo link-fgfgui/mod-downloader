@@ -18,6 +18,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
+import { scaledDuration } from "@/lib/animations";
 import { formatCompactNumber, formatNumber } from "@/lib/format";
 import i18n from "@/i18n";
 import { useDownloadQueueStore } from "@/stores/downloadQueue";
@@ -60,6 +62,7 @@ export function HomePage() {
       stats.packwizExports,
     [stats],
   );
+  const animatedTotal = useAnimatedNumber(totalOperations);
 
   const metrics = [
     { key: "downloads", labelKey: "home.usage.downloads", value: stats.downloadsCompleted, icon: Download, color: "text-sky-600 dark:text-sky-400", bg: "bg-sky-500/10" },
@@ -108,7 +111,7 @@ export function HomePage() {
             <p className="text-xs text-muted-foreground">{t("home.usage.sinceTracking")}</p>
           </div>
           <div className="flex items-baseline gap-2">
-            <span key={totalOperations} className="text-3xl font-bold leading-none animate-in fade-in-0 duration-200">{formatNumber(totalOperations, locale)}</span>
+            <span className="text-3xl font-bold leading-none tabular-nums">{formatNumber(animatedTotal, locale)}</span>
             <span className="text-xs text-muted-foreground">{t("home.usage.total")}</span>
           </div>
         </div>
@@ -118,15 +121,15 @@ export function HomePage() {
             return (
               <Card
                 key={metric.key}
-                className="gap-0 py-0 animate-in fade-in-0 slide-in-from-bottom-1 duration-300"
-                style={{ animationDelay: `${index * 35}ms`, animationFillMode: "both" }}
+                className="gap-0 py-0 animate-in fade-in-0 slide-in-from-bottom-1 duration-md-slow"
+                style={{ animationDelay: `${scaledDuration(index * 0.035)}s`, animationFillMode: "both" }}
               >
                 <CardContent className="flex min-h-20 items-center gap-3 p-4">
                   <div className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${metric.bg} ${metric.color}`}>
                     <Icon className="size-5" />
                   </div>
                   <div className="min-w-0">
-                    <div key={metric.value} className="text-xl font-bold leading-tight animate-in fade-in-0 duration-200">{formatCompactNumber(metric.value, locale)}</div>
+                    <MetricValue value={metric.value} locale={locale} />
                     <div className="mt-0.5 text-xs text-muted-foreground">{t(metric.labelKey)}</div>
                   </div>
                 </CardContent>
@@ -184,6 +187,11 @@ export function HomePage() {
       </section>
     </div>
   );
+}
+
+function MetricValue({ value, locale }: { value: number; locale: string }) {
+  const animated = useAnimatedNumber(value);
+  return <div className="text-xl font-bold leading-tight tabular-nums">{formatCompactNumber(animated, locale)}</div>;
 }
 
 function StatusRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
