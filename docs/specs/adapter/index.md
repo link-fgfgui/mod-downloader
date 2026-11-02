@@ -5,4 +5,4 @@ core 领域规则见 `docs/specs/core/`。
 
 | 主题 | 文件 | 摘要 |
 | --- | --- | --- |
-| App 绑定面 | [`binding-surface.md`](./binding-surface.md) | 只暴露前端实际消费的方法；`app_contract_test.go` 锁定 67 个业务方法 |
+| App 绑定面 | [`binding-surface.md`](./binding-surface.md) | 只暴露前端实际消费的方法；`app_contract_test.go` 锁定 68 个业务方法 |

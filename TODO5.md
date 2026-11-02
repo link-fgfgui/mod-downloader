@@ -164,14 +164,15 @@
 
 ## 7. P2-A 文档与规范库迁移
 
-- [ ] 重写 `README.md`（当前仍是 Wails3 脚手架模板）：双许可证声明（主程序 GPL-3.0 / core LGPL-3.0 + linking exception）、
+- [x] 重写 `README.md`（当前仍是 Wails3 脚手架模板）：双许可证声明（主程序 GPL-3.0 / core LGPL-3.0 + linking exception）、
       TOML 配置全表（含 `require_ctrl_for_multi_select`、动画倍率、GPU Policy）、环境变量表、
       `wails3 dev` / `wails3 task build` / `build:server` 指南、无头 server + Playwright 验证工作流。
-- [ ] **修正 `AGENTS.md` 死链**（不提取旧仓）：§5 质量指南来源、§6.2 “开发前查阅”、§6 开头对
+- [x] **修正 `AGENTS.md` 死链**（不提取旧仓）：§5 质量指南来源、§6.2 “开发前查阅”、§6 开头对
       `../mod-downloader/docs/specs/` 的引用，直接改指本仓 `docs/specs/`；旧仓归档仅作历史参考，不再作为规范源。
       红线内容（吞错、type alias、边界常量单源等）在本仓 §5 已有内联版本，检查无遗漏后删除对旧仓的依赖。
-- [ ] **验收**：文档中命令可复制执行；`docs/specs/*/index.md` 与实际文件一一对应；全仓 grep 无
-      `../mod-downloader` 引用残留（归档说明除外）。
+- [x] **验收**：文档中命令可复制执行；`docs/specs/*/index.md` 与实际文件一一对应；全仓 grep 无
+      `../mod-downloader` 引用残留（归档说明除外）。已核对：仅剩 CLI 姊妹仓库（`../mod-downloader-cli`）
+      与本仓目录名 `../mod-downloader-gui-v3` 的有效引用，以及本计划中的历史说明。
 
 ## 8. P2-B 桌面端人工实机点检（不阻塞自动化，产出安装包后执行）
 

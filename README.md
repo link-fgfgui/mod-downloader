@@ -1,81 +1,121 @@
-# Welcome to Your New Wails3 Project!
+# Mod Downloader
 
-Congratulations on generating your Wails3 application! This README will guide you through the next steps to get your project up and running.
+Minecraft 模组下载与实例管理器。Wails v3 桌面应用（React 18 + Tailwind v4 前端，Go 后端），
+支持 Modrinth / CurseForge 搜索下载、本地实例 Mod 管理（依赖树、批量启停/卸载、未使用依赖标记）、
+收藏夹、跨版本复制与 packwiz 导出。
 
-## Getting Started
+## 架构
 
-1. Navigate to your project directory in the terminal.
+```text
+React 前端 (pages/, stores/, components/)      ← 渲染、本地 UI 缓存、输入体验
+        │ ① 生成式绑定 frontend/bindings/（App 方法 RPC）
+        │ ② Wails 事件总线（线缆名 = appcore EventKind.Name()）
+Root App 适配器 (main.go, app.go, app_*.go)    ← Wails 装配、绑定透传、原生对话框
+        ▼
+core/host    UI 无关运行时：生命周期 + HTTP 扩展服务器 + 类型化事件分发
+        ▼
+core/appcore.Service 业务 facade（进程级单例）
+        ├── providers / downloader / modbridge / minecraft
+        └── storage / configs / structs / models
+```
 
-2. To run your application in development mode, use the following command:
+- `core/` 是独立 Go 模块（`github.com/link-fgfgui/mod-downloader/core`），同时被姊妹仓库
+  `../mod-downloader-cli`（CLI/TUI）通过 symlink 引用；GUI 与 TUI 共享同一份领域层。
+  任何“换 UI 框架仍成立”的逻辑必须住在 `core`。详见 [AGENTS.md](AGENTS.md)。
+- 领域规范与经验沉淀在 [docs/specs/](docs/specs/)（core / adapter / frontend / guides）。
 
-   ```
-   wails3 dev
-   ```
+## 环境要求
 
-   This will start your application and enable hot-reloading for both frontend and backend changes.
+- Go 1.26+（core 模块最低 1.24）
+- Node.js 24+ 与 npm
+- Wails v3 CLI：`go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0`
+- Linux 需要 `libgtk-3-dev libwebkit2gtk-4.1-dev`
 
-3. To build your application for production, use:
+## 开发与构建
 
-   ```
-   wails3 build
-   ```
+```bash
+wails3 dev                              # 桌面开发模式（前端热更新）
+wails3 task build                       # 生产桌面构建 → bin/
+wails3 task package                     # 平台安装包（deb/rpm/appimage、nsis/msix、dmg）
+wails3 task build:server                # 无头服务器构建 → bin/mod-downloader-server
+wails3 task common:generate:bindings    # Go 绑定面变化后重新生成 frontend/bindings/
+wails3 task clean:artifacts             # 清理 bin/、dist 与本地运行产物
+```
 
-   This will create a production-ready executable in the `build` directory.
+测试与检查：
 
-## Exploring Wails3 Features
+```bash
+go build . && go build -tags server .   # 两种形态都必须可编译
+go vet ./... && go test ./...
+(cd core && go vet ./... && go test ./... && go test -race ./...)
+cd frontend && npm run lint && npm run test && npm run build
+cd ../mod-downloader-cli && go build ./... && go vet ./... && go test ./...   # core 变化后联动
+```
 
-Now that you have your project set up, it's time to explore the features that Wails3 offers:
+## 无头验收（Playwright）
 
-1. **Check out the examples**: The best way to learn is by example. Visit the `examples` directory in the `v3/examples` directory to see various sample applications.
+```bash
+wails3 task build:server
+./bin/mod-downloader-server          # http://127.0.0.1:9245（MOD_DOWNLOADER_SERVER_PORT 可覆盖）
+```
 
-2. **Run an example**: To run any of the examples, navigate to the example's directory and use:
+用浏览器打开该地址即可操作真实后端（生产前端 + 真实 bindings）。无头服务器同样受单实例约束
+（绑定 `127.0.0.1:18801`），已有 GUI/TUI 实例运行时需先关闭。源码级调试可另起 Vite：
 
-   ```
-   go run .
-   ```
+```bash
+cd frontend && WAILS_SERVER_URL=http://127.0.0.1:9245 npm run dev -- --port 9246
+```
 
-   Note: Some examples may be under development during the alpha phase.
+## 配置
 
-3. **Explore the documentation**: Visit the [Wails3 documentation](https://v3.wails.io/) for in-depth guides and API references.
+配置文件为工作目录下的 `mod-downloader.toml`（首次运行自动生成）。常用键：
 
-4. **Join the community**: Have questions or want to share your progress? Join the [Wails Discord](https://discord.gg/JDdSxwjhGf) or visit the [Wails discussions on GitHub](https://github.com/wailsapp/wails/discussions).
+```toml
+[preferences]
+  theme = "dark"                        # dark / light / system
+  language = "system"                   # system / zh / en
+  minecraft_dir = "~/.minecraft"
+  simple_mode = false
+  animation_duration_multiplier = 1.0   # 全局动效速度倍率
+  mcim_enabled = false                  # CurseForge 元数据走 MCIM 镜像
+  enable_jij_detection = true           # Jar-in-Jar 子模组检测
+  hardware_acceleration = true          # Linux WebKitGTK GPU 策略（重启生效）
+  require_ctrl_for_multi_select = false # 开启后普通点击单选，Ctrl/Cmd 多选
 
-## Project Structure
+[downloads]
+  file_concurrency = 4
+  concurrent_downloads = 1
+  adaptive_file_concurrency = false
+  target_download_rate_mib = 1.0
+  verify_sha1 = false
 
-Take a moment to familiarize yourself with your project structure:
+[api]
+  requests_per_second = 0               # 0 为不限速
 
-- `frontend/`: Contains your frontend code (HTML, CSS, JavaScript/TypeScript)
-- `main.go`: The entry point of your Go backend
-- `app.go`: Define your application structure and methods here
-- `wails.json`: Configuration file for your Wails project
+[keys]
+  curseforge_api_key = ""
+  modrinth_api_key = ""
 
-## Next Steps
+[logging]
+  enabled = true
+  max_size_mb = 6
+  max_backups = 2
+```
 
-1. Modify the frontend in the `frontend/` directory to create your desired UI.
-2. Add backend functionality in `main.go`.
-3. Use `wails3 dev` to see your changes in real-time.
-4. When ready, build your application with `wails3 build`.
+环境变量覆盖：`CF_API_KEY`、`MODRINTH_API_KEY`、`THEME`、`LANGUAGE`、`MINECRAFT_DIR`、
+`MOD_DOWNLOADER_CACHE_DIR`、`MOD_DOWNLOADER_SERVER_PORT` 等（见 `core/configs/structs.go` 的
+`env:` 标签）。构建期注入（release 构建）：
 
-Happy coding with Wails3! If you encounter any issues or have questions, don't hesitate to consult the documentation or reach out to the Wails community.
+```bash
+APP_VERSION=v1.2.3 DEFAULT_CF_API_KEY=... wails3 task build
+```
 
-## License
+`APP_VERSION` 默认取 `git describe`；`DEFAULT_CF_API_KEY` 仅在用户未配置 Key 时作为内置回退。
 
-The main program (everything outside `core/`) is free software licensed under
-the GNU General Public License, version 3 or (at your option) any later
-version.
+## 许可证
 
-SPDX-License-Identifier: `GPL-3.0-or-later`
-
-See [LICENSE](LICENSE) for the full GPL-3.0 text.
-
-The `core/` directory is a separate Go module,
-`github.com/link-fgfgui/mod-downloader/core`, licensed under the GNU Lesser
-General Public License, version 3 or (at your option) any later version, with
-the LGPL-3.0 Linking Exception. The legacy
-`github.com/link-fgfgui/mod-downloader-core` module path is deprecated.
-
-SPDX-License-Identifier: `LGPL-3.0-or-later WITH LGPL-3.0-linking-exception`
-
-See [core/LICENSE](core/LICENSE) and [core/LICENSE.exception](core/LICENSE.exception).
-Every Go source file declares its applicable SPDX license identifier in its
-header.
+- 主程序（`core/` 之外）：GPL-3.0-or-later，见 [LICENSE](LICENSE)。
+- `core/`：LGPL-3.0-or-later WITH LGPL-3.0-linking-exception，见
+  [core/LICENSE](core/LICENSE) 与 [core/LICENSE.exception](core/LICENSE.exception)。
+  弱许可 + 链接例外是“适配器可替换（GUI/TUI）”这一架构决策的许可证化体现。
+- 每个 Go 源文件在头部声明 SPDX 标识。

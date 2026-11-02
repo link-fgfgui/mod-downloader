@@ -1,7 +1,7 @@
 # AGENTS
 
 本文件面向在本仓库工作的 AI 助手与人类开发者，给出架构边界、首要分层规则、开发与验证命令、
-编码红线，以及继承自 `../mod-downloader` 的经验沉淀（docs）机制。
+编码红线，以及本仓库的经验沉淀（docs）机制。
 
 ---
 
@@ -65,7 +65,7 @@ core/appcore.Service 业务 facade（进程级单例）
 
 ### 2.2 为什么这么严（历史教训）
 
-- 旧仓库 `../mod-downloader`（Wails v2、单前端时代）沉淀的红线见第 5 节；进入
+- 旧仓时代（Wails v2、单前端）沉淀的红线已内联在本文件第 5 节；进入
   GUI+TUI 双前端时代后，重复实现的问题被实测放大（详见
   `../mod-downloader-cli/docs/architecture/core-gui-tui-adaptation-plan.md`）：
   - 同一组“Manage 分组 / Jij 去重 / 兼容性判定 / 搜索文本”曾有三份实现
@@ -158,8 +158,7 @@ WAILS_SERVER_URL=http://127.0.0.1:9245 npm run dev -- --port 9246
 
 ## 5. 编码标准与反模式
 
-以下红线继承自 `../mod-downloader/docs/specs/backend/quality-guidelines.md`，
-在本仓库依旧适用：
+以下红线是本仓库的编码标准（早期源自旧仓实践，现已内联于此，不再依赖外部仓库）：
 
 ### Go
 
@@ -184,13 +183,12 @@ WAILS_SERVER_URL=http://127.0.0.1:9245 npm run dev -- --port 9246
 
 ---
 
-## 6. 经验沉淀与 docs 机制（移植自 `../mod-downloader`）
+## 6. 经验沉淀与 docs 机制
 
 经验沉淀使用**轻量、无工具**的纯 Markdown 机制（不引入脚本、状态机、JSONL 清单），
-归档在 `docs/specs/`。除本仓库已有的 UI 验证知识外，旧仓库
-`../mod-downloader/docs/specs/` 中仍然适用的规范（下载/重试/停滞、连接器兼容性、
-代理、存储、错误处理、UI 状态生命周期等）以那边为源；本仓库继续沉淀新增内容时，
-优先复用既有文件而不是另起炉灶。
+归档在 `docs/specs/`。**规范的唯一来源是本仓库 `docs/specs/`**；旧仓已归档
+（`../archived-legacy-mod-downloader.tar.gz`），仅作历史参考，不再作为规范源。
+新增内容优先复用既有文件而不是另起炉灶。
 
 ### 6.1 目录结构
 
@@ -208,8 +206,8 @@ docs/specs/
 
 ### 6.2 开发前查阅（开发前检索）
 
-修改任何既有层或模块之前，先在 `docs/specs/`（包含 `../mod-downloader/docs/specs/`
-的对应主题）找到相关规范，确认方案不违反已记录的契约，不重蹈已记录的反模式。
+修改任何既有层或模块之前，先在 `docs/specs/` 找到相关规范，确认方案不违反已记录的契约，
+不重蹈已记录的反模式。尚未沉淀的主题，按 6.3 的触发条件补充后再动手。
 
 ### 6.3 何时沉淀（沉淀触发场景）
 
