@@ -1,35 +1,48 @@
-# 配置文件原子写入与临时文件清理
+# Atomic Config Writes and Temp-File Cleanup
 
-## 结论
+## Decision
 
-`core/configs.Save` 采用 **同目录临时文件 + 编码/fsync + rename** 替换 `mod-downloader.toml`，
-并在每次保存前清扫同模式的陈旧临时文件。
+`core/configs.Save` replaces `mod-downloader.toml` using a **same-directory temp
+file + encode/fsync + rename**, and sweeps stale temp files of the same pattern
+before every save.
 
-## 现象与根因
+## Symptom and root cause
 
-进程在保存过程中被强杀（SIGKILL、断电、容器回收）时，Go 的 `defer` 不会执行，
-`.mod-downloader.toml.<random>.tmp` 会永久残留。反复被杀会持续堆积临时文件，
-污染工作目录（`mod-downloader.toml` 常与用户实例目录同层）。
+If the process is killed during a save (SIGKILL, power loss, container
+reclamation), Go `defer` blocks do not run and
+`.mod-downloader.toml.<random>.tmp` is left behind permanently. Repeated kills
+accumulate temp files and pollute the working directory (which often sits next to
+the user's instance directory).
 
-## 约束
+## Constraints
 
 **Don't**
 
-- 不要直接 `os.OpenFile(path, O_TRUNC)` 写真实配置：编码失败会截断用户已有配置。
-- 不要在 `CreateTemp` 前假设目录里没有残留：崩溃/强杀路径不执行 defer。
-- 不要用固定临时文件名：并发保存会互相覆盖（虽然 core 单实例，但测试与工具链会并发跑）。
+- Do not write the real config with `os.OpenFile(path, O_TRUNC)`: an encoding
+  failure would truncate the user's existing config.
+- Do not assume the directory has no leftovers before `CreateTemp`: crash/kill
+  paths do not run `defer`.
+- Do not use a fixed temp file name: concurrent saves would overwrite each other
+  (core is single-instance, but tests and tooling run concurrently).
 
 **Instead**
 
-- 临时文件名保持 `.<configBase>.*.tmp` 模式（`os.CreateTemp` 保证随机后缀）。
-- 保存前用 `filepath.Glob` 清扫同模式残留；**前提是 core 进程级单实例**
-  （见 [`single-instance.md`](./single-instance.md)），否则清扫可能删掉另一个进程正在写的文件。
-- 写失败路径必须 `Close` + `Remove`；成功路径 `Rename` 后再返回。
+- Keep the temp-file pattern `.<configBase>.*.tmp` (`os.CreateTemp` guarantees a
+  random suffix).
+- Sweep leftovers of the same pattern with `filepath.Glob` before saving. **This
+  relies on the process-wide single instance** (see
+  [`single-instance.md`](./single-instance.md)); otherwise the sweep could delete
+  a file another process is writing.
+- On the failure path, `Close` and `Remove`; on the success path, `Rename` before
+  returning.
 
-## 验证
+## Verification
 
-- `TestSaveReplacesConfigAtomicallyAndLeavesNoTempFiles`：连续两次保存后目录无 `*.tmp`。
-- `TestSaveSweepsStaleTempFilesFromKilledWrites`：预置残留 temp 文件，保存后它被清除且新配置生效。
-- `TestSaveFailurePreservesOriginalConfig`：编码/写入失败时原配置内容不变。
+- `TestSaveReplacesConfigAtomicallyAndLeavesNoTempFiles`: two consecutive saves
+  leave no `*.tmp` files.
+- `TestSaveSweepsStaleTempFilesFromKilledWrites`: a pre-seeded stale temp file is
+  removed and the new config takes effect.
+- `TestSaveFailurePreservesOriginalConfig`: the original content is unchanged
+  when encoding/writing fails.
 
-位置：`core/configs/config.go`（`Save`）、`core/configs/config_test.go`。
+Location: `core/configs/config.go` (`Save`), `core/configs/config_test.go`.

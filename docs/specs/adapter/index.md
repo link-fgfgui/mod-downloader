@@ -1,8 +1,9 @@
-# Adapter 规范索引
+# Adapter Specifications Index
 
-本目录登记 Wails 适配层（仓库根 `main.go` / `app.go` / `app_events.go`）的契约。
-core 领域规则见 `docs/specs/core/`。
+This directory registers contracts for the Wails adapter layer (`main.go`,
+`app.go`, `app_events.go` at the repository root). Core domain rules live in
+`docs/specs/core/`.
 
-| 主题 | 文件 | 摘要 |
+| Topic | File | Summary |
 | --- | --- | --- |
-| App 绑定面 | [`binding-surface.md`](./binding-surface.md) | 只暴露前端实际消费的方法；`app_contract_test.go` 锁定 68 个业务方法 |
+| App binding surface | [`binding-surface.md`](./binding-surface.md) | Expose only methods the frontend actually consumes; `app_contract_test.go` locks 68 business methods |

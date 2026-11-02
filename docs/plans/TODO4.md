@@ -1,7 +1,0 @@
-@/home/link/Downloads/next_development_plan.md
-
-本地mod管理，右上的视图切换不会记录状态（切换页面后重置）
-
-所有弹出的dialog在关闭动画的最后一帧会闪一次完整dialog
-
-

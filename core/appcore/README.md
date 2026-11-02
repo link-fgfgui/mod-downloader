@@ -4,12 +4,12 @@
 object, lifecycle/configuration, and workflows exposed to both Wails and the
 CLI. It must not import Wails runtime packages.
 
-## Where To Start
+## Where to start
 
 - `contracts.go`: event taxonomy, service options, and typed request/response
   contracts shared by adapters.
-- `../models/models.go`: canonical `ModProject`/`ModVersion` definitions used
-  by the service; this is the only model file in the package.
+- `../models/models.go`: canonical `ModProject`/`ModVersion` definitions used by
+  the service; this is the only model file in the package.
 - `service_runtime.go`: lifecycle, configuration application, provider clients,
   mods watcher, and shutdown ordering.
 - `service_search.go`, `service_favorites.go`, `service_settings.go`,
@@ -22,17 +22,17 @@ CLI. It must not import Wails runtime packages.
   root Wails adapter.
 - `user_agent.go`: versioned outbound identity.
 
-Use function names as the stable anchors rather than line numbers.
+Use function names as stable anchors rather than line numbers.
 
 ## Contracts
 
 - Return typed `models` and `structs` values; do not add aliases or re-exports.
 - Emit `appcore.Event` for UI progress; adapters decide how to display it.
-  `App.emitCoreEvent` is the only Wails event-name mapping; transport adapters
-  such as `httpserver` must not own event names.
-- Event payloads use the same `core/structs` types as RPC results. The frontend
-  mirrors event-only payloads once in `frontend/src/utils/events.ts`;
-  there is no second PascalCase contract.
+  `app_events.go` (`registerCoreEvents` / `emit`) is the only place that maps core
+  events onto Wails event names; transport adapters such as `httpserver` must not
+  own event names.
+- Event payloads use the same `core/structs` types as RPC results; there is no
+  second PascalCase contract.
 - Keep persistence and provider access behind their existing packages.
-- Keep cancellation checks inside the downloader queue lifecycle. `Startup`
-  opens the queue, `Shutdown` cancels and drains it before storage closes.
+- Keep cancellation checks inside the downloader queue lifecycle. `Startup` opens
+  the queue; `Shutdown` cancels and drains it before storage closes.

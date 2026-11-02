@@ -1,241 +1,276 @@
 # AGENTS
 
-本文件面向在本仓库工作的 AI 助手与人类开发者，给出架构边界、首要分层规则、开发与验证命令、
-编码红线，以及本仓库的经验沉淀（docs）机制。
+This file is for AI assistants and human developers working in this repository.
+It defines the architecture boundary, the primary layering rule, build and
+verification commands, coding red lines, and the documentation mechanism.
 
 ---
 
-## 1. 项目概述与架构边界
+## 1. Project overview and architecture boundaries
 
-本仓库是 **Wails v3 桌面应用**（搜索、下载、管理 Minecraft 模组及其依赖）。`core/` 是一个
-独立 Go 模块（`github.com/link-fgfgui/mod-downloader/core`，`go.mod` 经
-`replace => ./core` 注入），**同一份 core 也被 TUI 仓库 `../mod-downloader-cli` 通过
-symlink `core -> ../mod-downloader-gui-v3/core` 引用**。因此本仓库存在 **GUI（React）
-与 TUI（tview，位于姊妹仓库）两个前端**，共享同一条 Go 领域层。
+This repository is a **Wails v3 desktop app** for searching, downloading, and
+managing Minecraft mods. `core/` is a standalone Go module
+(`github.com/link-fgfgui/mod-downloader/core`, wired through
+`replace => ./core`). **The same `core` is consumed by the TUI repository
+`../mod-downloader-cli` through the symlink `core -> ../mod-downloader-gui-v3/core`**.
+The repository therefore has two frontends — GUI (React) and TUI (tview, in the
+sibling repository) — sharing one Go domain layer.
 
 ```text
-React 前端 (pages/, stores/, hooks/, lib/)          ← 渲染、本地 UI 缓存、输入体验
-        │  ① 生成式绑定 frontend/bindings/（App 方法 RPC）
-        │  ② Wails 事件总线（线缆名 = appcore EventKind.Name()）
-Root App 适配器 (main.go / main_server.go, app.go,
-                app_contracts.go, app_events.go)    ← 装配、绑定透传、原生对话框
+React frontend (pages/, stores/, hooks/, lib/)       ← rendering, local UI cache, input
+        │  ① generated bindings frontend/bindings/ (App method RPC)
+        │  ② Wails event bus (wire name = appcore EventKind.Name())
+Root App adapter (main.go / main_server.go, app.go,
+                app_contracts.go, app_events.go)     ← wiring, binding pass-through, native dialogs
         ▼
-core/host    UI 无关运行时：core 生命周期 + HTTP 扩展服务器 + 类型化事件分发
+core/host    UI-agnostic runtime: core lifecycle + HTTP extension server + typed event dispatch
         ▼
-core/appcore.Service 业务 facade（进程级单例）
-        ├── providers    Modrinth / CurseForge 集成
-        ├── downloader   下载队列、分块、重试与停滞处理
-        ├── modbridge    在线元数据 ↔ 本地 mod
-        ├── minecraft    实例/启动器探测、jar 解析、JIJ 依赖分析
-        ├── storage      SQLite（收藏、置顶、统计）+ gob+zstd 元数据缓存
-        ├── configs      TOML 配置、边界常量与规范化
-        ├── structs      跨前端共享投影类型（数据契约，唯一来源）
-        └── models       规范域模型（单一事实源）
+core/appcore.Service  business facade (process-wide singleton)
+        ├── providers    Modrinth / CurseForge integrations
+        ├── downloader   download queue, chunking, retries, stall handling
+        ├── modbridge    online metadata ↔ local mods
+        ├── minecraft    instance/launcher discovery, jar parsing, JIJ analysis
+        ├── storage      SQLite (favorites, pins, stats) + gob+zstd metadata cache
+        ├── configs      TOML config, boundary constants, normalization
+        ├── structs      cross-frontend projection types (single data contract)
+        └── models       canonical domain models (single source of truth)
 ```
 
-- 姊妹布局：`../mod-downloader-cli` 必须与本仓库同级存在，否则其 `core` symlink 断裂。
-- 所有域结构体只定义在 `core/models` / `core/structs`；适配器与前端不得复制定义。
-- core 启动失败必须 fail-fast：`GetStartupStatus` 返回类型化失败原因，前端 bootstrap
-  先查它再挂载 store，不得用静默空结果掩盖。
+- Sibling layout: `../mod-downloader-cli` must exist next to this repository,
+  otherwise its `core` symlink breaks.
+- Domain structs are defined only in `core/models` / `core/structs`; adapters and
+  the frontend must not duplicate them.
+- Core startup must fail fast: `GetStartupStatus` returns a typed failure reason,
+  and the frontend bootstrap checks it before mounting stores. Never hide a
+  startup failure behind an empty result.
 
 ---
 
-## 2. 首要规则：不要在 core 之外写 UI 框架无关的逻辑
+## 2. Primary rule: no UI-framework-agnostic logic outside core
 
-由于 **GUI 与 TUI 共享同一份 core**，任何“换一个 UI 框架（React ↔ tview）依然成立”的
-逻辑，都必须**只有一份 Go 实现，且住在 core**。这是本仓库最重要的分层红线。
+Because the GUI and TUI share one `core`, any logic that still holds after
+swapping the UI framework (React ↔ tview) must have **exactly one Go
+implementation, inside core**. This is the most important layering rule in the
+repository.
 
-### 2.1 归类判据
+### 2.1 Classification test
 
-改任何逻辑前先回答两个问题：
+Before changing any logic, answer:
 
-1. **换到另一个 UI 框架，这条规则还成立吗？**
-2. **它会写回 core 状态，或两套 UI 必须表现一致吗？**
+1. **Would this rule still hold under a different UI framework?**
+2. **Does it write core state, or must both UIs behave identically?**
 
-任一为“是” → 写进 core，通过 `appcore.Service` 方法或 `core/structs` 投影类型暴露，
-`app.go` 只透传，前端只消费。两者都是“否” → 才允许留在前端（或仓库根适配层）。
+If either answer is yes, put it in core and expose it through an
+`appcore.Service` method or a `core/structs` projection. `app.go` only passes it
+through; the frontend only consumes it. If both answers are no, it may stay in
+the frontend (or the root adapter).
 
-| 属于 core（GUI/TUI 必须一致） | 允许留在前端 |
+| Belongs in core (GUI/TUI must agree) | May stay in the frontend |
 | :--- | :--- |
-| 搜索表达式解析、排序、分组、兼容性判定 | 分页、焦点、抽屉、选区、表单草稿 |
-| 设置边界常量与 clamp 规范化 | 动画时长表现、GSAP/FLIP、主题样式 |
-| 收藏排序/作用域过滤、置顶分区 | tooltip 文案、i18n、拼音首字母输入增强 |
-| 下载队列状态推进、分块/重试规则 | 命令式布局、每帧格式化（基于 core 已算好的值） |
-| 事件 kind、线缆名、生命周期、HTTP 服务器 | 直接渲染投影 |
+| Search expression parsing, sorting, grouping, compatibility | Pagination, focus, drawers, selection, form drafts |
+| Settings boundary constants and clamp normalization | Animation timing, GSAP/FLIP, theme styling |
+| Favorite ordering/scope filtering, pinned partitions | Tooltip copy, i18n, pinyin-initial search enhancement |
+| Download queue transitions, chunking/retry rules | Imperative layout, per-frame formatting of core-computed values |
+| Event kinds, wire names, lifecycle, HTTP server | Rendering projections directly |
 
-### 2.2 为什么这么严（历史教训）
+### 2.2 Why this is strict (historical lesson)
 
-- 旧仓时代（Wails v2、单前端）沉淀的红线已内联在本文件第 5 节；进入
-  GUI+TUI 双前端时代后，重复实现的问题被实测放大（详见
-  `../mod-downloader-cli/docs/architecture/core-gui-tui-adaptation-plan.md`）：
-  - 同一组“Manage 分组 / Jij 去重 / 兼容性判定 / 搜索文本”曾有三份实现
-    （core、TUI `uistate`、GUI `lib/*.ts`），行为漂移后靠下沉 core（Phase 5）收敛；
-  - 设置边界常量三份、收藏排序两份（且都漏了 `created_at` 平局规则）；
-  - 三套事件枚举靠手写线缆名保持一致。
-- 上述问题已经通过 `core/host` + `appcore.EventKind.Name()` + `core/structs` 下沉收敛。
-  **新增逻辑时禁止重演**：想把它写进 `app.go`、`stores/*.ts` 或 `lib/*.ts` 之前，
-  先按 2.1 判据归类。
+After the GUI + TUI split, duplicated implementations were measured and
+amplified: Manage grouping/JIJ/compatibility/search text had three copies,
+settings boundary constants existed three times, favorite ordering twice (both
+missing the `created_at` tie-breaker), and three event enums kept hand-written
+wire names in sync. They were consolidated into `core/host`,
+`appcore.EventKind.Name()`, and `core/structs`. **Do not reintroduce them.**
+Before writing logic in `app.go`, `stores/*.ts`, or `lib/*.ts`, apply the 2.1
+test.
 
-### 2.3 依赖方向（机械可检查）
+### 2.3 Dependency direction (mechanically checkable)
 
-1. `core/` 不得导入任何适配器包；适配器（仓库根 main 包、TUI `internal/...`）可以导入 `core/*`。
-2. 事件 kind 与线缆名只在 `core/appcore` 定义一次（`EventKind.Name()`，kebab-case，
-   已由契约测试锁定），适配器不得再定义枚举或第二套名字。
-3. 订阅 core 事件只允许 `core/host` 的 `host.On / host.OnEvent` 类型化 handler；
-   `any` 断言只允许在 `core/host` 内出现一处。
-4. `app.go` 不持有生命周期：启动/关闭/HTTP/事件都归 `core/host`；根目录只放
-   Wails 装配、绑定透传与原生对话框。`app_contracts.go` 只收适配器特有类型
-   （如原生对话框返回值）。
-5. 新增 GUI 能力的标准路径是 **core 加 API/投影类型 → `app.go` 绑定 → 前端消费**；
-   如果第 1 步做不到（纯 TUI 也需要同一规则），说明这条逻辑本来就不该写在前端。
+1. `core/` must not import adapter packages. Adapters (the root main package,
+   TUI `internal/...`) may import `core/*`.
+2. Event kinds and wire names are defined once in `core/appcore`
+   (`EventKind.Name()`, kebab-case, locked by a contract test). Adapters must not
+   define enums or a second set of names.
+3. Subscribe to core events only through `core/host`'s typed `host.On` /
+   `host.OnEvent` handlers. The single `any` assertion is allowed only inside
+   `core/host`.
+4. `app.go` does not own lifecycle: startup/shutdown/HTTP/events belong to
+   `core/host`. The repository root only holds Wails wiring, binding
+   pass-through, and native dialogs. `app_contracts.go` holds adapter-only types
+   (for example native dialog results).
+5. The standard path for a new GUI capability is **core API/projection type →
+   `app.go` binding → frontend consumption**. If step 1 is impossible (the TUI
+   needs the same rule), the logic never belonged in the frontend.
 
 ---
 
-## 3. 构建、测试与绑定
+## 3. Build, test, and bindings
 
 ### Go
 
 ```bash
-go build . && go build -tags server .   # 两种形态（窗口/无头服务器）都必须可编译
+go build . && go build -tags server .   # both forms (window / headless) must compile
 go vet ./...
-go test ./...                           # 根目录契约与版本测试
-(cd core && go test ./...)              # core 是独立模块，必须单独跑
+go test ./...                           # root contract and version tests
+(cd core && go test ./...)              # core is a separate module; run it separately
 ```
 
-- `app_test.go` / `app_contract_test.go` 锁定 App 绑定面（`expectedAppMethods`）：
-  新增/删除 `App` 方法时必须同步更新契约测试并使其通过。
-- core 是共享层：**任何 core 公共 API 或事件变化，都要到 TUI 仓库验证**
-  （见第 6.4 提交前自检）。
+- `app_test.go` / `app_contract_test.go` lock the App binding surface
+  (`expectedAppMethods`): when adding or removing an `App` method, update the
+  contract test and make it pass.
+- Core is shared: **any public core API or event change must be verified in the
+  TUI repository** (see the 6.4 pre-commit checklist).
 
-### 前端
+### Frontend
 
 ```bash
 cd frontend
-npm run build      # tsc 类型检查 + Vite 生产构建
-npx vitest run     # 单元测试
+npm run build      # tsc type check + Vite production build
+npx vitest run     # unit tests
 ```
 
-- Go `App` 方法签名或 core 结构变化后，用 `wails3 generate bindings`
-  （等价于 `build/Taskfile.yml` 的 `generate:bindings`，含 `-clean=true -ts`）重新生成
-  `frontend/bindings/`；生成在 `server,production` tag 下分析同一套代码。
-- 前端只消费 bindings 生成的类型，禁止手写平行 interface。
+- After Go `App` signatures or core structs change, regenerate
+  `frontend/bindings/` with `wails3 generate bindings` (equivalent to
+  `build/Taskfile.yml`'s `generate:bindings`, including `-clean=true -ts`). The
+  generator analyzes the same code under the `server,production` tags.
+- The frontend consumes generated binding types only; never hand-write parallel
+  interfaces.
 
 ---
 
-## 4. UI 验证
+## 4. UI verification
 
-所有 UI 检查一律使用 Playwright MCP 浏览器工具。禁止使用 `spectacle`、`xwininfo`、
-`uinput` 或其他桌面截图/输入自动化：通过无头 Wails 服务器的浏览器页面来检查应用，
-更快、可脚本化，并能拿到 DOM 级断言。
+All UI checks use the Playwright MCP browser tools. Do not use `spectacle`,
+`xwininfo`, `uinput`, or other desktop screenshot/input automation: drive the
+headless Wails server in a browser instead. It is faster, scriptable, and gives
+DOM-level assertions.
 
-### 无头服务器工作流
+### Headless server workflow
 
 ```bash
 wails3 task build:server
 ./bin/mod-downloader-server
 ```
 
-服务器默认监听 `http://127.0.0.1:9245`，可用 `MOD_DOWNLOADER_SERVER_PORT` 覆盖。
-无头服务器同样受全局单实例约束（绑定 `127.0.0.1:18801`）；已有 GUI/TUI 实例运行时，
-先关闭旧实例再启动，否则会以 `instance.ErrAlreadyRunning` 退出。详见
-`docs/specs/core/single-instance.md`。
-用 Playwright MCP 导航、检查可访问性树、点击、输入、截图。无头服务器提供的是
-内嵌的生产前端加真实 Go bindings，因此 API 调用与事件都跑在真实后端上。
+The server listens on `http://127.0.0.1:9245` by default; override with
+`MOD_DOWNLOADER_SERVER_PORT`. It is subject to the global single-instance guard
+(`127.0.0.1:18801`); close any running GUI/TUI instance first or it exits with
+`instance.ErrAlreadyRunning` (see `docs/specs/core/single-instance.md`). It serves
+the embedded production frontend with real Go bindings, so Playwright exercises
+the real backend.
 
-需要源码级 React 诊断时，先起无头服务器，再启动带 dev-server 代理的 Vite：
+For source-level React diagnostics, start the server first and run Vite against
+it; open `http://127.0.0.1:9246/`:
 
 ```bash
-cd frontend
-WAILS_SERVER_URL=http://127.0.0.1:9245 npm run dev -- --port 9246
+cd frontend && WAILS_SERVER_URL=http://127.0.0.1:9245 npm run dev -- --port 9246
 ```
 
-用 Playwright 打开 `http://127.0.0.1:9246/`。这样既保留真实 bindings，又能让 Vite
-提供未压缩模块与 React 错误栈。
-
-裸跑 `cd frontend && npm run dev` 不提供 Wails bindings；端到端 UI 验证必须走无头服务器。
+Running `npm run dev` alone provides no Wails bindings; end-to-end UI
+verification must go through the headless server.
 
 ---
 
-## 5. 编码标准与反模式
+## 5. Coding standards and anti-patterns
 
-以下红线是本仓库的编码标准（早期源自旧仓实践，现已内联于此，不再依赖外部仓库）：
+These red lines are the repository's coding standard (originally derived from the
+old repository, now inlined here).
 
 ### Go
 
-1. **禁止 type alias 过渡层**：不要写 `type SearchModResult = models.ModProject`，
-   直接导入并使用 `core/models.*` / `core/structs.*`。
-2. **禁止 re-export 文件**：任何包不得转口 core 已导出的类型。
-3. **替换即删除**：用新实现替换转换/规则代码时，在同一批提交里删掉旧实现，
-   不留 dead path。
-4. **测试边界值从生产常量推导**：写 `MaxLimit + 1`，禁止会随常量演化而过期的魔法数。
-5. 错误显式返回并翻译为用户可读文案，禁止吞错或“存而不用”；日志走 `core/logging`。
-6. 改过的文件保持 `gofmt` / `go vet` 干净。
-7. 每个源文件保留 SPDX 头：core 外 `GPL-3.0-or-later`；core 内
-   `LGPL-3.0-or-later WITH LGPL-3.0-linking-exception`。core 用弱许可 + 链接例外，
-   正是“适配器可替换（GUI/TUI）”这一架构决策的许可证化体现。
+1. **No type-alias transition layers**: do not write
+   `type SearchModResult = models.ModProject`; import and use
+   `core/models.*` / `core/structs.*` directly.
+2. **No re-export files**: no package may forward core-exported types.
+3. **Replace means delete**: when replacing conversion/rule code, delete the old
+   implementation in the same commit; leave no dead path.
+4. **Derive test boundaries from production constants**: write `MaxLimit + 1`,
+   not a magic number that rots when the constant changes.
+5. **Return errors explicitly** and translate them into user-readable copy. Never
+   swallow errors or store them unused; log through `core/logging`.
+6. Keep touched files clean under `gofmt` / `go vet`.
+7. Keep the SPDX header on every source file: `GPL-3.0-or-later` outside core;
+   `LGPL-3.0-or-later WITH LGPL-3.0-linking-exception` inside core. The weaker
+   core license plus linking exception is the licensing expression of the
+   replaceable-adapter (GUI/TUI) architecture.
 
-### 前端（React + TypeScript）
+### Frontend (React + TypeScript)
 
-1. 弹窗/抽屉等临时 UI 状态必须在关闭与取消路径上彻底重置（不得靠页面重载清状态）。
-2. 双端一致的判定一律下沉 core（见第 2 节）；尽量少写 `lib/` helper，现有展示投影
-   helper（如 `modGroupDisplay.ts`）不得复刻 core 已有的排序/分组/兼容性规则。
-3. i18n 修订时 `locales/en.ts` 与 `locales/zh.ts` 同批更新，不留缺失 key。
+1. Transient UI state (dialogs, drawers) must be fully reset on close and cancel
+   paths; never rely on a page reload to clear state.
+2. Cross-frontend rules belong in core (see section 2). Minimize `lib/` helpers;
+   existing display projections such as `modGroupDisplay.ts` must not reimplement
+   core sorting/grouping/compatibility rules.
+3. When revising i18n, update `locales/en.ts` and `locales/zh.ts` in the same
+   change; do not leave missing keys.
 
 ---
 
-## 6. 经验沉淀与 docs 机制
+## 6. Documentation mechanism
 
-经验沉淀使用**轻量、无工具**的纯 Markdown 机制（不引入脚本、状态机、JSONL 清单），
-归档在 `docs/specs/`。**规范的唯一来源是本仓库 `docs/specs/`**；旧仓已归档
-（`../archived-legacy-mod-downloader.tar.gz`），仅作历史参考，不再作为规范源。
-新增内容优先复用既有文件而不是另起炉灶。
+Documentation uses a lightweight, tool-free Markdown mechanism (no scripts, state
+machines, or JSONL manifests) under `docs/specs/`. **The only source of truth for
+specifications is this repository's `docs/specs/`**; the old repository is
+archived (`../archived-legacy-mod-downloader.tar.gz`) and is historical reference
+only. Reuse an existing file instead of creating a new one.
 
-### 6.1 目录结构
+All project documentation is written in English.
+
+### 6.1 Directory structure
 
 ```text
 docs/specs/
-  core/       core 领域规范（存储、下载、网络、兼容性…）
-  adapter/    Wails 适配层（绑定面、事件、原生对话框、server 模式）
-  frontend/   React UI（状态生命周期、动画、i18n、主题）
-  guides/     思维指南（跨层检查清单、复用判断）
+  core/       core domain rules (storage, downloads, networking, compatibility, …)
+  adapter/    Wails adapter (binding surface, events, native dialogs, server mode)
+  frontend/   React UI (state lifecycle, animation, i18n, theme)
 ```
 
-- 每个子目录配一个 `index.md` 登记所有主题文件；首个文件落地时与目录一并创建。
-- core 物理上只存在于本仓库：**core 级规范以本仓库 `docs/specs/core/` 为准**，
-  TUI 仓库相关文档应引用这里，而不是复制一份。
+- Each subdirectory has an `index.md` listing every topic file. Create it when
+  the first file lands.
+- `core` exists physically only in this repository: **core-level specifications
+  live in this repository's `docs/specs/core/`**. The TUI repository must link
+  here rather than copy them.
 
-### 6.2 开发前查阅（开发前检索）
+### 6.2 Read before changing
 
-修改任何既有层或模块之前，先在 `docs/specs/` 找到相关规范，确认方案不违反已记录的契约，
-不重蹈已记录的反模式。尚未沉淀的主题，按 6.3 的触发条件补充后再动手。
+Before modifying an existing layer or module, find the relevant specification in
+`docs/specs/` and confirm the plan does not violate a recorded contract or repeat
+a recorded anti-pattern. If the topic is not documented, add it using the
+triggers in 6.3 before changing code.
 
-### 6.3 何时沉淀（沉淀触发场景）
+### 6.3 When to record
 
-凡涉及以下情况，必须当场沉淀：
+Record immediately when any of the following occurs:
 
-1. **隐蔽或反复出现的 Bug**：非显而易见的陷阱（静默丢字段、goroutine 泄漏、
-   竞态、事件丢失、第三方 API 怪癖）。记录问题、根因、禁止模式（Don't）、
-   正确做法（Instead）。
-2. **架构与契约边界变更**：新增模块、跨层负载格式变化、SQLite schema 变化、
-   `App` 绑定面或 core 事件变化。更新对应 spec 或新建 `docs/specs/<层>/<主题>.md`
-   并登记到 `index.md`。
-3. **识别出的反模式**：重构中发现的循环依赖、重复实现（尤其违反第 2 节的）、
-   状态重复三个来源等。追加到对应层规范或质量指南。
-4. **关键特性方案备忘**：非平凡的方案决策（复杂依赖解析、下载分块计算、
-   分组/兼容性下沉等），记录关键约束与设计取舍。
+1. **Subtle or recurring bugs**: non-obvious traps (silently dropped fields,
+   goroutine leaks, races, lost events, third-party API quirks). Record the
+   problem, root cause, forbidden pattern (Don't), and correct approach (Instead).
+2. **Architecture or contract boundary changes**: new modules, cross-layer
+   payload changes, SQLite schema changes, `App` binding or core event changes.
+   Update the relevant spec or create `docs/specs/<layer>/<topic>.md` and register
+   it in `index.md`.
+3. **Identified anti-patterns**: circular dependencies, duplicate
+   implementations (especially those violating section 2), or three sources of
+   duplicated state. Append to the relevant layer spec.
+4. **Key design decisions**: non-trivial choices (complex dependency resolution,
+   download chunk calculation, grouping/compatibility consolidation). Record the
+   constraints and trade-offs.
 
-### 6.4 提交前 1 分钟闭环自检
+### 6.4 One-minute pre-commit checklist
 
-完成任务或提交前过一遍：
+Before finishing a task or committing:
 
-- [ ] `go build . && go build -tags server .`、`go vet ./...`、`go test ./...` 通过。
-- [ ] `(cd core && go test ./...)` 通过。
-- [ ] 前端 `npm run build` 与 `npx vitest run` 无错误。
-- [ ] 若 `App` 方法或 core 结构变了：bindings 已重新生成，`app_contract_test.go` 已更新。
-- [ ] **core 公共 API / 事件变化时，姊妹仓库联动验证**：
+- [ ] `go build . && go build -tags server .`, `go vet ./...`, `go test ./...` pass.
+- [ ] `(cd core && go test ./...)` passes.
+- [ ] Frontend `npm run build` and `npx vitest run` pass.
+- [ ] If `App` methods or core structs changed: bindings regenerated and
+      `app_contract_test.go` updated.
+- [ ] **When core public APIs or events change, verify the sibling repository**:
       `cd ../mod-downloader-cli && go build ./... && go vet ./... && go test ./...`
-- [ ] 本次工作是否修了隐蔽 Bug 或产生了架构洞见？**是**则在 `docs/specs/` 更新/新建
-      对应规范，并且该文档变更与代码变更**进入同一批提交**。
-- [ ] grep 抽查无“第二实现”复活：例如
+- [ ] Did this work fix a subtle bug or produce an architectural insight? If yes,
+      update/create the relevant spec in `docs/specs/`, and commit the doc change
+      in the same batch as the code change.
+- [ ] Grep for revived "second implementations", for example:
       `rg -n "MinFileConcurrency|MinConcurrentDownloads|MaxTargetDownloadRateMiB" --glob '!core/**'`
-      在适配器与前端应为 0 命中（边界规则只活在一处）。
+      must return 0 hits in adapters and the frontend (boundary rules live in one
+      place only).

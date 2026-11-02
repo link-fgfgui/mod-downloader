@@ -1,49 +1,56 @@
-# Radix 弹窗退场动画
+# Radix Dialog Exit Animation
 
-## 现象
+## Symptom
 
-关闭任意 Dialog / AlertDialog / DropdownMenu / Tooltip 时，退出动画播放到最后一帧后，
-会短暂闪回一次完整、可见的弹窗，然后才从 DOM 移除。
+Closing any Dialog / AlertDialog / DropdownMenu / Tooltip plays the exit animation
+to its last frame, then briefly flashes a complete, visible dialog before the node
+is removed from the DOM.
 
-## 根因
+## Root cause
 
-- `tw-animate-css` 的 `animate-out` 默认 `animation-fill-mode: none`，动画结束后元素会
-  立即恢复基础样式（`opacity: 1`、`scale: 1`）。
-- Radix Presence 依赖 `animationend` 才卸载节点。它在事件处理里临时写入
-  `style.animationFillMode = "forwards"`，随后用 `setTimeout(0)` 把内联值改回去。
-- 在 WebKitGTK / React 18 下，这个内联重置可能先于 React 提交卸载发生。此时动画已经
-  结束、`fill-mode` 又被清空，浏览器就会按基础样式绘制一帧完整弹窗，即“最后一帧闪烁”。
+- `tw-animate-css`'s `animate-out` defaults to `animation-fill-mode: none`, so the
+  element snaps back to its base style (`opacity: 1`, `scale: 1`) when the
+  animation ends.
+- Radix Presence waits for `animationend` before unmounting. In its handler it
+  temporarily sets `style.animationFillMode = "forwards"`, then clears the inline
+  value with `setTimeout(0)`.
+- Under WebKitGTK / React 18, that inline reset can happen before React commits
+  the unmount. The animation has ended and `fill-mode` is cleared, so the browser
+  paints one frame of the full dialog: the "last-frame flash".
 
-## 约束
+## Constraints
 
 **Don't**
 
-- 不要只依赖 Radix 的内联 `animationFillMode` 兜底。
-- 不要给任何 Radix Presence 的 `data-[state=closed]:animate-out` 元素省略
-  `data-[state=closed]:fill-mode-forwards`。
-- 不要只给内容层加退出动画而漏掉 Overlay；两层时长不一致会让遮罩先消失。
+- Do not rely only on Radix's inline `animationFillMode` fallback.
+- Do not omit `data-[state=closed]:fill-mode-forwards` on any Radix Presence
+  element using `data-[state=closed]:animate-out`.
+- Do not animate only the content layer and skip the overlay; mismatched
+  durations make the scrim disappear first.
 
 **Instead**
 
-- 每个使用 `data-[state=closed]:animate-out` 的组件类名都必须同时包含
-  `data-[state=closed]:fill-mode-forwards`，让样式表在动画结束后继续持有
-  `opacity: 0` / 缩放后的最后一帧，直到 Radix 真正卸载节点。
-- Dialog / AlertDialog 的 Overlay 与 Content 统一使用 `duration-md`，保证遮罩与内容
-  按同一个用户动画倍率同步退场。
-- 退出期间加 `data-[state=closed]:pointer-events-none`，避免动画中的弹窗继续接收点击。
+- Every component class using `data-[state=closed]:animate-out` must also include
+  `data-[state=closed]:fill-mode-forwards`, so the stylesheet holds the final
+  `opacity: 0` / scaled frame until Radix actually unmounts the node.
+- Dialog / AlertDialog overlay and content use `duration-md` together, so the
+  scrim and content exit at the same user animation multiplier.
+- Add `data-[state=closed]:pointer-events-none` during exit so the animating
+  dialog cannot receive clicks.
 
-当前覆盖位置：
+Current coverage:
 
 - `frontend/src/components/ui/dialog.tsx`
 - `frontend/src/components/ui/alert-dialog.tsx`
 - `frontend/src/components/ui/dropdown-menu.tsx`
 - `frontend/src/components/ui/tooltip.tsx`
 
-## 验证
+## Verification
 
-在无头服务器 + Playwright 中关闭弹窗，监听 `animationend`：
+Close dialogs in the headless server with Playwright and observe `animationend`:
 
-1. Radix 处理完后，计算样式应为 `animation-fill-mode: forwards`、`opacity: 0`。
-2. 手动清空内联 `animationFillMode`（模拟 Radix 的 `setTimeout` 重置）后，计算样式仍须
-   保持 `forwards` / `opacity: 0`。
-3. 节点卸载前不得出现 `opacity: 1` 的采样帧。
+1. After Radix handles it, computed style must be `animation-fill-mode: forwards`
+   and `opacity: 0`.
+2. Manually clear inline `animationFillMode` (simulating Radix's `setTimeout`
+   reset); computed style must still be `forwards` / `opacity: 0`.
+3. No sampled frame before unmount may show `opacity: 1`.

@@ -1,61 +1,77 @@
-# 双前端共享决策投影
+# Shared Decision Projections for Both Frontends
 
-## 结论
+## Decision
 
-GUI 与 TUI 必须表现一致的本地 mod 规则由 core 计算，适配器只渲染字段：
+Local-mod rules that the GUI and TUI must present identically are computed in
+core; adapters only render fields:
 
-- `LocalModGroup.RowKey`：物理 jar 的稳定行键（`id|sha1|path|fileName` 中非空部分）。
-- `LocalModGroup.CanReplaceVersion`：是否存在在线平台 + 项目 ID。
-- `LocalModGroup.OnlineProject`：由本地 mod 的在线元数据构造的 `models.ModProject`。
-- `LocalModGroup.Incompatible` / `SearchText` / `Categories` / `Loaders`：原有投影。
+- `LocalModGroup.RowKey`: stable row key for a physical jar (non-empty parts of
+  `id|sha1|path|fileName`).
+- `LocalModGroup.CanReplaceVersion`: whether an online platform and project ID
+  exist.
+- `LocalModGroup.OnlineProject`: `models.ModProject` built from the local mod's
+  online metadata.
+- `LocalModGroup.Incompatible` / `SearchText` / `Categories` / `Loaders`:
+  existing projections.
 
-适配器不得再自行拼接行键或在线项目字段；需要“是否已选实例”等 UI 状态时，
-在 core 字段之上追加判断，而不是重新实现字段规则。
+Adapters must not assemble row keys or online-project fields themselves. When a
+UI state such as "has a selected instance" is needed, add a condition on top of
+the core fields instead of reimplementing the field rules.
 
-## 依赖森林
+## Dependency forest
 
-`core/modgraph` 是 Manage 依赖树的唯一构建实现：provider 匹配、JIJ 子节点、缺失叶子与
-环收缩都在 core。`LocalModView.Graph` 以“扁平节点 + key 引用”返回，避免递归 children
-产生循环 JSON；`LocalModView.Dependents` 以 group `RowKey` 索引反向依赖。GUI 只负责
-key → 节点水合和拼音搜索增强；TUI 当前仍用 `BuildLocalModGroups` 渲染扁平列表，
-需要树视图时直接消费同一投影，不得重新实现图构建。
+`core/modgraph` is the only implementation that builds the Manage dependency
+tree: provider matching, JIJ child nodes, missing leaves, and cycle contraction
+all live in core. `LocalModView.Graph` returns a flat node list plus key
+references to avoid recursive `children` and cyclic JSON;
+`LocalModView.Dependents` indexes reverse dependencies by group `RowKey`. The GUI
+only hydrates keys into nodes and adds pinyin search enhancement. The TUI
+currently renders a flat list with `BuildLocalModGroups`; when it needs a tree,
+it must consume the same projection rather than rebuilding the graph.
 
-## 搜索表达式
+## Search expressions
 
-`core/searchexpr` 是本地 mod 搜索语法的唯一 Go 实现：
+`core/searchexpr` is the only Go implementation of the local-mod search syntax:
 
 ```text
 expression := branch ( '|' branch )*
 branch     := term ( '&' term )*
 ```
 
-`&` 比 `|` 绑定更紧；空查询与纯操作符查询匹配全部。TUI 的 Manage 过滤直接调用
-`searchexpr.Matches`。GUI 仍使用等价的 TypeScript 解析器做逐键过滤（避免每帧 RPC），
-两端共享同一组测试用例；修改语法时必须同时更新
-`core/searchexpr/expression_test.go` 与 `frontend/src/utils/searchExpression.test.ts`。
+`&` binds tighter than `|`; an empty query and an operator-only query match
+everything. The TUI's Manage filter calls `searchexpr.Matches` directly. The GUI
+still uses an equivalent TypeScript parser for per-keystroke filtering (to avoid
+an RPC on every frame); both sides share the same test cases. When changing the
+syntax, update both `core/searchexpr/expression_test.go` and
+`frontend/src/utils/searchExpression.test.ts`.
 
-## 版本比较
+## Version comparison
 
-`core/minecraft` 提供 `CompareVersions` / `IsVersionDowngrade` /
-`HasMajorVersionChange`。TUI 在替换版本列表中用它们标记“降级或跨大版本”风险；
-GUI 的 TypeScript 版本比较必须与 Go 测试保持同一组边界用例。
+`core/minecraft` provides `CompareVersions` / `IsVersionDowngrade` /
+`HasMajorVersionChange`. The TUI uses them to flag "downgrade or major-version
+change" risks in the version list. The GUI's TypeScript comparison must use the
+same boundary cases as the Go tests.
 
-## 安装时保留 disabled 状态
+## Preserving disabled state during install
 
-`core/downloader` 在替换旧 jar 时检查被替换文件是否全部为 `.jar.disabled`，
-新文件写入后自动恢复 `.disabled` 后缀。适配器**不得**在安装完成后自行 rename：
+When replacing an old jar, `core/downloader` checks whether every replaced file
+was `.jar.disabled` and restores the `.disabled` suffix after writing the new
+file. Adapters **must not** rename files after installation:
 
-- CLI `upgrade` 不再执行 `KeepDisabled` 后处理；
-- GUI/TUI 的版本替换自动获得同一行为。
+- CLI `upgrade` no longer runs a `KeepDisabled` post-processing step;
+- GUI/TUI version replacement gets the same behavior automatically.
 
-## 批量本地 mod 操作
+## Batch local-mod operations
 
-`ApplyLocalModBatchOperation` 是 enable/disable/delete 的唯一入口。一次性 CLI 命令
-通过 `LocalModBatchOperationRequest.TargetDir` 指定显式 mods 目录；GUI/TUI 留空，
-使用当前选中实例。CLI 不得再直接 `os.Remove` 或 `os.Rename` 操作 jar。
+`ApplyLocalModBatchOperation` is the only entry point for enable/disable/delete.
+One-shot CLI commands pass an explicit mods directory through
+`LocalModBatchOperationRequest.TargetDir`; the GUI/TUI leave it empty and use the
+currently selected instance. The CLI must not call `os.Remove` or `os.Rename` on
+jars directly.
 
-## 禁止
+## Prohibited
 
-- 不要在 `app.go`、`tviewui`、`frontend/src` 重新实现上述字段/规则。
-- 不要为 CLI 单独保留一套 `.jar.disabled` 后缀判断：使用
-  `minecraft.IsDisabledModName` / `DisableModPath` / `EnableModPath`。
+- Do not reimplement these fields/rules in `app.go`, `tviewui`, or
+  `frontend/src`.
+- Do not keep a separate `.jar.disabled` suffix check for the CLI: use
+  `minecraft.IsDisabledModName` / `DisableModPath` / `EnableModPath`.
