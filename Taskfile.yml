@@ -9,6 +9,18 @@ vars:
   # by `wails3 build GOOS=...` (or the GOOS env var) for cross-compilation. The
   # tasks below dispatch to the matching platform Taskfile via this variable.
   GOOS: '{{.GOOS | default OS}}'
+  # Link-time injection consumed by the production branch of BUILD_FLAGS in
+  # build/Taskfile.yml (server) and build/{linux,windows,darwin}/Taskfile.yml.
+  # APP_VERSION: env override > git describe (tag or short hash) > "dev".
+  # DEV=true builds skip ldflags entirely and keep the in-source default "dev".
+  APP_VERSION:
+    sh: 'v="${APP_VERSION:-}"; if [ -n "$v" ]; then printf "%s" "$v"; else git describe --tags --always --dirty 2>/dev/null || printf dev; fi'
+  # Built-in CurseForge API key used for outbound requests when the user has
+  # none configured (EffectiveCurseForgeAPIKey prefers the user key). Kept out
+  # of source control; pass via env for release builds:
+  #   DEFAULT_CF_API_KEY=... wails3 task build
+  DEFAULT_CF_API_KEY:
+    sh: 'printf "%s" "${DEFAULT_CF_API_KEY:-}"'
 
 includes:
   common: ./build/Taskfile.yml
@@ -66,3 +78,13 @@ tasks:
     summary: Builds and runs the Docker image
     cmds:
       - task: common:run:docker
+
+  clean:artifacts:
+    summary: Removes local build outputs and runtime artifacts
+    desc: |
+      Deletes ignored build outputs (bin/, frontend/dist) and runtime state
+      files that tests or manual runs may have left in the repository root
+      (log, sqlite, metadata temp). Tracked files are never touched.
+    cmds:
+      - rm -rf bin frontend/dist
+      - rm -f mod-downloader mod-downloader-server mod-downloader.log mod-favs.sqlite mod-metadata.tmp mods.db mods.db-shm mods.db-wal

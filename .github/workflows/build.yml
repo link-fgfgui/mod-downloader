@@ -1,0 +1,201 @@
+name: Build & Verify
+
+on:
+  push:
+    branches: [v3]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+# Cancel superseded runs on the same ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: write
+
+env:
+  # Built-in CurseForge API key injected at link time. Empty on PRs from
+  # forks (secrets are withheld); production builds then ship without a
+  # built-in key and users must configure their own.
+  DEFAULT_CF_API_KEY: ${{ secrets.DEFAULT_CF_API_KEY }}
+
+jobs:
+  verify:
+    name: Verify (linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout GUI repository
+        uses: actions/checkout@v4
+        with:
+          path: mod-downloader-gui-v3
+
+      # The CLI repository's go.work and `core` symlink expect the GUI
+      # repository checked out as a sibling directory named
+      # `mod-downloader-gui-v3`. Verify compiles both adapters against the
+      # one canonical core.
+      - name: Checkout CLI sibling repository
+        uses: actions/checkout@v4
+        with:
+          repository: link-fgfgui/mod-downloader-cli
+          path: mod-downloader-cli
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: mod-downloader-gui-v3/go.mod
+          cache-dependency-path: |
+            mod-downloader-gui-v3/go.sum
+            mod-downloader-gui-v3/core/go.sum
+            mod-downloader-cli/go.sum
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: mod-downloader-gui-v3/frontend/package-lock.json
+
+      - name: Install wails3 CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0
+
+      - name: Install Linux webview dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      - name: Check Go formatting (GUI)
+        working-directory: mod-downloader-gui-v3
+        run: |
+          unformatted=$(gofmt -l $(git ls-files '*.go'))
+          if [ -n "$unformatted" ]; then
+            echo "Files not gofmt-formatted:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Check Go formatting (CLI)
+        working-directory: mod-downloader-cli
+        run: |
+          unformatted=$(gofmt -l $(git ls-files '*.go'))
+          if [ -n "$unformatted" ]; then
+            echo "Files not gofmt-formatted:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Test core module (vet + test + race)
+        working-directory: mod-downloader-gui-v3/core
+        run: |
+          go vet ./...
+          go test ./...
+          go test -race ./...
+
+      - name: Test GUI root module (vet + test)
+        working-directory: mod-downloader-gui-v3
+        run: |
+          go vet ./...
+          go test ./...
+
+      - name: Test CLI sibling repository (build + vet + test)
+        working-directory: mod-downloader-cli
+        run: |
+          go build ./...
+          go vet ./...
+          go test ./...
+
+      - name: Frontend quality gate (lint + test + build)
+        working-directory: mod-downloader-gui-v3/frontend
+        run: |
+          npm ci
+          npm run lint
+          npm run test
+          npm run build
+
+      - name: Build headless server binary
+        working-directory: mod-downloader-gui-v3
+        run: wails3 task build:server
+
+  build:
+    name: Build (${{ matrix.os }})
+    needs: verify
+    if: startsWith(github.ref, 'refs/tags/v')
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - name: Checkout GUI repository
+        uses: actions/checkout@v4
+        with:
+          path: mod-downloader-gui-v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: mod-downloader-gui-v3/go.mod
+          cache-dependency-path: |
+            mod-downloader-gui-v3/go.sum
+            mod-downloader-gui-v3/core/go.sum
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: mod-downloader-gui-v3/frontend/package-lock.json
+
+      - name: Install wails3 CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0
+
+      - name: Install Linux webview dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      # APP_VERSION is derived by the Taskfile via `git describe` from the
+      # checked-out tag; DEFAULT_CF_API_KEY comes from the job environment.
+      - name: Build desktop application
+        working-directory: mod-downloader-gui-v3
+        run: wails3 task build
+
+      - name: Upload binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: mod-downloader-${{ runner.os }}
+          path: |
+            mod-downloader-gui-v3/bin/*
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download all platform artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Flatten artifact layout
+        run: |
+          mkdir -p release
+          find dist -type f -not -name "*.txt" -exec cp {} release/ \; || true
+          ls -lR dist
+          ls -l release
+
+      - name: Create release with binaries
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --generate-notes \
+            --verify-tag \
+            release/*

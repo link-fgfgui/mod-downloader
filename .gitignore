@@ -6,6 +6,10 @@ frontend/dist
 frontend/node_modules
 frontend/src/node_modules
 
+# Verification screenshots belong in .playwright-mcp/ or the external
+# guiv3-test-work directory, never in the repository root.
+/*.png
+
 # Local runtime state and credentials
 mod-downloader.toml
 mod-downloader.log

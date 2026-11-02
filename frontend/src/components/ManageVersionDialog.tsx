@@ -171,12 +171,9 @@ export function ManageVersionDialog({
   const selectVersion = async (version: ModVersion) => {
     if (!group || replacingVersionId) return;
     setReplacingVersionId(version.id);
-    let analysis: DependencyPreflightResult | null = null;
-    try {
-      analysis = await checkPreflight(version);
-    } finally {
+    const analysis = await checkPreflight(version).finally(() => {
       setReplacingVersionId("");
-    }
+    });
     if (analysis && (analysis.missing > 0 || analysis.conflicts > 0)) {
       setPendingVersion(version);
       setPreflightResult(analysis);
