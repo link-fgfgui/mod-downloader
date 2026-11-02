@@ -289,6 +289,10 @@ export function SaveMCIMSettings(req: structs$0.SaveMCIMSettingsRequest): $Cance
     return $Call.ByID(983863619, req);
 }
 
+export function SaveMultiSelectSettings(req: structs$0.SaveMultiSelectSettingsRequest): $CancellablePromise<view$0.SettingsView> {
+    return $Call.ByID(1981756528, req);
+}
+
 export function SaveNetworkSettings(req: structs$0.SaveNetworkSettingsRequest): $CancellablePromise<view$0.SettingsView> {
     return $Call.ByID(1280426947, req);
 }

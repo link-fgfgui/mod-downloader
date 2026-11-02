@@ -192,7 +192,19 @@ func Save(cfg *Config) error {
 	// Write to a sibling temp file first and only replace the real config after
 	// the encoder has flushed and fsynced. A failed or partial write must never
 	// truncate the user's existing configuration.
-	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".*.tmp")
+	//
+	// A process killed mid-write leaves the deferred cleanup unrun and strands
+	// its temp file. Core is single-instance by contract, so any matching temp
+	// file seen here is stale and can be swept before creating a new one.
+	dir := filepath.Dir(path)
+	if stale, globErr := filepath.Glob(filepath.Join(dir, "."+filepath.Base(path)+".*.tmp")); globErr == nil {
+		for _, candidate := range stale {
+			if removeErr := os.Remove(candidate); removeErr == nil {
+				logging.Debug("removed stale config temp file", "path", candidate)
+			}
+		}
+	}
+	tmp, err := os.CreateTemp(dir, "."+filepath.Base(path)+".*.tmp")
 	if err != nil {
 		logging.Error("create temp config file failed", "path", path, "error", err)
 		return fmt.Errorf("create temp config for %s: %w", path, err)

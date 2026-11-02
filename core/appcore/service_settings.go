@@ -186,6 +186,18 @@ func (s *Service) SaveJIJDetectionSettings(req appstructs.SaveJIJDetectionSettin
 	return s.GetSettings()
 }
 
+// SaveMultiSelectSettings persists the Ctrl-held multi-select preference. It
+// is a pure UI selection behavior read from the settings snapshot; no runtime
+// reconfiguration is required.
+func (s *Service) SaveMultiSelectSettings(req appstructs.SaveMultiSelectSettingsRequest) appview.SettingsView {
+	if s.config == nil {
+		s.config = &configs.Config{}
+	}
+	s.config.Preferences.RequireCtrlForMultiSelect = req.RequireCtrlForMultiSelect
+	s.persistConfig("save multi-select setting failed", "requireCtrlForMultiSelect", req.RequireCtrlForMultiSelect)
+	return s.GetSettings()
+}
+
 // SaveHardwareAccelerationSettings persists the webview GPU preference. The
 // value is read while the app starts on the next launch; it cannot be applied
 // to the already-created webview at runtime.

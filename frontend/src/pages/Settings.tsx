@@ -31,6 +31,7 @@ export function SettingsPage() {
   const isSavingCacheDir = useSettingsStore((state) => state.isSavingCacheDir);
   const isSavingJijDetection = useSettingsStore((state) => state.isSavingJijDetection);
   const isSavingHardwareAcceleration = useSettingsStore((state) => state.isSavingHardwareAcceleration);
+  const isSavingMultiSelect = useSettingsStore((state) => state.isSavingMultiSelect);
   const autoSaveState = useSettingsStore((state) => state.autoSaveState);
   const autoSaveError = useSettingsStore((state) => state.autoSaveError);
   const persistError = settings?.saveError || "";
@@ -42,6 +43,7 @@ export function SettingsPage() {
   const saveLanguage = useSettingsStore((state) => state.saveLanguage);
   const saveJij = useSettingsStore((state) => state.saveJijDetectionSettings);
   const saveHardware = useSettingsStore((state) => state.saveHardwareAccelerationSettings);
+  const saveMultiSelect = useSettingsStore((state) => state.saveMultiSelectSettings);
   const saveKeys = useSettingsStore((state) => state.saveApiKeys);
   const scheduleAutoSave = useSettingsStore((state) => state.scheduleAutoSave);
   const chooseCacheDir = useSettingsStore((state) => state.chooseCacheDir);
@@ -90,6 +92,16 @@ export function SettingsPage() {
     try {
       await saveHardware();
       toast.success(t("settings.hardwareAcceleration.saved"));
+    } catch (error) {
+      fail(error);
+    }
+  };
+
+  const handleMultiSelect = async (value: boolean) => {
+    patch({ draftRequireCtrlForMultiSelect: value });
+    try {
+      await saveMultiSelect();
+      toast.success(t("settings.multiSelect.saved"));
     } catch (error) {
       fail(error);
     }
@@ -297,6 +309,22 @@ export function SettingsPage() {
                 </span>
               </label>
               <p className="text-xs text-muted-foreground">{t("settings.hardwareAcceleration.hint")}</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("settings.multiSelect.label")}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1">
+              <label className="flex items-center justify-between gap-3 text-sm">
+                <span>{t("settings.multiSelect.enabled")}</span>
+                <span className="flex items-center gap-2">
+                  {isSavingMultiSelect ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                  <Switch checked={draft.draftRequireCtrlForMultiSelect} onCheckedChange={(value) => void handleMultiSelect(value)} />
+                </span>
+              </label>
+              <p className="text-xs text-muted-foreground">{t("settings.multiSelect.hint")}</p>
             </CardContent>
           </Card>
 

@@ -278,6 +278,15 @@ export interface SaveMCIMSettingsRequest {
 }
 
 /**
+ * SaveMultiSelectSettingsRequest toggles Ctrl-held multi-select: when enabled,
+ * a plain row click selects a single item and only Ctrl/Cmd clicks extend the
+ * selection (download, manage and favorites lists).
+ */
+export interface SaveMultiSelectSettingsRequest {
+    "requireCtrlForMultiSelect": boolean;
+}
+
+/**
  * SaveNetworkSettingsRequest updates download concurrency, rate limiting and
  * API request pacing; the core clamps every field to its documented range.
  */

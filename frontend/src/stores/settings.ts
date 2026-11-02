@@ -17,9 +17,54 @@ export type AutoSaveKind =
   | "simpleMode"
   | "cleanup"
   | "mcim"
+  | "multiSelect"
   | "releaseType"
   | "network"
   | "keys";
+
+// Every settings field group that round-trips through the backend. A save in
+// flight for one slot must never clobber a draft that was edited afterwards
+// (the rerun-ui-notes.md autosave race); drafts are therefore versioned per
+// slot and stale responses are dropped.
+type SaveSlot = AutoSaveKind | "theme" | "language" | "jij" | "hardware";
+
+const draftSlotByField: Record<string, SaveSlot> = {
+  draftTheme: "theme",
+  draftLanguage: "language",
+  draftAnimationDurationMultiplier: "animations",
+  draftSimpleMode: "simpleMode",
+  draftAutoScanUnusedDependencies: "cleanup",
+  draftMCIMEnabled: "mcim",
+  draftEnableJijDetection: "jij",
+  draftHardwareAcceleration: "hardware",
+  draftRequireCtrlForMultiSelect: "multiSelect",
+  draftPreferredReleaseType: "releaseType",
+  draftFileConcurrency: "network",
+  draftConcurrentDownloads: "network",
+  draftAdaptiveFileConcurrency: "network",
+  draftTargetDownloadRateMiB: "network",
+  draftVerifySHA1: "network",
+  draftRequestsPerSecond: "network",
+  draftCurseforgeKey: "keys",
+  draftModrinthKey: "keys",
+  clearCurseforgeKey: "keys",
+  clearModrinthKey: "keys",
+};
+
+const autoSaveTimers = new Map<AutoSaveKind, number>();
+
+// Monotonic per-slot draft revision. Bumped by patch() for every touched
+// draft field; save methods capture the revision before issuing the request
+// and only apply responses that are still current.
+const draftRevisions = new Map<SaveSlot, number>();
+
+function currentRevision(slot: SaveSlot): number {
+  return draftRevisions.get(slot) ?? 0;
+}
+
+function bumpRevision(slot: SaveSlot) {
+  draftRevisions.set(slot, currentRevision(slot) + 1);
+}
 
 export interface SettingsDrafts {
   draftTheme: string;
@@ -30,6 +75,7 @@ export interface SettingsDrafts {
   draftMCIMEnabled: boolean;
   draftEnableJijDetection: boolean;
   draftHardwareAcceleration: boolean;
+  draftRequireCtrlForMultiSelect: boolean;
   draftPreferredReleaseType: string;
   draftFileConcurrency: number;
   draftConcurrentDownloads: number;
@@ -58,6 +104,7 @@ interface SettingsState extends SettingsDrafts {
   isSavingMCIM: boolean;
   isSavingJijDetection: boolean;
   isSavingHardwareAcceleration: boolean;
+  isSavingMultiSelect: boolean;
   isSavingKeys: boolean;
   isSavingCacheDir: boolean;
   isChoosingCacheDir: boolean;
@@ -73,6 +120,7 @@ interface SettingsState extends SettingsDrafts {
   saveMCIMSettings: () => Promise<SettingsView>;
   saveJijDetectionSettings: () => Promise<SettingsView>;
   saveHardwareAccelerationSettings: () => Promise<SettingsView>;
+  saveMultiSelectSettings: () => Promise<SettingsView>;
   savePreferredReleaseTypeSettings: () => Promise<SettingsView>;
   saveNetworkSettings: () => Promise<SettingsView>;
   saveApiKeys: () => Promise<SettingsView>;
@@ -80,8 +128,6 @@ interface SettingsState extends SettingsDrafts {
   chooseCacheDir: () => Promise<boolean>;
   resetCacheDir: () => Promise<SettingsView>;
 }
-
-const autoSaveTimers = new Map<AutoSaveKind, number>();
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   settings: null,
@@ -98,6 +144,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   draftMCIMEnabled: false,
   draftEnableJijDetection: true,
   draftHardwareAcceleration: true,
+  draftRequireCtrlForMultiSelect: false,
   draftPreferredReleaseType: "latest",
   draftFileConcurrency: 4,
   draftConcurrentDownloads: 1,
@@ -117,6 +164,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   isSavingMCIM: false,
   isSavingJijDetection: false,
   isSavingHardwareAcceleration: false,
+  isSavingMultiSelect: false,
   isSavingKeys: false,
   isSavingCacheDir: false,
   isChoosingCacheDir: false,
@@ -138,6 +186,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         draftMCIMEnabled: view?.mcimEnabled ?? false,
         draftEnableJijDetection: view?.enableJijDetection ?? true,
         draftHardwareAcceleration: view?.hardwareAcceleration ?? true,
+        draftRequireCtrlForMultiSelect: view?.requireCtrlForMultiSelect ?? false,
         draftPreferredReleaseType: view?.preferredReleaseType || "latest",
         draftFileConcurrency: view?.fileConcurrency ?? 4,
         draftConcurrentDownloads: view?.concurrentDownloads ?? 1,
@@ -164,6 +213,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   patch(patch) {
+    for (const key of Object.keys(patch)) {
+      const slot = draftSlotByField[key];
+      if (slot) bumpRevision(slot);
+    }
     set(patch);
   },
 
@@ -189,6 +242,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             case "mcim":
               await get().saveMCIMSettings();
               break;
+            case "multiSelect":
+              await get().saveMultiSelectSettings();
+              break;
             case "releaseType":
               await get().savePreferredReleaseTypeSettings();
               break;
@@ -211,15 +267,20 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   async saveTheme() {
+    const revision = currentRevision("theme");
     const theme = normalizeThemePreference(get().draftTheme);
     set({ isSavingTheme: true, error: "" });
     try {
       const next = normalizeThemePreference(await api.SaveTheme(theme));
-      set((state) => ({
-        draftTheme: next,
-        settings: state.settings ? { ...state.settings, theme: next } : state.settings,
-      }));
-      applyThemePreference(next);
+      // A newer draft edit superseded this request: keep the newer draft and
+      // let the save it scheduled apply the theme.
+      if (currentRevision("theme") === revision) {
+        set((state) => ({
+          draftTheme: next,
+          settings: state.settings ? { ...state.settings, theme: next } : state.settings,
+        }));
+        applyThemePreference(next);
+      }
       return next;
     } catch (error) {
       set({ error: error instanceof Error ? error.message : String(error) });
@@ -230,15 +291,18 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   async saveLanguage() {
+    const revision = currentRevision("language");
     const language = normalizeLanguagePreference(get().draftLanguage);
     set({ isSavingLanguage: true, error: "" });
     try {
       const next = normalizeLanguagePreference(await api.SaveLanguage(language));
-      set((state) => ({
-        draftLanguage: next,
-        settings: state.settings ? { ...state.settings, language: next } : state.settings,
-      }));
-      await applyLanguagePreference(next);
+      if (currentRevision("language") === revision) {
+        set((state) => ({
+          draftLanguage: next,
+          settings: state.settings ? { ...state.settings, language: next } : state.settings,
+        }));
+        await applyLanguagePreference(next);
+      }
       return next;
     } catch (error) {
       set({ error: error instanceof Error ? error.message : String(error) });
@@ -249,12 +313,15 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   async saveAnimationSettings() {
+    const revision = currentRevision("animations");
     set({ isSavingAnimations: true, error: "" });
     try {
       const multiplier = normalizeAnimationDurationMultiplier(get().draftAnimationDurationMultiplier);
       const view = await api.SaveAnimationSettings({ animationDurationMultiplier: multiplier });
-      set({ settings: view, draftAnimationDurationMultiplier: view.animationDurationMultiplier });
-      applyAnimationSettings(view);
+      if (currentRevision("animations") === revision) {
+        set({ settings: view, draftAnimationDurationMultiplier: view.animationDurationMultiplier });
+        applyAnimationSettings(view);
+      }
       return view.animationDurationMultiplier;
     } catch (error) {
       set({ error: error instanceof Error ? error.message : String(error) });
@@ -266,10 +333,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   async saveSimpleModeSettings() {
+    const revision = currentRevision("simpleMode");
     set({ isSavingSimpleMode: true, error: "" });
     try {
       const view = await api.SaveSimpleModeSettings({ simpleMode: get().draftSimpleMode });
-      set({ settings: view, draftSimpleMode: view.simpleMode });
+      if (currentRevision("simpleMode") === revision) {
+        set({ settings: view, draftSimpleMode: view.simpleMode });
+      }
       return view;
     } finally {
       set({ isSavingSimpleMode: false });
@@ -277,12 +347,15 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   async saveUnusedDependencyCleanupSettings() {
+    const revision = currentRevision("cleanup");
     set({ isSavingUnusedDependencyCleanup: true, error: "" });
     try {
       const view = await api.SaveUnusedDependencyCleanupSettings({
         autoScanUnusedDependencies: get().draftAutoScanUnusedDependencies,
       });
-      set({ settings: view, draftAutoScanUnusedDependencies: view.autoScanUnusedDependencies });
+      if (currentRevision("cleanup") === revision) {
+        set({ settings: view, draftAutoScanUnusedDependencies: view.autoScanUnusedDependencies });
+      }
       return view;
     } finally {
       set({ isSavingUnusedDependencyCleanup: false });
@@ -290,10 +363,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   async saveMCIMSettings() {
+    const revision = currentRevision("mcim");
     set({ isSavingMCIM: true, error: "" });
     try {
       const view = await api.SaveMCIMSettings({ mcimEnabled: get().draftMCIMEnabled });
-      set({ settings: view, draftMCIMEnabled: view.mcimEnabled });
+      if (currentRevision("mcim") === revision) {
+        set({ settings: view, draftMCIMEnabled: view.mcimEnabled });
+      }
       return view;
     } finally {
       set({ isSavingMCIM: false });
@@ -301,10 +377,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   async saveJijDetectionSettings() {
+    const revision = currentRevision("jij");
     set({ isSavingJijDetection: true, error: "" });
     try {
       const view = await api.SaveJIJDetectionSettings({ enableJijDetection: get().draftEnableJijDetection });
-      set({ settings: view, draftEnableJijDetection: view.enableJijDetection });
+      if (currentRevision("jij") === revision) {
+        set({ settings: view, draftEnableJijDetection: view.enableJijDetection });
+      }
       return view;
     } finally {
       set({ isSavingJijDetection: false });
@@ -312,28 +391,51 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   async saveHardwareAccelerationSettings() {
+    const revision = currentRevision("hardware");
     set({ isSavingHardwareAcceleration: true, error: "" });
     try {
       const view = await api.SaveHardwareAccelerationSettings({
         hardwareAcceleration: get().draftHardwareAcceleration,
       });
-      set({ settings: view, draftHardwareAcceleration: view.hardwareAcceleration });
+      if (currentRevision("hardware") === revision) {
+        set({ settings: view, draftHardwareAcceleration: view.hardwareAcceleration });
+      }
       return view;
     } finally {
       set({ isSavingHardwareAcceleration: false });
     }
   },
 
+  async saveMultiSelectSettings() {
+    const revision = currentRevision("multiSelect");
+    set({ isSavingMultiSelect: true, error: "" });
+    try {
+      const view = await api.SaveMultiSelectSettings({
+        requireCtrlForMultiSelect: get().draftRequireCtrlForMultiSelect,
+      });
+      if (currentRevision("multiSelect") === revision) {
+        set({ settings: view, draftRequireCtrlForMultiSelect: view.requireCtrlForMultiSelect });
+      }
+      return view;
+    } finally {
+      set({ isSavingMultiSelect: false });
+    }
+  },
+
   async savePreferredReleaseTypeSettings() {
+    const revision = currentRevision("releaseType");
     set({ error: "" });
     const view = await api.SavePreferredReleaseTypeSettings({
       preferredReleaseType: get().draftPreferredReleaseType,
     });
-    set({ settings: view, draftPreferredReleaseType: view.preferredReleaseType });
+    if (currentRevision("releaseType") === revision) {
+      set({ settings: view, draftPreferredReleaseType: view.preferredReleaseType });
+    }
     return view;
   },
 
   async saveNetworkSettings() {
+    const revision = currentRevision("network");
     set({ isSavingNetwork: true, error: "" });
     try {
       const view = await api.SaveNetworkSettings({
@@ -344,15 +446,17 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         verifySha1: get().draftVerifySHA1,
         requestsPerSecond: get().draftRequestsPerSecond,
       });
-      set({
-        settings: view,
-        draftFileConcurrency: view.fileConcurrency,
-        draftConcurrentDownloads: view.concurrentDownloads,
-        draftAdaptiveFileConcurrency: view.adaptiveFileConcurrency,
-        draftTargetDownloadRateMiB: view.targetDownloadRateMiB,
-        draftVerifySHA1: view.verifySha1,
-        draftRequestsPerSecond: view.requestsPerSecond,
-      });
+      if (currentRevision("network") === revision) {
+        set({
+          settings: view,
+          draftFileConcurrency: view.fileConcurrency,
+          draftConcurrentDownloads: view.concurrentDownloads,
+          draftAdaptiveFileConcurrency: view.adaptiveFileConcurrency,
+          draftTargetDownloadRateMiB: view.targetDownloadRateMiB,
+          draftVerifySHA1: view.verifySha1,
+          draftRequestsPerSecond: view.requestsPerSecond,
+        });
+      }
       return view;
     } finally {
       set({ isSavingNetwork: false });
@@ -371,6 +475,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     // An explicit save supersedes any pending autosave; otherwise the timer
     // fires a second request with the already-cleared draft.
     get().cancelApiKeyAutoSave();
+    const revision = currentRevision("keys");
     const curseforgeDraft = get().draftCurseforgeKey;
     const modrinthDraft = get().draftModrinthKey;
     const clearCurseforge = get().clearCurseforgeKey;
@@ -381,17 +486,19 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         curseforgeApiKey: clearCurseforge ? "" : curseforgeDraft || apiKeyKeepSentinel,
         modrinthApiKey: clearModrinth ? "" : modrinthDraft || apiKeyKeepSentinel,
       });
-      set((state) => ({
-        settings: view,
-        draftCurseforgeKey:
-          state.draftCurseforgeKey === curseforgeDraft ? "" : state.draftCurseforgeKey,
-        draftModrinthKey:
-          state.draftModrinthKey === modrinthDraft ? "" : state.draftModrinthKey,
-        clearCurseforgeKey:
-          state.clearCurseforgeKey === clearCurseforge ? false : state.clearCurseforgeKey,
-        clearModrinthKey:
-          state.clearModrinthKey === clearModrinth ? false : state.clearModrinthKey,
-      }));
+      if (currentRevision("keys") === revision) {
+        set((state) => ({
+          settings: view,
+          draftCurseforgeKey:
+            state.draftCurseforgeKey === curseforgeDraft ? "" : state.draftCurseforgeKey,
+          draftModrinthKey:
+            state.draftModrinthKey === modrinthDraft ? "" : state.draftModrinthKey,
+          clearCurseforgeKey:
+            state.clearCurseforgeKey === clearCurseforge ? false : state.clearCurseforgeKey,
+          clearModrinthKey:
+            state.clearModrinthKey === clearModrinth ? false : state.clearModrinthKey,
+        }));
+      }
       return view;
     } finally {
       set({ isSavingKeys: false });

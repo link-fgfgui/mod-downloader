@@ -27,6 +27,7 @@ export type {
     SaveHardwareAccelerationSettingsRequest,
     SaveJIJDetectionSettingsRequest,
     SaveMCIMSettingsRequest,
+    SaveMultiSelectSettingsRequest,
     SaveNetworkSettingsRequest,
     SavePreferredReleaseTypeSettingsRequest,
     SaveSimpleModeSettingsRequest,

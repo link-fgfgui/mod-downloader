@@ -267,6 +267,10 @@ func (a *App) SaveJIJDetectionSettings(req appstructs.SaveJIJDetectionSettingsRe
 	return a.service().SaveJIJDetectionSettings(req)
 }
 
+func (a *App) SaveMultiSelectSettings(req appstructs.SaveMultiSelectSettingsRequest) appview.SettingsView {
+	return a.service().SaveMultiSelectSettings(req)
+}
+
 func (a *App) SavePreferredReleaseTypeSettings(req appstructs.SavePreferredReleaseTypeSettingsRequest) appview.SettingsView {
 	return a.service().SavePreferredReleaseTypeSettings(req)
 }

@@ -126,6 +126,12 @@ const messages = {
         hint: "Force GPU rendering for the webview; restart the app to apply. Disable this if the window goes black or renders incorrectly",
         saved: "Hardware acceleration setting saved; restart the app to apply",
       },
+      multiSelect: {
+        label: "Multi-select behavior",
+        enabled: "Require Ctrl/Cmd for multi-select",
+        hint: "When enabled, a plain click selects only the current row; hold Ctrl (Cmd on macOS) to add or remove rows. Applies to the download, manage and favorites lists",
+        saved: "Multi-select setting saved",
+      },
       advanced: {
         label: "Mod Management / Advanced",
         jijDetection: "Detect bundled dependencies (Jar-in-Jar)",

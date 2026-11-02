@@ -24,6 +24,7 @@ var expectedAppMethods = []string{
 	"GetMinecraftReleaseVersions", "GetSettings", "ChooseCacheDir",
 	"SaveTheme", "SaveLanguage", "SaveAnimationSettings", "SaveSimpleModeSettings",
 	"SaveUnusedDependencyCleanupSettings", "SaveMCIMSettings", "SaveJIJDetectionSettings",
+	"SaveMultiSelectSettings",
 	"SavePreferredReleaseTypeSettings", "SaveHardwareAccelerationSettings", "SaveNetworkSettings",
 	"SaveCacheDirPreference", "SaveAPIKeys",
 	"QueueModDownload", "CheckDependencyFulfillment", "RestoreCachedDependency",
@@ -37,8 +38,8 @@ var expectedAppMethods = []string{
 }
 
 func TestAppBindingContract(t *testing.T) {
-	if len(expectedAppMethods) != 67 {
-		t.Fatalf("contract contains %d business methods, want 67", len(expectedAppMethods))
+	if len(expectedAppMethods) != 68 {
+		t.Fatalf("contract contains %d business methods, want 68", len(expectedAppMethods))
 	}
 	expected := make(map[string]bool, len(expectedAppMethods)+2)
 	for _, name := range expectedAppMethods {

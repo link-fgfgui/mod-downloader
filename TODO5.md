@@ -105,10 +105,12 @@
 
 **目标文件**：`frontend/vite.config.ts`、`frontend/src/App.tsx`。
 
-- [ ] `build.rollupOptions.output.manualChunks`：`pinyin-pro`、`gsap`、`@radix-ui/* + lucide-react` 各拆独立 vendor chunk。
-- [ ] `App.tsx` 保留 `HomePage` 静态导入，其余五页 `React.lazy` + 轻量 Suspense fallback；
-      确认懒加载首帧与 `animateRouteEnter` 的入场动画不冲突（fallback 不得产生高度跳变）。
-- [ ] **验收**：`npm run build` 零 ">500 kB chunk" 警告；Playwright 实测六路由首次切换正常、路由入场方向动画不受影响。
+- [x] `App.tsx` 保留 `HomePage` 静态导入，其余五页 `React.lazy` + `Suspense fallback={null}`
+      （stage 高度由 flex 布局决定，空 fallback 不产生高度跳变；路由入场动画作用于常驻的 stage 容器）。
+- [x] ~~manualChunks 拆 vendor~~ **决策（2026-11-02）：不配置**。Vite 8 (Rolldown) 对共享模块自动拆分
+      （switch/alert-dialog/useFlipListAnimation 等已是独立 chunk）；懒加载后最大 chunk 为 app 394 KB /
+      Manage 331 KB，全部低于 500 KB。内嵌桌面场景无浏览器缓存收益，manualChunks/advancedChunks 无增量价值。
+- [x] **验收**：`npm run build` 零 ">500 kB chunk" 警告；Playwright 实测六路由首次切换正常、路由入场方向动画不受影响。
 
 ---
 

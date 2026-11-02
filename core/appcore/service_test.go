@@ -1104,6 +1104,44 @@ func TestSaveSimpleModeSettingsPersistsAndAppliesImmediately(t *testing.T) {
 	}
 }
 
+func TestSaveMultiSelectSettingsPersists(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	appDir := t.TempDir()
+	if err := os.Chdir(appDir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(oldwd); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	svc := New(Options{Config: &configs.Config{}})
+	if svc.GetSettings().RequireCtrlForMultiSelect {
+		t.Fatal("default require ctrl for multi-select = true, want false")
+	}
+	view := svc.SaveMultiSelectSettings(appstructs.SaveMultiSelectSettingsRequest{RequireCtrlForMultiSelect: true})
+	if !view.RequireCtrlForMultiSelect || !svc.Config().Preferences.RequireCtrlForMultiSelect {
+		t.Fatalf("enabled multi-select setting was not applied: view=%#v config=%v", view, svc.Config().Preferences.RequireCtrlForMultiSelect)
+	}
+
+	loaded, err := configs.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !loaded.Preferences.RequireCtrlForMultiSelect {
+		t.Fatal("persisted require ctrl for multi-select = false, want true")
+	}
+
+	view = svc.SaveMultiSelectSettings(appstructs.SaveMultiSelectSettingsRequest{RequireCtrlForMultiSelect: false})
+	if view.RequireCtrlForMultiSelect {
+		t.Fatalf("disabled multi-select setting remained active: view=%#v", view)
+	}
+}
+
 func TestSaveLanguagePersistsAndNormalizes(t *testing.T) {
 	oldwd, err := os.Getwd()
 	if err != nil {

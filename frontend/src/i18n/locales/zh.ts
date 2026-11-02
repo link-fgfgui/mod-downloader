@@ -131,6 +131,12 @@ const messages = {
         hint: "强制 WebView 使用 GPU 渲染；修改后需重启应用生效。若出现黑屏或画面异常请关闭",
         saved: "硬件加速设置已保存，重启应用后生效",
       },
+      multiSelect: {
+        label: "多选行为",
+        enabled: "多选需要按住 Ctrl/Cmd",
+        hint: "开启后普通点击只选中当前行，按住 Ctrl（macOS 为 Cmd）点击可增减选择；作用于下载、管理与收藏夹三处列表",
+        saved: "多选设置已保存",
+      },
       releaseType: { label: "偏好发行变体", hint: "自动安装时优先选择此发行变体；明确选择或固定的版本不受影响", latest: "最新版", stable: "稳定版", beta: "Beta 版", alpha: "Alpha 版" },
       minecraftDir: { label: ".minecraft 目录", choose: "选择目录", valid: "目录有效", invalid: "目录无效或为空" },
       cacheDir: { label: "缓存目录", path: "实际路径", choose: "选择目录", reset: "恢复默认", default: "默认位置", saved: "缓存目录已保存" },

@@ -13,6 +13,7 @@ vi.mock("@/services/app", () => ({
     SaveMCIMSettings: vi.fn(),
     SaveJIJDetectionSettings: vi.fn(),
     SaveHardwareAccelerationSettings: vi.fn(),
+    SaveMultiSelectSettings: vi.fn(),
     SavePreferredReleaseTypeSettings: vi.fn(),
     SaveNetworkSettings: vi.fn(),
     SaveAPIKeys: vi.fn(),
@@ -61,6 +62,7 @@ describe("settings store", () => {
       error: "",
       draftTheme: "dark",
       draftLanguage: "system",
+      draftRequireCtrlForMultiSelect: false,
       draftCurseforgeKey: "",
       draftModrinthKey: "",
       clearCurseforgeKey: false,
@@ -109,5 +111,42 @@ describe("settings store", () => {
       modrinthApiKey: "new-key",
     });
     expect(useSettingsStore.getState().draftModrinthKey).toBe("");
+  });
+
+  it("persists the multi-select preference and mirrors the saved view", async () => {
+    vi.mocked(api.SaveMultiSelectSettings).mockResolvedValue({ ...view, requireCtrlForMultiSelect: true });
+    useSettingsStore.setState({ settings: view, draftRequireCtrlForMultiSelect: true });
+    await useSettingsStore.getState().saveMultiSelectSettings();
+    expect(api.SaveMultiSelectSettings).toHaveBeenCalledWith({ requireCtrlForMultiSelect: true });
+    const state = useSettingsStore.getState();
+    expect(state.draftRequireCtrlForMultiSelect).toBe(true);
+    expect(state.settings?.requireCtrlForMultiSelect).toBe(true);
+  });
+
+  it("drops an in-flight save response after the draft is edited again", async () => {
+    // The rerun-ui-notes.md autosave race: an older in-flight response must
+    // not clobber a newer draft before the save it scheduled fires.
+    let resolveFirst!: (value: SettingsView) => void;
+    const first = new Promise<SettingsView>((resolve) => {
+      resolveFirst = resolve;
+    });
+    vi.mocked(api.SaveSimpleModeSettings)
+      .mockImplementationOnce(() => first as unknown as ReturnType<typeof api.SaveSimpleModeSettings>)
+      .mockResolvedValueOnce({ ...view, simpleMode: false });
+
+    useSettingsStore.setState({ settings: view, draftSimpleMode: true });
+    const saving = useSettingsStore.getState().saveSimpleModeSettings();
+    // The user flips the same switch again while the first save is in flight.
+    useSettingsStore.getState().patch({ draftSimpleMode: false });
+    resolveFirst({ ...view, simpleMode: true });
+    await saving;
+    // The stale response (simpleMode: true) must not overwrite the newer draft.
+    expect(useSettingsStore.getState().draftSimpleMode).toBe(false);
+
+    // The follow-up save persists the newer value and applies its response.
+    await useSettingsStore.getState().saveSimpleModeSettings();
+    expect(api.SaveSimpleModeSettings).toHaveBeenLastCalledWith({ simpleMode: false });
+    expect(useSettingsStore.getState().draftSimpleMode).toBe(false);
+    expect(useSettingsStore.getState().settings?.simpleMode).toBe(false);
   });
 });

@@ -201,6 +201,42 @@ func TestSaveReplacesConfigAtomicallyAndLeavesNoTempFiles(t *testing.T) {
 	}
 }
 
+func TestSaveSweepsStaleTempFilesFromKilledWrites(t *testing.T) {
+	dir := t.TempDir()
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(oldwd); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	// Simulate a process killed mid-write: the deferred cleanup never ran.
+	stale := filepath.Join(dir, "."+configFileName+".123456.tmp")
+	if err := os.WriteFile(stale, []byte("partial"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Save(&Config{Preferences: Preferences{MinecraftDir: "/swept"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(stale); !os.IsNotExist(err) {
+		t.Fatalf("stale temp file still present after save: %v", err)
+	}
+	contents, err := os.ReadFile(filepath.Join(dir, configFileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(contents), "/swept") {
+		t.Fatalf("saved config = %q, want swept write", contents)
+	}
+}
+
 func TestSaveFailurePreservesOriginalConfig(t *testing.T) {
 	dir := t.TempDir()
 	oldwd, err := os.Getwd()

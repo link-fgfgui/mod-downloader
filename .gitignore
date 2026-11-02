@@ -12,6 +12,7 @@ frontend/src/node_modules
 
 # Local runtime state and credentials
 mod-downloader.toml
+.*.toml.*.tmp
 mod-downloader.log
 mod-metadata.tmp
 mod-favs.sqlite

@@ -53,6 +53,13 @@ type SaveJIJDetectionSettingsRequest struct {
 	EnableJIJDetection bool `json:"enableJijDetection"`
 }
 
+// SaveMultiSelectSettingsRequest toggles Ctrl-held multi-select: when enabled,
+// a plain row click selects a single item and only Ctrl/Cmd clicks extend the
+// selection (download, manage and favorites lists).
+type SaveMultiSelectSettingsRequest struct {
+	RequireCtrlForMultiSelect bool `json:"requireCtrlForMultiSelect"`
+}
+
 // SavePreferredReleaseTypeSettingsRequest sets the preferred release channel
 // ("latest", "release", "beta" or "alpha").
 type SavePreferredReleaseTypeSettingsRequest struct {
