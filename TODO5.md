@@ -141,20 +141,24 @@
 
 ### 6.1 拆分（纯结构搬运，不改行为；红线：单文件 < 800 行）
 
-| 文件 | 当前行数 | 拆分目标 |
-| --- | ---: | --- |
-| `pages/Manage.tsx` | 1219 | 主文件 < 450；抽 `components/manage/ManageFilterToolbar.tsx`（版本信息、Connector 切换、`HelpTooltip`、视图滑块、排序筛选）、`ManageModTreeView.tsx`（树 + Ghost + `useFlipTreeAnimation`）、`ManageModListView.tsx`（兼容列表 + 不兼容折叠区 + `useFlipListAnimation`）、`ManageImpactDialogs.tsx`（禁用影响/前置清理对话框） |
-| `pages/Favorites.tsx` | 976 | 主文件 < 450；抽 `components/favorites/FavoriteListSidebar.tsx`（列表、置顶分区、拖拽排序）、`FavoriteModTable.tsx`（条目表、引用只读行、多选胶囊栏）、`FavoriteListDialogs.tsx`（新建/重命名/元数据/引用对话框） |
+| 文件 | 原行数 | 现主文件 | 拆分结果 |
+| --- | ---: | ---: | --- |
+| `pages/Manage.tsx` | 1219 | **552** | `components/manage/`：`ManageFilterToolbar`(256)、`ManageModTreeView`(204)、`ManageModListView`(252)、`ManageSelectionToolbar`(112)、`ManageImpactDialogs`(186) |
+| `pages/Favorites.tsx` | 976 | **543** | `components/favorites/`：`FavoriteListSidebar`(220)、`FavoriteModTable`(117)、`FavoriteSelectionToolbar`(88)、`FavoriteListDialogs`(268)、`shared.ts` |
 
-- [ ] 拆分批次内跑全量回归（自动化基线 + Playwright 抽查 Manage 树/列表 FLIP、Favorites 拖拽插入线）。
-- [ ] Download.tsx（761）/ Settings.tsx（632）/ DownloadQueuePanel.tsx（571）暂不拆，红线内。
+- [x] 拆分完成；两页均低于 800 行红线。**偏离原 450 目标**：再降需要把状态/effects 抽成数据 hook（行为风险大于收益），
+      在 <800 红线内保留；后续如需继续收敛，优先抽 `useManageGroups` 数据管线（独立批次）。
+- [x] 拆分批次内跑全量回归（自动化基线 + Playwright 抽查 Manage 树/列表 FLIP、Favorites 拖拽插入线）。
+- [x] Download.tsx（761）/ Settings.tsx（632）/ DownloadQueuePanel.tsx（571）暂不拆，红线内。
 
-### 6.2 测试扩充（当前 8 文件 / 25 用例 → 目标覆盖核心交互组件）
+### 6.2 测试扩充（8 文件 / 25 用例 → 12 文件 / 37 用例）
 
-- [ ] `components/ui/combobox.test.tsx`：过滤匹配、`allowCustomValue` 自由输入、键盘导航、Escape 分层关闭（Dialog 内浮层）。
-- [ ] `components/DownloadQueuePanel.test.tsx`：活动/完成 Tab 切换、主动移除退场状态、空队列 FAB 退场、可选依赖忽略。
-- [ ] 筛选守卫测试：搜索隐藏行与折叠在不兼容区内的行绝不混入批量操作选中集（Manage / Favorites 各一）。
-- [ ] `stores/settings.test.ts` 补 §3.1 / §3.2 新用例。
+- [x] `components/ui/combobox.test.tsx`：搜索过滤、`allowCustom` 自由输入、键盘导航 + Enter 提交、Escape 分层（Dialog 内首次只关浮层）。
+      顺带修复 `DialogOverlay` 未转发 ref（React 18 下 Radix Slot 警告）。
+- [x] `components/DownloadQueuePanel.test.tsx`：空队列不渲染、Tab 切换、仅提醒时自动切 Optional、主动移除先退场后调 store。
+- [x] `pages/Manage.test.tsx`：状态筛选隐藏行后批量选择被裁剪，恢复筛选后行保持未选中。
+- [x] `pages/Favorites.test.tsx`：引用行（只读投影）不可选中。
+- [x] `stores/settings.test.ts` 补 §3.1 / §3.2 新用例。
 
 ---
 
