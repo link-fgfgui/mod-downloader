@@ -8,27 +8,27 @@
         AllowPromptForPassword="false">
     </Settings>
     <Installer
-        Path="mod-downloader-gui-v3"
+        Path="mod-downloader"
         Arguments=""
-        InstallLocation="C:\Program Files\My Company\My Product">
+        InstallLocation="C:\Program Files\link-fgfgui\Mod Downloader">
     </Installer>
     <PackageInformation
-        PackageName="My Product"
-        PackageDisplayName="My Product"
-        PublisherName="CN=My Company"
-        PublisherDisplayName="My Company"
+        PackageName="Mod Downloader"
+        PackageDisplayName="Mod Downloader"
+        PublisherName="CN=link-fgfgui"
+        PublisherDisplayName="link-fgfgui"
         Version="0.1.0.0"
-        PackageDescription="A mod-downloader-gui-v3 application">
+        PackageDescription="Minecraft mod downloader and instance manager">
         <Capabilities>
             <Capability Name="runFullTrust" />
             
         </Capabilities>
         <Applications>
             <Application
-                Id="io.github.linkfgfgui.moddownloaderguiv3"
-                Description="A mod-downloader-gui-v3 application"
-                DisplayName="My Product"
-                ExecutableName="mod-downloader-gui-v3"
+                Id="com.linkfgfgui.moddownloader"
+                Description="Minecraft mod downloader and instance manager"
+                DisplayName="Mod Downloader"
+                ExecutableName="mod-downloader"
                 EntryPoint="Windows.FullTrustApplication">
                 
             </Application>
@@ -41,13 +41,13 @@
         </Dependencies>
         <Properties>
             <Framework>false</Framework>
-            <DisplayName>My Product</DisplayName>
-            <PublisherDisplayName>My Company</PublisherDisplayName>
-            <Description>A mod-downloader-gui-v3 application</Description>
+            <DisplayName>Mod Downloader</DisplayName>
+            <PublisherDisplayName>link-fgfgui</PublisherDisplayName>
+            <Description>Minecraft mod downloader and instance manager</Description>
             <Logo>Assets\AppIcon.png</Logo>
         </Properties>
     </PackageInformation>
-    <SaveLocation PackagePath="mod-downloader-gui-v3.msix" />
+    <SaveLocation PackagePath="mod-downloader.msix" />
     <PackageIntegrity>
         <CertificatePath></CertificatePath>
     </PackageIntegrity>

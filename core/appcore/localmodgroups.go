@@ -89,16 +89,14 @@ func (s *Service) GetLocalModView(versionKey, modLoader string) appview.LocalMod
 func (s *Service) resolveLocalModsForView(versionKey string) ([]structs.ModInfo, structs.VersionInfo) {
 	versionKey = strings.TrimSpace(versionKey)
 	selected := global.GetSelectedVersion()
-	switch {
-	case versionKey == "" || versionKey == selected.ID || versionKey == selected.Name:
+	if versionKey == "" || versionKey == selected.ID || versionKey == selected.Name {
 		return selected.Mods, selected
-	default:
-		localMods, err := s.LocalMods(versionKey)
-		if err != nil {
-			return selected.Mods, selected
-		}
-		return localMods, global.GetSelectedVersion()
 	}
+	version, err := s.localModsForVersion(versionKey)
+	if err != nil {
+		return selected.Mods, selected
+	}
+	return version.Mods, version
 }
 
 func localModLoader(requested string, selected structs.VersionInfo) string {

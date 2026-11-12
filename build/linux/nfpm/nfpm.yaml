@@ -3,26 +3,26 @@
 #
 # The lines below are called `modelines`. See `:help modeline`
 
-name: "mod-downloader-gui-v3"
+name: "mod-downloader"
 arch: ${GOARCH}
 platform: "linux"
 version: "0.1.0"
 section: "default"
 priority: "extra"
-maintainer: ${GIT_COMMITTER_NAME} <${GIT_COMMITTER_EMAIL}>
-description: "A mod-downloader-gui-v3 application"
-vendor: "My Company"
-homepage: "https://wails.io"
+maintainer: "link-fgfgui <fgfgui_link@outlook.com>"
+description: "Minecraft mod downloader and instance manager"
+vendor: "link-fgfgui"
+homepage: "https://github.com/link-fgfgui/mod-downloader"
 license: "GPL-3.0-or-later"
 release: "1"
 
 contents:
-  - src: "./bin/mod-downloader-gui-v3"
-    dst: "/usr/local/bin/mod-downloader-gui-v3"
+  - src: "./bin/mod-downloader"
+    dst: "/usr/local/bin/mod-downloader"
   - src: "./build/appicon.png"
-    dst: "/usr/share/icons/hicolor/128x128/apps/mod-downloader-gui-v3.png"
-  - src: "./build/linux/mod-downloader-gui-v3.desktop"
-    dst: "/usr/share/applications/mod-downloader-gui-v3.desktop"
+    dst: "/usr/share/icons/hicolor/128x128/apps/mod-downloader.png"
+  - src: "./build/linux/mod-downloader.desktop"
+    dst: "/usr/share/applications/mod-downloader.desktop"
 
 # Default dependencies for the GTK4 + WebKitGTK 6.0 stack (Ubuntu 24.04+ / Debian 13+)
 depends:

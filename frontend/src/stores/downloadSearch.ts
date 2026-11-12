@@ -311,6 +311,7 @@ export const useDownloadSearchStore = create<SearchState>((set, get) => ({
       return;
     }
     if (get().downloadingKeys[key]) return;
+    if (status === DownloadStatus.MissingDownloadUrl) return;
     if (MetadataRetryStatuses.has(status || "")) {
       await get().refreshDownloadStates();
       return;
@@ -477,6 +478,8 @@ export const useDownloadSearchStore = create<SearchState>((set, get) => ({
       });
       set({ pinnedVersionId: pin?.versionId || "" });
       await get().refreshDownloadStates();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
     } finally {
       set({ pinningVersionId: "" });
     }
@@ -523,6 +526,10 @@ export const useDownloadSearchStore = create<SearchState>((set, get) => ({
           searching: update.append ? get().searching : update.loading,
           loadingMore: update.append ? update.loading : get().loadingMore,
         });
+        if (update.error) {
+          set({ error: update.error, searching: false, loadingMore: false });
+          toast.error(i18n.t("download.searchFailed", { reason: update.error }));
+        }
         if (!update.loading) void get().refreshDownloadStates();
       }),
       onAppEvent(appEventNames.ExtensionModsAccepted, (update) => {
@@ -642,7 +649,19 @@ async function doInstall(
     });
     if (res?.skipped) {
       const errorKey = DownloadErrorKeys[res.reason];
-      toast.error(i18n.t(errorKey ? `download.errors.${errorKey}` : "download.errors.generic"));
+      if (errorKey) {
+        toast.error(i18n.t(`download.errors.${errorKey}`));
+      } else {
+        // Unknown reasons may be actionable text such as the official
+        // CurseForge download page, so show them verbatim instead of a generic
+        // failure.
+        toast.error(
+          i18n.t("download.errors.failedWithReason", {
+            fileName: res.fileName || i18n.t("download.errors.unknownFile"),
+            reason: res.reason || i18n.t("download.errors.generic"),
+          }),
+        );
+      }
     } else {
       toast.success(i18n.t("download.queued"));
       await get().refreshDownloadStates();

@@ -5,6 +5,23 @@ Core Go packages for mod-downloader: configuration, metadata providers, Minecraf
 > The legacy module path `github.com/link-fgfgui/mod-downloader-core` is
 > deprecated; use `github.com/link-fgfgui/mod-downloader/core` instead.
 
+## API documentation
+
+The public API is documented with Go doc comments in the packages themselves.
+From this directory, for example:
+
+```bash
+go doc ./appcore
+go doc ./storage
+go doc ./host
+go doc -all ./appcore
+```
+
+Package overviews live in package comments (`doc.go` where present); exported
+types, functions and methods carry their own contract comments. Behavioral
+decisions and anti-patterns that are not obvious from the API live in
+[`docs/specs/`](docs/specs/).
+
 ## License
 
 This module is licensed under the GNU Lesser General Public License, version 3

@@ -30,6 +30,9 @@ func (fn providerRoundTripFunc) RoundTrip(req *http.Request) (*http.Response, er
 }
 
 func TestCurseForgeDownloadURL(t *testing.T) {
+	if !curseForgeCDNFallbackEnabled {
+		t.Skip("CDN fallback is compiled out")
+	}
 	tests := []struct {
 		name string
 		id   string
@@ -48,6 +51,67 @@ func TestCurseForgeDownloadURL(t *testing.T) {
 				t.Fatalf("CurseForgeDownloadURL() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestCurseForgeDownloadPageURL(t *testing.T) {
+	tests := []struct {
+		name      string
+		slug      string
+		projectID string
+		fileID    string
+		want      string
+	}{
+		{
+			name:      "slug",
+			slug:      "jei",
+			projectID: "238222",
+			fileID:    "4593550",
+			want:      "https://www.curseforge.com/minecraft/mc-mods/jei/download/4593550",
+		},
+		{
+			name:      "project ID fallback",
+			projectID: "238222",
+			fileID:    "4593550",
+			want:      "https://www.curseforge.com/projects/238222/download/4593550",
+		},
+		{
+			name:   "missing file ID",
+			slug:   "jei",
+			fileID: " ",
+		},
+		{
+			name:   "missing project",
+			fileID: "4593550",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := CurseForgeDownloadPageURL(tt.slug, tt.projectID, tt.fileID); got != tt.want {
+				t.Fatalf("CurseForgeDownloadPageURL() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestEffectiveDownloadURLCurseForgeFallbackMode(t *testing.T) {
+	version := models.ModVersion{Platform: "CurseForge", ID: "12345678", FileName: "example.jar"}
+	got := EffectiveDownloadURL(version)
+	if curseForgeCDNFallbackEnabled {
+		want := "https://edge.forgecdn.net/files/1234/5678/example.jar"
+		if got != want {
+			t.Fatalf("EffectiveDownloadURL() = %q, want %q", got, want)
+		}
+		if !VersionDownloadAvailable(version) {
+			t.Fatal("VersionDownloadAvailable() = false, want true with CDN fallback")
+		}
+		return
+	}
+	if got != "" {
+		t.Fatalf("EffectiveDownloadURL() = %q, want empty in strict mode", got)
+	}
+	if VersionDownloadAvailable(version) {
+		t.Fatal("VersionDownloadAvailable() = true, want false for a URL-less version in strict mode")
 	}
 }
 

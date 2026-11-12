@@ -1,7 +1,4 @@
 const messages = {
-    welcome: "Welcome to Wails Desktop App",
-    about: "About Us",
-    changeLang: "Change Language",
     startup: {
       title: "Core service failed to start",
       description: "The app cannot load data right now. Check the config file, cache directory or logs, then reopen the app.",
@@ -13,6 +10,12 @@ const messages = {
       extensionWarning: "Extension HTTP server failed to start: {message}",
       retry: "Retry",
       quit: "Quit application",
+    },
+    errorBoundary: {
+      title: "Something went wrong",
+      description: "The interface stopped responding after an unexpected error. Reload the application to continue; if the problem persists, check the logs.",
+      details: "Error details",
+      reload: "Reload application",
     },
     nav: {
       home: "Home",
@@ -440,6 +443,7 @@ const messages = {
         download: "Download",
         metadataLoading: "Loading version info",
         metadataFailed: "Failed to load version info — click to retry",
+        missingDownloadUrl: "Missing download URL — unavailable in this build",
       },
     },
     versions: {
@@ -471,8 +475,6 @@ const messages = {
       clearSearch: "Clear search",
       useCustom: 'Use "{value}"',
     },
-    aboutDescription:
-      "A feature-rich desktop template based on Wails + Vue3 + Vuetify + Router + i18n.",
 };
 
 export default messages;

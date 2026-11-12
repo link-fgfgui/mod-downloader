@@ -1,8 +1,6 @@
 // SPDX-FileCopyrightText: 2026 link-fgfgui
 // SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
 
-// Package storage owns the gob+zstd metadata cache and the SQLite user
-// database (favorites, pins and usage stats).
 package storage
 
 import (
@@ -14,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/link-fgfgui/mod-downloader/core/logging"
 	"github.com/link-fgfgui/mod-downloader/core/models"
@@ -30,10 +29,18 @@ const (
 )
 
 var (
-	db         *cacheDB
-	dbPath     string
-	userDB     *userStore
-	userDBPath string
+	dbPtr     atomic.Pointer[cacheDB]
+	userDBPtr atomic.Pointer[userStore]
+
+	// storeMu serializes store creation, path changes and shutdown. Runtime
+	// reads use the atomic pointers so a cache-dir switch never closes a store
+	// that another goroutine is still using; retired stores are closed by
+	// Close after all service work drains.
+	storeMu     sync.Mutex
+	dbPath      string
+	userDBPath  string
+	retiredDBs  []*cacheDB
+	retiredUser []*userStore
 )
 
 var errMetadataCacheNotOpen = errors.New("metadata cache is not open")
@@ -139,8 +146,9 @@ func UserDataPathForCachePath(cachePath string) string {
 	return filepath.Join(filepath.Dir(cachePath), UserDataFileName)
 }
 
-// OpenAt opens the metadata cache and user database at an explicit path,
-// closing any store that was already open.
+// OpenAt opens the metadata cache and user database at an explicit path.
+// Existing stores stay open until Close so in-flight readers never observe a
+// closed database; the new store is only published after both files open.
 func OpenAt(path string) error {
 	targetPath := strings.TrimSpace(path)
 	if targetPath == "" {
@@ -155,15 +163,16 @@ func OpenAt(path string) error {
 	}
 	targetPath = filepath.Clean(targetPath)
 	targetUserPath := UserDataPathForCachePath(targetPath)
-	if db != nil && dbPath == targetPath && userDB != nil && userDBPath == targetUserPath {
+
+	storeMu.Lock()
+	defer storeMu.Unlock()
+	currentDB := dbPtr.Load()
+	currentUserDB := userDBPtr.Load()
+	if currentDB != nil && dbPath == targetPath && currentUserDB != nil && userDBPath == targetUserPath {
 		logging.Debug("cache already open", "path", targetPath)
 		return nil
 	}
 
-	if db != nil {
-		logging.Info("cache path changed, closing previous store", "previousPath", dbPath, "nextPath", targetPath)
-		Close()
-	}
 	logging.Info("opening cache", "path", targetPath)
 	state, err := loadCacheState(targetPath)
 	if err != nil {
@@ -180,35 +189,62 @@ func OpenAt(path string) error {
 	state.intern(&pool)
 	nextDB := &cacheDB{path: targetPath, state: state, strings: pool}
 
-	db = nextDB
+	if currentDB != nil {
+		// Persist the retiring store before publishing the next one. Without
+		// this, switching A -> B -> A would reload A from disk and lose every
+		// metadata update made in memory since the last save.
+		if err := currentDB.save(); err != nil {
+			logging.Warn("save retired cache failed", "path", currentDB.path, "error", err)
+		}
+		retiredDBs = append(retiredDBs, currentDB)
+	}
+	if currentUserDB != nil {
+		retiredUser = append(retiredUser, currentUserDB)
+	}
+	dbPtr.Store(nextDB)
+	userDBPtr.Store(nextUserDB)
 	dbPath = targetPath
-	userDB = nextUserDB
 	userDBPath = targetUserPath
 	logging.Info("cache opened", "path", targetPath)
 	return nil
 }
 
-// Close persists the metadata cache and closes both databases.
+// Close persists every metadata cache and closes both current and retired
+// stores. Callers must stop background storage users before invoking it.
 func Close() {
-	if db != nil {
-		logging.Info("closing cache", "path", dbPath)
-		if err := db.save(); err != nil {
-			logging.Warn("save cache failed", "path", dbPath, "error", err)
-		}
-		db = nil
-	}
+	storeMu.Lock()
+	currentDB := dbPtr.Swap(nil)
+	currentUserDB := userDBPtr.Swap(nil)
+	dbs := append(retiredDBs, currentDB)
+	users := append(retiredUser, currentUserDB)
+	retiredDBs = nil
+	retiredUser = nil
 	dbPath = ""
-	if userDB != nil {
-		logging.Info("closing user database", "path", userDBPath)
-		if err := userDB.close(); err != nil {
-			logging.Warn("close user database failed", "path", userDBPath, "error", err)
-		}
-		userDB = nil
-	}
 	userDBPath = ""
+	storeMu.Unlock()
+
+	for _, store := range dbs {
+		if store == nil {
+			continue
+		}
+		logging.Info("closing cache", "path", store.path)
+		if err := store.save(); err != nil {
+			logging.Warn("save cache failed", "path", store.path, "error", err)
+		}
+	}
+	for _, store := range users {
+		if store == nil {
+			continue
+		}
+		logging.Info("closing user database", "path", store.path)
+		if err := store.close(); err != nil {
+			logging.Warn("close user database failed", "path", store.path, "error", err)
+		}
+	}
 }
 
 func readyDB() (*cacheDB, error) {
+	db := dbPtr.Load()
 	if db == nil {
 		logging.Warn("cache access attempted before open")
 		return nil, errMetadataCacheNotOpen
@@ -217,6 +253,7 @@ func readyDB() (*cacheDB, error) {
 }
 
 func readyUserDB() (*userStore, error) {
+	userDB := userDBPtr.Load()
 	if userDB == nil {
 		logging.Warn("user database access attempted before open")
 		return nil, errUserDatabaseNotOpen

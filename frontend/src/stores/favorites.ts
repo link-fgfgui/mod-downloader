@@ -205,7 +205,7 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
     );
     const scopedModLoader = normalizeKeyPart(modLoader ?? get().displayModLoader);
     if (!hasFavoriteScope(scopedMinecraftVersion, scopedModLoader)) return null;
-    const list = await api.CreateFavoriteList(name, scopedMinecraftVersion, scopedModLoader);
+    const list = await api.CreateFavoriteListForScope(name, scopedMinecraftVersion, scopedModLoader);
     if (!list?.id) return null;
     set({ selectedListId: list.id, contents: null, items: [] });
     await get().refreshOverview();
@@ -257,9 +257,13 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
   },
 
   async reorderLists(ids) {
-    const ok = await api.ReorderFavoriteLists(ids);
-    if (ok) await get().loadLists();
-    return ok;
+    try {
+      await api.ReorderFavoriteLists(ids);
+      await get().loadLists();
+      return true;
+    } catch {
+      return false;
+    }
   },
 
   async addDrafts(listId, drafts) {
@@ -320,7 +324,7 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
     if (!targetListId || get().exportingPackwiz) return null;
     set({ exportingPackwiz: true });
     try {
-      return await api.ExportFavoriteListPackwizZip(
+      return await api.ExportFavoriteListPackwizZipForScope(
         targetListId,
         get().displayMinecraftVersion,
         get().displayModLoader,

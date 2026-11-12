@@ -13,6 +13,11 @@ import (
 	"github.com/link-fgfgui/mod-downloader/core/storage"
 )
 
+// ErrFavoriteListNotFound reports a missing favorite list for adapters that
+// need to distinguish it from a storage failure. The legacy methods collapse
+// both cases into a zero value.
+var ErrFavoriteListNotFound = errors.New("favorite list not found")
+
 // ListFavoriteLists returns every favorite list in display order.
 func (s *Service) ListFavoriteLists() []storage.FavoriteList {
 	return storage.ListFavoriteLists()
@@ -26,59 +31,96 @@ func (s *Service) CreateFavoriteList(name string) storage.FavoriteList {
 // CreateFavoriteListForScope creates a favorite list bound to a Minecraft
 // version and mod loader, or to no scope when both are empty.
 func (s *Service) CreateFavoriteListForScope(name, minecraftVersion, modLoader string) storage.FavoriteList {
+	list, _ := s.CreateFavoriteListForScopeWithError(name, minecraftVersion, modLoader)
+	return list
+}
+
+// CreateFavoriteListForScopeWithError is CreateFavoriteListForScope with the
+// storage error preserved.
+func (s *Service) CreateFavoriteListForScopeWithError(name, minecraftVersion, modLoader string) (storage.FavoriteList, error) {
 	list, err := storage.CreateFavoriteListForScope(name, minecraftVersion, modLoader)
 	if err != nil {
 		logging.Error("create favorite list failed", "name", name, "error", err)
-		return storage.FavoriteList{}
+		return storage.FavoriteList{}, err
 	}
-	return list
+	return list, nil
 }
 
 // RenameFavoriteList updates a list name and returns the stored list, or an
 // empty value when the list does not exist.
 func (s *Service) RenameFavoriteList(id, name string) storage.FavoriteList {
+	list, _ := s.RenameFavoriteListWithError(id, name)
+	return list
+}
+
+// RenameFavoriteListWithError is RenameFavoriteList with storage errors
+// preserved. It returns ErrFavoriteListNotFound when the list does not exist.
+func (s *Service) RenameFavoriteListWithError(id, name string) (storage.FavoriteList, error) {
 	list, ok, err := storage.UpdateFavoriteListName(id, name)
 	if err != nil {
 		logging.Error("rename favorite list failed", "id", id, "name", name, "error", err)
-		return storage.FavoriteList{}
+		return storage.FavoriteList{}, err
 	}
 	if !ok {
-		return storage.FavoriteList{}
+		return storage.FavoriteList{}, ErrFavoriteListNotFound
 	}
-	return list
+	return list, nil
 }
 
 // DeleteFavoriteList removes a list and reports whether it existed.
 func (s *Service) DeleteFavoriteList(id string) bool {
+	deleted, _ := s.DeleteFavoriteListWithError(id)
+	return deleted
+}
+
+// DeleteFavoriteListWithError is DeleteFavoriteList with storage errors
+// preserved. A missing list is an idempotent no-op: it returns false with a
+// nil error.
+func (s *Service) DeleteFavoriteListWithError(id string) (bool, error) {
 	deleted, err := storage.DeleteFavoriteList(id)
 	if err != nil {
 		logging.Error("delete favorite list failed", "id", id, "error", err)
-		return false
+		return false, err
 	}
-	return deleted
+	return deleted, nil
 }
 
 // UpdateFavoriteListMetadata persists name, icon and pinning changes for a
 // list.
 func (s *Service) UpdateFavoriteListMetadata(list storage.FavoriteList) storage.FavoriteList {
+	updated, _ := s.UpdateFavoriteListMetadataWithError(list)
+	return updated
+}
+
+// UpdateFavoriteListMetadataWithError is UpdateFavoriteListMetadata with
+// storage errors preserved. It returns ErrFavoriteListNotFound when the list
+// does not exist.
+func (s *Service) UpdateFavoriteListMetadataWithError(list storage.FavoriteList) (storage.FavoriteList, error) {
 	updated, ok, err := storage.UpdateFavoriteListMetadata(list)
 	if err != nil {
 		logging.Error("update favorite list metadata failed", "id", list.ID, "error", err)
-		return storage.FavoriteList{}
+		return storage.FavoriteList{}, err
 	}
 	if !ok {
-		return storage.FavoriteList{}
+		return storage.FavoriteList{}, ErrFavoriteListNotFound
 	}
-	return updated
+	return updated, nil
 }
 
 // ReorderFavoriteLists stores the given list order.
 func (s *Service) ReorderFavoriteLists(ids []string) bool {
+	err := s.ReorderFavoriteListsWithError(ids)
+	return err == nil
+}
+
+// ReorderFavoriteListsWithError is ReorderFavoriteLists with storage errors
+// preserved.
+func (s *Service) ReorderFavoriteListsWithError(ids []string) error {
 	if err := storage.ReorderFavoriteLists(ids); err != nil {
 		logging.Error("reorder favorite lists failed", "error", err)
-		return false
+		return err
 	}
-	return true
+	return nil
 }
 
 // ListFavoriteMods returns the direct mods stored in one list.
@@ -94,19 +136,26 @@ func (s *Service) ListFavoriteContents(listID string) storage.FavoriteListConten
 
 // AddFavoriteMod inserts or updates a mod in its target list.
 func (s *Service) AddFavoriteMod(mod storage.FavoriteMod) storage.FavoriteMod {
+	saved, _ := s.AddFavoriteModWithError(mod)
+	return saved
+}
+
+// AddFavoriteModWithError is AddFavoriteMod with storage errors preserved. It
+// returns ErrFavoriteListNotFound when the target list does not exist.
+func (s *Service) AddFavoriteModWithError(mod storage.FavoriteMod) (storage.FavoriteMod, error) {
 	_, existed := favoriteModKeySet(storage.ListFavoriteMods(mod.ListID))[favoriteModIdentityKey(mod)]
 	saved, ok, err := storage.UpsertFavoriteMod(mod)
 	if err != nil {
 		logging.Error("add favorite mod failed", "listID", mod.ListID, "platform", mod.Platform, "modID", mod.ModID, "error", err)
-		return storage.FavoriteMod{}
+		return storage.FavoriteMod{}, err
 	}
 	if !ok {
-		return storage.FavoriteMod{}
+		return storage.FavoriteMod{}, ErrFavoriteListNotFound
 	}
 	if !existed {
 		s.incrementUsageStat(storage.UsageStatFavoritesAdded, 1)
 	}
-	return saved
+	return saved, nil
 }
 
 // AddFavoriteModsToLists upserts a batch of mods into several target lists and
@@ -358,15 +407,23 @@ func favoriteCrossVersionCopyVersionID(version models.ModVersion) string {
 
 // AddFavoriteListReference links a child list into a parent list.
 func (s *Service) AddFavoriteListReference(parentListID, childListID string) storage.FavoriteListRef {
+	ref, _ := s.AddFavoriteListReferenceWithError(parentListID, childListID)
+	return ref
+}
+
+// AddFavoriteListReferenceWithError is AddFavoriteListReference with storage
+// errors preserved. It returns ErrFavoriteListNotFound when either list does
+// not exist.
+func (s *Service) AddFavoriteListReferenceWithError(parentListID, childListID string) (storage.FavoriteListRef, error) {
 	ref, ok, err := storage.CreateFavoriteListRef(parentListID, childListID)
 	if err != nil {
 		logging.Error("add favorite list reference failed", "parentListID", parentListID, "childListID", childListID, "error", err)
-		return storage.FavoriteListRef{}
+		return storage.FavoriteListRef{}, err
 	}
 	if !ok {
-		return storage.FavoriteListRef{}
+		return storage.FavoriteListRef{}, ErrFavoriteListNotFound
 	}
-	return ref
+	return ref, nil
 }
 
 // RemoveFavoriteListReference unlinks a child list from a parent list.
@@ -386,12 +443,20 @@ func (s *Service) ListFavoriteListRefs(parentListID string) []storage.FavoriteLi
 
 // RemoveFavoriteMod deletes one mod entry from a list.
 func (s *Service) RemoveFavoriteMod(listID, platform, modID, minecraftVersion, modLoader string) bool {
+	deleted, _ := s.RemoveFavoriteModWithError(listID, platform, modID, minecraftVersion, modLoader)
+	return deleted
+}
+
+// RemoveFavoriteModWithError is RemoveFavoriteMod with storage errors
+// preserved. A missing entry is an idempotent no-op: it returns false with a
+// nil error.
+func (s *Service) RemoveFavoriteModWithError(listID, platform, modID, minecraftVersion, modLoader string) (bool, error) {
 	deleted, err := storage.DeleteFavoriteMod(listID, platform, modID, minecraftVersion, modLoader)
 	if err != nil {
 		logging.Error("remove favorite mod failed", "listID", listID, "platform", platform, "modID", modID, "error", err)
-		return false
+		return false, err
 	}
-	return deleted
+	return deleted, nil
 }
 
 func uniqueNonEmpty(values []string) []string {

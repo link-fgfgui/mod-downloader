@@ -17,6 +17,8 @@ import (
 	appview "github.com/link-fgfgui/mod-downloader/core/structs/view"
 )
 
+const extensionAcceptConcurrency = 8
+
 type extensionAcceptedPayload struct {
 	index     int
 	platform  string
@@ -30,12 +32,15 @@ type extensionAcceptResult struct {
 	pinned  bool
 	skipped bool
 	reason  string
+	err     error
 }
 
 // AcceptExtensionProjects receives browser-extension scan results, resolves
 // their metadata, filters by the selected instance, auto-pins matching explicit
-// versions and emits the accepted projects. HTTP transport must only decode and
-// encode; this method owns the workflow and project-level concurrency.
+// versions and emits the accepted projects. It returns one result per payload
+// in input order; Queued is always false because the frontend performs queuing.
+// HTTP transport must only decode and encode; this method owns the workflow and
+// bounded project-level concurrency.
 func (s *Service) AcceptExtensionProjects(payloads []appstructs.ExtensionProjectPayload) []appstructs.ModDownloadResult {
 	selected := global.GetSelectedVersion()
 	minecraftVersion := strings.TrimSpace(selected.MinecraftVersion)
@@ -78,10 +83,13 @@ func (s *Service) AcceptExtensionProjects(payloads []appstructs.ExtensionProject
 
 	resolved := make([]extensionAcceptResult, len(accepted))
 	var wg sync.WaitGroup
+	sem := make(chan struct{}, extensionAcceptConcurrency)
 	for j, item := range accepted {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
 			resolved[j] = s.resolveExtensionPayload(item, minecraftVersion, modLoader)
 		}()
 	}
@@ -91,9 +99,12 @@ func (s *Service) AcceptExtensionProjects(payloads []appstructs.ExtensionProject
 	seen := make(map[string]bool)
 	for _, result := range resolved {
 		results[result.index] = appstructs.ModDownloadResult{
-			Queued:  !result.skipped,
-			Skipped: result.skipped,
-			Reason:  result.reason,
+			Queued:   false,
+			Accepted: !result.skipped,
+			Pinned:   result.pinned,
+			Skipped:  result.skipped,
+			Reason:   result.reason,
+			Error:    extensionResultError(result.err),
 		}
 		if result.skipped || result.project.ID == "" || seen[result.project.ID] {
 			continue
@@ -112,10 +123,10 @@ func (s *Service) AcceptExtensionProjects(payloads []appstructs.ExtensionProject
 }
 
 func (s *Service) resolveExtensionPayload(payload extensionAcceptedPayload, minecraftVersion, modLoader string) extensionAcceptResult {
-	project, ok := providers.LookupProjectByPlatform(payload.platform, payload.idOrSlug, minecraftVersion, modLoader)
-	if !ok {
-		logging.Warn("extension project lookup failed", "platform", payload.platform, "idOrSlug", payload.idOrSlug)
-		return extensionAcceptResult{index: payload.index, skipped: true, reason: "project not found"}
+	project, err := providers.LookupProjectByPlatformWithError(payload.platform, payload.idOrSlug, minecraftVersion, modLoader)
+	if err != nil {
+		logging.Warn("extension project lookup failed", "platform", payload.platform, "idOrSlug", payload.idOrSlug, "error", err)
+		return extensionAcceptResult{index: payload.index, skipped: true, reason: "project not found", err: err}
 	}
 
 	versions := providers.ListMatchingProjectVersions(project, minecraftVersion, modLoader)
@@ -142,6 +153,7 @@ func (s *Service) resolveExtensionPayload(payload extensionAcceptedPayload, mine
 				ModLoader:        modLoader,
 			}); err != nil {
 				logging.Error("extension auto-pin failed", "platform", project.Platform, "modID", modID, "versionID", payload.versionID, "error", err)
+				result.err = err
 			} else {
 				result.pinned = true
 				logging.Info("extension auto-pinned version", "platform", project.Platform, "modID", modID, "versionID", payload.versionID)
@@ -150,6 +162,13 @@ func (s *Service) resolveExtensionPayload(payload extensionAcceptedPayload, mine
 		break
 	}
 	return result
+}
+
+func extensionResultError(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }
 
 // extensionPlatform maps the extension's short platform code to the canonical

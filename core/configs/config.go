@@ -1,8 +1,6 @@
 // SPDX-FileCopyrightText: 2026 link-fgfgui
 // SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
 
-// Package configs loads, normalizes and persists the TOML/environment
-// configuration shared by every adapter.
 package configs
 
 import (

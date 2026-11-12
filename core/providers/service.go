@@ -4,6 +4,8 @@
 package providers
 
 import (
+	"errors"
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -34,17 +36,24 @@ var providerBackground = struct {
 // falling back to broad text results. emitUpdate receives intermediate and
 // final pages.
 func SearchMods(req appstructs.SearchModsRequest, emitUpdate func(appview.SearchModsUpdate)) {
+	searchMods(modProviders, req, emitUpdate)
+}
+
+// searchMods is the injectable implementation behind SearchMods. Tests use it
+// with fake providers to exercise partial-failure aggregation.
+func searchMods(sources []modProvider, req appstructs.SearchModsRequest, emitUpdate func(appview.SearchModsUpdate)) {
 	req = normalizeSearchModsRequest(req)
 
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	providerResults := make(map[string][]models.ModProject, len(modProviders))
+	providerResults := make(map[string][]models.ModProject, len(sources))
 	var exactResults []models.ModProject
-	remaining := len(modProviders)
+	var searchErrors []string
+	remaining := len(sources)
 	if req.Query == "" {
-		remaining = len(modProviders)
+		remaining = len(sources)
 	} else {
-		remaining = len(modProviders) * 2
+		remaining = len(sources) * 2
 	}
 
 	emit := func() {
@@ -52,51 +61,63 @@ func SearchMods(req appstructs.SearchModsRequest, emitUpdate func(appview.Search
 		if len(results) == 0 {
 			results = mergeProviderSearchResults(providerResults)
 		}
+		errorText := ""
+		if remaining == 0 && len(searchErrors) > 0 {
+			errorText = strings.Join(searchErrors, "; ")
+		}
 		if emitUpdate != nil {
 			emitUpdate(appview.SearchModsUpdate{
 				RequestID: req.RequestID,
 				Results:   results,
 				Loading:   remaining > 0,
 				Append:    req.Offset > 0,
+				Error:     errorText,
 			})
 		}
 	}
 
-	finish := func(update func()) {
+	finish := func(failure string, update func()) {
 		mu.Lock()
 		defer mu.Unlock()
 		if update != nil {
 			update()
+		}
+		if failure != "" {
+			searchErrors = append(searchErrors, failure)
 		}
 		remaining--
 		emit()
 	}
 
 	if req.Query != "" {
-		for _, provider := range modProviders {
+		for _, provider := range sources {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
 				results, err := provider.ExactSearch(req)
+				failure := ""
 				if err != nil {
 					logging.Error("search exact mods failed", "provider", provider.Name(), "query", req.Query, "version", req.Version, "modLoader", req.ModLoader, "error", err)
+					failure = provider.Name() + ": " + err.Error()
 				}
-				finish(func() {
+				finish(failure, func() {
 					exactResults = mergeSearchResultsByTitle(exactResults, results)
 				})
 			}()
 		}
 	}
 
-	for _, provider := range modProviders {
+	for _, provider := range sources {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			results, err := provider.Search(req)
+			failure := ""
 			if err != nil {
 				logging.Error("search mods failed", "provider", provider.Name(), "query", req.Query, "version", req.Version, "modLoader", req.ModLoader, "error", err)
+				failure = provider.Name() + ": " + err.Error()
 			}
-			finish(func() {
+			finish(failure, func() {
 				if len(exactResults) == 0 {
 					providerResults[provider.Name()] = results
 				}
@@ -119,41 +140,56 @@ func SearchMods(req appstructs.SearchModsRequest, emitUpdate func(appview.Search
 // SearchModsText runs the broad text search only, without the extra exact
 // title probes used by SearchMods.
 func SearchModsText(req appstructs.SearchModsRequest, emitUpdate func(appview.SearchModsUpdate)) {
+	searchModsText(modProviders, req, emitUpdate)
+}
+
+func searchModsText(sources []modProvider, req appstructs.SearchModsRequest, emitUpdate func(appview.SearchModsUpdate)) {
 	req = normalizeSearchModsRequest(req)
 
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	providerResults := make(map[string][]models.ModProject, len(modProviders))
-	remaining := len(modProviders)
+	providerResults := make(map[string][]models.ModProject, len(sources))
+	var searchErrors []string
+	remaining := len(sources)
 
 	emit := func() {
+		errorText := ""
+		if remaining == 0 && len(searchErrors) > 0 {
+			errorText = strings.Join(searchErrors, "; ")
+		}
 		if emitUpdate != nil {
 			emitUpdate(appview.SearchModsUpdate{
 				RequestID: req.RequestID,
 				Results:   mergeProviderSearchResults(providerResults),
 				Loading:   remaining > 0,
 				Append:    req.Offset > 0,
+				Error:     errorText,
 			})
 		}
 	}
 
-	finish := func(providerName string, results []models.ModProject) {
+	finish := func(providerName string, results []models.ModProject, failure string) {
 		mu.Lock()
 		defer mu.Unlock()
 		providerResults[providerName] = results
+		if failure != "" {
+			searchErrors = append(searchErrors, failure)
+		}
 		remaining--
 		emit()
 	}
 
-	for _, provider := range modProviders {
+	for _, provider := range sources {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			results, err := provider.Search(req)
+			failure := ""
 			if err != nil {
 				logging.Error("search text mods failed", "provider", provider.Name(), "query", req.Query, "version", req.Version, "modLoader", req.ModLoader, "error", err)
+				failure = provider.Name() + ": " + err.Error()
 			}
-			finish(provider.Name(), results)
+			finish(provider.Name(), results, failure)
 		}()
 	}
 	wg.Wait()
@@ -446,26 +482,49 @@ func startBackgroundTask(task func()) {
 	providerBackground.mu.Unlock()
 }
 
+// ErrProjectNotFound indicates that a provider returned no matching project.
+var ErrProjectNotFound = errors.New("project not found")
+
+// ErrUnsupportedPlatform indicates an unknown provider platform.
+var ErrUnsupportedPlatform = errors.New("unsupported platform")
+
 // LookupProjectByPlatform resolves a project ID-or-slug using the provider's
 // exact search.
 func LookupProjectByPlatform(platform, idOrSlug, minecraftVersion, modLoader string) (models.ModProject, bool) {
+	project, err := LookupProjectByPlatformWithError(platform, idOrSlug, minecraftVersion, modLoader)
+	return project, err == nil
+}
+
+// LookupProjectByPlatformWithError resolves a project and preserves provider
+// failures so callers can distinguish them from a missing project.
+func LookupProjectByPlatformWithError(platform, idOrSlug, minecraftVersion, modLoader string) (models.ModProject, error) {
 	provider := providerByPlatform(platform)
 	if provider == nil {
-		return models.ModProject{}, false
+		return models.ModProject{}, fmt.Errorf("%w: %s", ErrUnsupportedPlatform, platform)
 	}
 	results, err := provider.ExactSearch(appstructs.SearchModsRequest{
 		Query:     idOrSlug,
 		Version:   strings.TrimSpace(minecraftVersion),
 		ModLoader: strings.ToLower(strings.TrimSpace(modLoader)),
 	})
-	if err != nil || len(results) == 0 {
-		return models.ModProject{}, false
+	if err != nil {
+		return models.ModProject{}, fmt.Errorf("%s lookup failed: %w", provider.Name(), err)
 	}
-	return results[0], true
+	if len(results) == 0 {
+		return models.ModProject{}, ErrProjectNotFound
+	}
+	return results[0], nil
 }
 
 // LookupProjectByPlatformSlug resolves a project by slug and verifies its slug.
 func LookupProjectByPlatformSlug(platform, slug, minecraftVersion, modLoader string) (models.ModProject, bool) {
+	project, err := LookupProjectByPlatformSlugWithError(platform, slug, minecraftVersion, modLoader)
+	return project, err == nil
+}
+
+// LookupProjectByPlatformSlugWithError is LookupProjectByPlatformSlug with
+// provider errors preserved.
+func LookupProjectByPlatformSlugWithError(platform, slug, minecraftVersion, modLoader string) (models.ModProject, error) {
 	return lookupProjectByPlatformMatching(platform, slug, minecraftVersion, modLoader, func(project models.ModProject, expected string) bool {
 		return strings.EqualFold(strings.TrimSpace(project.Slug), expected)
 	})
@@ -474,21 +533,31 @@ func LookupProjectByPlatformSlug(platform, slug, minecraftVersion, modLoader str
 // LookupProjectByPlatformID resolves a project by platform project ID and
 // verifies the returned project ID.
 func LookupProjectByPlatformID(platform, projectID, minecraftVersion, modLoader string) (models.ModProject, bool) {
+	project, err := LookupProjectByPlatformIDWithError(platform, projectID, minecraftVersion, modLoader)
+	return project, err == nil
+}
+
+// LookupProjectByPlatformIDWithError is LookupProjectByPlatformID with
+// provider errors preserved.
+func LookupProjectByPlatformIDWithError(platform, projectID, minecraftVersion, modLoader string) (models.ModProject, error) {
 	return lookupProjectByPlatformMatching(platform, projectID, minecraftVersion, modLoader, func(project models.ModProject, expected string) bool {
 		return strings.EqualFold(strings.TrimSpace(project.ProjectID), expected)
 	})
 }
 
-func lookupProjectByPlatformMatching(platform, idOrSlug, minecraftVersion, modLoader string, match func(models.ModProject, string) bool) (models.ModProject, bool) {
+func lookupProjectByPlatformMatching(platform, idOrSlug, minecraftVersion, modLoader string, match func(models.ModProject, string) bool) (models.ModProject, error) {
 	expected := strings.TrimSpace(idOrSlug)
 	if expected == "" {
-		return models.ModProject{}, false
+		return models.ModProject{}, ErrProjectNotFound
 	}
-	project, ok := LookupProjectByPlatform(platform, expected, minecraftVersion, modLoader)
-	if !ok || !match(project, expected) {
-		return models.ModProject{}, false
+	project, err := LookupProjectByPlatformWithError(platform, expected, minecraftVersion, modLoader)
+	if err != nil {
+		return models.ModProject{}, err
 	}
-	return project, true
+	if !match(project, expected) {
+		return models.ModProject{}, ErrProjectNotFound
+	}
+	return project, nil
 }
 
 func providerByPlatform(platform string) modProvider {

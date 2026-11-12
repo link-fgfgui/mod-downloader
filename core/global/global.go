@@ -1,8 +1,6 @@
 // SPDX-FileCopyrightText: 2026 link-fgfgui
 // SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
 
-// Package global owns the process-wide Minecraft directory, version cache and
-// provider client singletons shared by every adapter.
 package global
 
 import (
@@ -45,15 +43,16 @@ func SetMinecraftDir(dir string) {
 	logging.Info("global minecraft dir set", "previousDir", previous, "minecraftDir", dir)
 }
 
-// GetVersions returns the cached version list.
+// GetVersions returns a snapshot of the cached version list.
 func GetVersions() []structs.VersionInfo {
 	mu.RLock()
 	defer mu.RUnlock()
 	logging.Debug("global versions read", "minecraftDir", cachedVersionsMinecraftDir, "versionCount", len(versions))
-	return versions
+	return cloneVersionInfos(versions)
 }
 
-// GetVersionsForDir returns the cached version list for dir when it matches the cache owner.
+// GetVersionsForDir returns a snapshot of the cached version list for dir when
+// it matches the cache owner.
 func GetVersionsForDir(dir string) ([]structs.VersionInfo, bool) {
 	mu.RLock()
 	defer mu.RUnlock()
@@ -62,7 +61,7 @@ func GetVersionsForDir(dir string) ([]structs.VersionInfo, bool) {
 		return nil, false
 	}
 	logging.Debug("global versions cache hit", "minecraftDir", dir, "versionCount", len(versions))
-	return versions, true
+	return cloneVersionInfos(versions), true
 }
 
 // SetVersions updates the cached version list for the current Minecraft directory.
@@ -81,9 +80,9 @@ func SetVersionsForDir(dir string, v []structs.VersionInfo) {
 
 func setVersionsLocked(dir string, v []structs.VersionInfo) {
 	cachedVersionsMinecraftDir = dir
-	versions = v
+	versions = cloneVersionInfos(v)
 	versionMap = make(map[string]structs.VersionInfo, len(v)*2)
-	for _, version := range v {
+	for _, version := range versions {
 		if version.Name != "" {
 			versionMap[version.Name] = version
 		}
@@ -112,6 +111,50 @@ func versionKey(version structs.VersionInfo) string {
 	return version.Name
 }
 
+// cloneVersionInfos returns a deep-enough copy for cross-goroutine readers.
+// Strings are immutable; every slice reachable from VersionInfo is copied.
+func cloneVersionInfos(v []structs.VersionInfo) []structs.VersionInfo {
+	if v == nil {
+		return nil
+	}
+	out := make([]structs.VersionInfo, len(v))
+	for i, version := range v {
+		out[i] = cloneVersionInfo(version)
+	}
+	return out
+}
+
+func cloneVersionInfo(version structs.VersionInfo) structs.VersionInfo {
+	version.Mods = cloneModInfos(version.Mods)
+	return version
+}
+
+func cloneModInfos(mods []structs.ModInfo) []structs.ModInfo {
+	if mods == nil {
+		return nil
+	}
+	out := make([]structs.ModInfo, len(mods))
+	for i, mod := range mods {
+		out[i] = mod
+		out[i].Categories = cloneStrings(mod.Categories)
+		out[i].Loaders = cloneStrings(mod.Loaders)
+		out[i].Authors = cloneStrings(mod.Authors)
+		out[i].Provides = cloneStrings(mod.Provides)
+		out[i].JIJMods = append([]structs.JIJModInfo(nil), mod.JIJMods...)
+		out[i].Dependencies = append([]structs.LocalModDependency(nil), mod.Dependencies...)
+		out[i].Recommends = append([]structs.LocalModDependency(nil), mod.Recommends...)
+		out[i].Breaks = append([]structs.LocalModDependency(nil), mod.Breaks...)
+	}
+	return out
+}
+
+func cloneStrings(values []string) []string {
+	if values == nil {
+		return nil
+	}
+	return append([]string(nil), values...)
+}
+
 // InvalidateVersions clears the cached version list and lookup map.
 func InvalidateVersions() {
 	mu.Lock()
@@ -131,7 +174,7 @@ func GetVersionByKey(key string) (structs.VersionInfo, bool) {
 	defer mu.RUnlock()
 	version, ok := versionMap[key]
 	logging.Debug("global version read by key", "key", key, "hit", ok)
-	return version, ok
+	return cloneVersionInfo(version), ok
 }
 
 // GetSelectedVersion returns the selected instance, or the zero value when the
@@ -145,7 +188,7 @@ func GetSelectedVersion() structs.VersionInfo {
 	}
 	if version, ok := versionMap[selectedVersionKey]; ok {
 		logging.Debug("global selected version read", "hit", true, "key", selectedVersionKey, "id", version.ID, "name", version.Name, "modLoader", version.ModLoader)
-		return version
+		return cloneVersionInfo(version)
 	}
 	logging.Debug("global selected version read", "hit", false, "key", selectedVersionKey, "minecraftDir", minecraftDir)
 	return structs.VersionInfo{}
@@ -160,35 +203,38 @@ func SetSelectedVersion(version structs.VersionInfo) {
 	selectedVersionKey = versionKey(version)
 	selectedVersionMinecraftDir = minecraftDir
 	if _, ok := versionMap[selectedVersionKey]; ok {
-		for i := range versions {
-			if versionKey(versions[i]) == selectedVersionKey {
-				versions[i] = version
+		next := append([]structs.VersionInfo(nil), versions...)
+		for i := range next {
+			if versionKey(next[i]) == selectedVersionKey {
+				next[i] = cloneVersionInfo(version)
 				break
 			}
 		}
+		versions = next
 		if version.Name != "" {
-			versionMap[version.Name] = version
+			versionMap[version.Name] = cloneVersionInfo(version)
 		}
 		if version.ID != "" {
-			versionMap[version.ID] = version
+			versionMap[version.ID] = cloneVersionInfo(version)
 		}
 	}
 	logging.Debug("global selected version set", "previousKey", previousKey, "key", selectedVersionKey, "minecraftDir", selectedVersionMinecraftDir)
 }
 
-// GetMinecraftReleaseVersions returns the cached official Minecraft release ids.
+// GetMinecraftReleaseVersions returns a snapshot of the cached official
+// Minecraft release ids.
 func GetMinecraftReleaseVersions() []string {
 	mu.RLock()
 	defer mu.RUnlock()
 	logging.Debug("global minecraft release versions read", "versionCount", len(minecraftReleaseVersions))
-	return minecraftReleaseVersions
+	return cloneStrings(minecraftReleaseVersions)
 }
 
 // SetMinecraftReleaseVersions updates the cached official Minecraft release ids.
 func SetMinecraftReleaseVersions(versions []string) {
 	mu.Lock()
 	defer mu.Unlock()
-	minecraftReleaseVersions = versions
+	minecraftReleaseVersions = cloneStrings(versions)
 	logging.Info("global minecraft release versions set", "versionCount", len(versions))
 }
 

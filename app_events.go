@@ -53,7 +53,7 @@ func (a *App) registerCoreEvents(h *host.Host) {
 	host.On(h, appcore.EventSelectedVersionChanged, func(version minecraft.VersionInfo) {
 		a.emit(appcore.EventNameSelectedVersionChanged, version)
 	})
-	host.OnEvent(h, appcore.EventUsageStatsUpdated, func() {
-		a.emit(appcore.EventNameUsageStatsUpdated, nil)
+	host.On(h, appcore.EventUsageStatsUpdated, func(stats storage.UsageStats) {
+		a.emit(appcore.EventNameUsageStatsUpdated, stats)
 	})
 }

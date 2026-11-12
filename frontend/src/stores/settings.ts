@@ -66,6 +66,13 @@ function bumpRevision(slot: SaveSlot) {
   draftRevisions.set(slot, currentRevision(slot) + 1);
 }
 
+// SettingsView.SaveError is the backend's signal that the config file was not
+// written. Surface it as a rejection so auto-save and manual save handlers
+// cannot report success.
+function throwIfSaveFailed(view: SettingsView) {
+  if (view.saveError) throw new Error(view.saveError);
+}
+
 export interface SettingsDrafts {
   draftTheme: string;
   draftLanguage: string;
@@ -284,6 +291,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       return next;
     } catch (error) {
       set({ error: error instanceof Error ? error.message : String(error) });
+      await get().load();
       throw error;
     } finally {
       set({ isSavingTheme: false });
@@ -306,6 +314,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       return next;
     } catch (error) {
       set({ error: error instanceof Error ? error.message : String(error) });
+      await get().load();
       throw error;
     } finally {
       set({ isSavingLanguage: false });
@@ -322,6 +331,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         set({ settings: view, draftAnimationDurationMultiplier: view.animationDurationMultiplier });
         applyAnimationSettings(view);
       }
+      throwIfSaveFailed(view);
       return view.animationDurationMultiplier;
     } catch (error) {
       set({ error: error instanceof Error ? error.message : String(error) });
@@ -340,6 +350,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       if (currentRevision("simpleMode") === revision) {
         set({ settings: view, draftSimpleMode: view.simpleMode });
       }
+      throwIfSaveFailed(view);
       return view;
     } finally {
       set({ isSavingSimpleMode: false });
@@ -356,6 +367,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       if (currentRevision("cleanup") === revision) {
         set({ settings: view, draftAutoScanUnusedDependencies: view.autoScanUnusedDependencies });
       }
+      throwIfSaveFailed(view);
       return view;
     } finally {
       set({ isSavingUnusedDependencyCleanup: false });
@@ -370,6 +382,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       if (currentRevision("mcim") === revision) {
         set({ settings: view, draftMCIMEnabled: view.mcimEnabled });
       }
+      throwIfSaveFailed(view);
       return view;
     } finally {
       set({ isSavingMCIM: false });
@@ -384,6 +397,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       if (currentRevision("jij") === revision) {
         set({ settings: view, draftEnableJijDetection: view.enableJijDetection });
       }
+      throwIfSaveFailed(view);
       return view;
     } finally {
       set({ isSavingJijDetection: false });
@@ -400,6 +414,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       if (currentRevision("hardware") === revision) {
         set({ settings: view, draftHardwareAcceleration: view.hardwareAcceleration });
       }
+      throwIfSaveFailed(view);
       return view;
     } finally {
       set({ isSavingHardwareAcceleration: false });
@@ -416,6 +431,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       if (currentRevision("multiSelect") === revision) {
         set({ settings: view, draftRequireCtrlForMultiSelect: view.requireCtrlForMultiSelect });
       }
+      throwIfSaveFailed(view);
       return view;
     } finally {
       set({ isSavingMultiSelect: false });
@@ -431,6 +447,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     if (currentRevision("releaseType") === revision) {
       set({ settings: view, draftPreferredReleaseType: view.preferredReleaseType });
     }
+    throwIfSaveFailed(view);
     return view;
   },
 
@@ -457,6 +474,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           draftRequestsPerSecond: view.requestsPerSecond,
         });
       }
+      throwIfSaveFailed(view);
       return view;
     } finally {
       set({ isSavingNetwork: false });
@@ -499,6 +517,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             state.clearModrinthKey === clearModrinth ? false : state.clearModrinthKey,
         }));
       }
+      throwIfSaveFailed(view);
       return view;
     } finally {
       set({ isSavingKeys: false });
@@ -509,9 +528,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set({ isChoosingCacheDir: true, error: "" });
     try {
       const previous = get().settings?.cacheDir || "";
-      const view = await api.ChooseCacheDir(currentLocale());
-      set({ settings: view });
-      return (view?.cacheDir || "") !== previous;
+      const result = await api.ChooseCacheDir(currentLocale());
+      set({ settings: result.settings, error: result.error || "" });
+      return !result.canceled && (result.settings?.cacheDir || "") !== previous;
     } finally {
       set({ isChoosingCacheDir: false });
     }
@@ -521,7 +540,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set({ isSavingCacheDir: true, error: "" });
     try {
       const view = await api.SaveCacheDirPreference("");
-      set({ settings: view });
+      set({ settings: view, error: view.saveError || "" });
+      if (view.saveError) throw new Error(view.saveError);
       return view;
     } finally {
       set({ isSavingCacheDir: false });

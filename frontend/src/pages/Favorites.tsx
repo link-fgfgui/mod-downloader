@@ -379,14 +379,20 @@ export function FavoritesPage() {
     const sourceId = draggedListId;
     setDraggedListId("");
     if (!sourceId || sourceId === targetListId) return;
-    const moved = await moveList(sourceId, pinned);
+    let moved: FavoriteList | null;
+    try {
+      moved = await moveList(sourceId, pinned);
+    } catch (error) {
+      toast.error(t("favorites.operationFailed") + ": " + errorMessage(error));
+      return;
+    }
     if (!moved) return;
     const ids = sectionLists.map((list) => list.id).filter((id) => id !== sourceId);
     let targetIndex = ids.indexOf(targetListId);
     if (targetIndex < 0) return;
     if (position === "after") targetIndex += 1;
     ids.splice(targetIndex, 0, sourceId);
-    await reorderLists(ids);
+    if (!(await reorderLists(ids))) toast.error(t("favorites.operationFailed"));
   };
 
   const onSectionDrop = async (event: React.DragEvent, pinned: boolean) => {
@@ -395,7 +401,11 @@ export function FavoritesPage() {
     setDraggedListId("");
     setDragOver(null);
     if (!sourceId) return;
-    await moveList(sourceId, pinned);
+    try {
+      await moveList(sourceId, pinned);
+    } catch (error) {
+      toast.error(t("favorites.operationFailed") + ": " + errorMessage(error));
+    }
   };
 
   const handleExport = async () => {

@@ -18,6 +18,62 @@ import (
 	structs "github.com/link-fgfgui/mod-downloader/core/structs/minecraft"
 )
 
+func TestGetVersionsColdLoadSelectsDefaultInstance(t *testing.T) {
+	root := t.TempDir()
+	versionDir := filepath.Join(root, "versions", "test")
+	if err := os.MkdirAll(versionDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(versionDir, "test.json"), []byte(`{
+		"name": "Test Instance",
+		"id": "test",
+		"patches": [
+			{"id": "game", "version": "1.21.1"},
+			{"id": "fabric", "version": "0.16.0"}
+		]
+	}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	global.SetMinecraftDir(root)
+	global.InvalidateVersions()
+	t.Cleanup(func() {
+		global.SetMinecraftDir("")
+		global.InvalidateVersions()
+	})
+
+	svc := New(Options{})
+	versions := svc.GetVersions()
+	if len(versions) != 1 || versions[0].ID != "test" {
+		t.Fatalf("GetVersions() = %#v, want test instance", versions)
+	}
+	if selected := global.GetSelectedVersion(); selected.ID != "test" {
+		t.Fatalf("selected version = %#v, want cold-load default", selected)
+	}
+}
+
+func TestLocalModsDoesNotChangeSelectedVersion(t *testing.T) {
+	dir := t.TempDir()
+	versions := []structs.VersionInfo{
+		{ID: "inst-a", Name: "Inst A", MinecraftVersion: "1.21.1", ModLoader: "fabric"},
+		{ID: "inst-b", Name: "Inst B", MinecraftVersion: "1.20.1", ModLoader: "forge"},
+	}
+	global.SetMinecraftDir(dir)
+	global.SetVersionsForDir(dir, versions)
+	global.SetSelectedVersion(versions[0])
+	t.Cleanup(func() {
+		global.SetMinecraftDir("")
+		global.InvalidateVersions()
+	})
+
+	svc := New(Options{})
+	if _, err := svc.LocalMods("inst-b"); err != nil {
+		t.Fatalf("LocalMods(inst-b): %v", err)
+	}
+	if selected := global.GetSelectedVersion(); selected.ID != "inst-a" {
+		t.Fatalf("selected version changed to %q", selected.ID)
+	}
+}
+
 func TestLocalModsInDirScansExplicitModsDir(t *testing.T) {
 	global.SetMinecraftDir("")
 	global.ClearLocalMods()
@@ -282,13 +338,14 @@ func TestEnrichModMetadataPrefersOnlineDisplayFields(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := storage.SetPlatformVersions("Modrinth", "project-1", []models.ModVersion{{
-		ID:        "version-1",
-		VersionID: "version-1",
-		ProjectID: "project-1",
-		Platform:  "Modrinth",
-		Version:   "1.0.1+online",
-		FileName:  "online-project-1.0.1.jar",
-		SHA1:      "abc123",
+		ID:          "version-1",
+		VersionID:   "version-1",
+		ProjectID:   "project-1",
+		Platform:    "Modrinth",
+		Version:     "1.0.1+online",
+		FileName:    "online-project-1.0.1.jar",
+		DownloadURL: "https://example.invalid/online-project-1.0.1.jar",
+		SHA1:        "abc123",
 	}}); err != nil {
 		t.Fatal(err)
 	}
@@ -343,7 +400,7 @@ func TestApplyResolvedModMetadataAppliesMatchAndClearsLoading(t *testing.T) {
 		mods,
 		map[string]uint32{"abc123": 42},
 		map[string]models.ModProject{"abc123": {Platform: "CurseForge", ProjectID: "123", Title: "Online"}},
-		map[string]models.ModVersion{"abc123": {ID: "456", Version: "online-version"}},
+		map[string]models.ModVersion{"abc123": {ID: "456", Version: "online-version", DownloadURL: "https://example.invalid/online.jar"}},
 	)
 	if !changed || updated[0].OnlineMetadataLoading || updated[0].OnlineName != "Online" || updated[0].OnlineVersionID != "456" {
 		t.Fatalf("resolved metadata = changed=%v mods=%#v", changed, updated)

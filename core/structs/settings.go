@@ -13,6 +13,15 @@ type StartupStatus struct {
 	ExtensionServerError string `json:"extensionServerError,omitempty"`
 }
 
+// Startup stage identifiers. Adapters should use these instead of hard-coded
+// strings.
+const (
+	StartupStageConfig   = "config"
+	StartupStageStorage  = "storage"
+	StartupStageReleases = "releases"
+	StartupStageUnknown  = "unknown"
+)
+
 // AppPreferences is the persisted preference subset exposed to clients.
 type AppPreferences struct {
 	Theme                       string  `json:"theme"`

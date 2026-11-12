@@ -277,6 +277,14 @@ func TestGetDownloadStatesReturnsDefaultWhenSelectedInstanceHasNoLocalMods(t *te
 	if len(states) != 1 {
 		t.Fatalf("state count = %d, want 1", len(states))
 	}
+	if providers.CurseForgeDownloadURL("12345678", "example.jar") == "" {
+		// Strict mode only keeps results whose cached versions have a download
+		// URL; this test has no cached versions at all.
+		if states[0].Key != "modrinth:sodium" || states[0].Status != modbridge.BtnStatusMissingDownloadURL || !states[0].Disabled {
+			t.Fatalf("strict state = %#v, want missing-URL state", states[0])
+		}
+		return
+	}
 	if states[0].Key != "modrinth:sodium" || states[0].Status != modbridge.BtnStatusNew || states[0].Icon != "mdi-download" || states[0].Color != "primary" || states[0].Disabled {
 		t.Fatalf("state = %#v", states[0])
 	}
@@ -989,6 +997,7 @@ func TestConfigureControlsFileAndQueueConcurrency(t *testing.T) {
 				ID:          fmt.Sprintf("version-%d", i),
 				FileName:    fmt.Sprintf("mod-%d.jar", i),
 				DownloadURL: fmt.Sprintf("https://example.test/mod-%d.jar", i),
+				ModIDs:      []string{fmt.Sprintf("mod-%d", i)},
 			},
 			TargetDir:        targetDir,
 			ModLoader:        "fabric",
@@ -1531,5 +1540,47 @@ func TestApplyPreservedDisabledState(t *testing.T) {
 	}
 	if got := applyPreservedDisabledState(path, false); got != path {
 		t.Fatalf("disabled preservation off returned %q", got)
+	}
+}
+
+func TestMissingDownloadURLReasonUsesOfficialCurseForgePage(t *testing.T) {
+	req := appstructs.ModDownloadRequest{
+		ProjectID: "curseforge:238222",
+		Result: models.ModProject{
+			Platform:  "CurseForge",
+			ProjectID: "238222",
+			Slug:      "jei",
+		},
+	}
+	version := models.ModVersion{Platform: "CurseForge", ID: "4593550"}
+	want := "https://www.curseforge.com/minecraft/mc-mods/jei/download/4593550"
+	if got := missingDownloadURLReason(req, version); got != want {
+		t.Fatalf("missingDownloadURLReason() = %q, want %q", got, want)
+	}
+
+	// Without a slug, the official project ID page is still a usable fallback.
+	req.Result.Slug = ""
+	req.Result.ProjectID = "999999999"
+	req.ProjectID = "curseforge:999999999"
+	version.ProjectID = "999999999"
+	want = "https://www.curseforge.com/projects/999999999/download/4593550"
+	if got := missingDownloadURLReason(req, version); got != want {
+		t.Fatalf("missingDownloadURLReason() without slug = %q, want %q", got, want)
+	}
+
+	// Non-CurseForge projects keep the stable internal reason.
+	req.Result.Platform = "Modrinth"
+	version.Platform = "Modrinth"
+	if got := missingDownloadURLReason(req, version); got != "missing download url" {
+		t.Fatalf("missingDownloadURLReason() for Modrinth = %q, want stable reason", got)
+	}
+
+	// Without a file ID no page URL can be built.
+	version.Platform = "CurseForge"
+	version.ID = ""
+	version.VersionID = ""
+	req.Result.Platform = "CurseForge"
+	if got := missingDownloadURLReason(req, version); got != "missing download url" {
+		t.Fatalf("missingDownloadURLReason() without file ID = %q, want stable reason", got)
 	}
 }

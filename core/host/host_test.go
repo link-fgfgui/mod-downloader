@@ -13,6 +13,7 @@ import (
 
 	"github.com/link-fgfgui/mod-downloader/core/appcore"
 	"github.com/link-fgfgui/mod-downloader/core/logging"
+	"github.com/link-fgfgui/mod-downloader/core/storage"
 	appstructs "github.com/link-fgfgui/mod-downloader/core/structs"
 	structs "github.com/link-fgfgui/mod-downloader/core/structs/minecraft"
 	appview "github.com/link-fgfgui/mod-downloader/core/structs/view"
@@ -88,7 +89,13 @@ func TestTypedHandlersReceiveEveryCoreEvent(t *testing.T) {
 		order = append(order, "version")
 		versions = append(versions, v)
 	})
-	OnEvent(h, appcore.EventUsageStatsUpdated, func() { order = append(order, "usage"); voids++ })
+	On(h, appcore.EventUsageStatsUpdated, func(stats storage.UsageStats) {
+		if stats.DownloadsCompleted != 3 {
+			t.Errorf("usage stats payload = %#v", stats)
+		}
+		order = append(order, "usage")
+		voids++
+	})
 	On(h, appcore.EventExtensionModsAccepted, func(u appview.SearchModsUpdate) {
 		order = append(order, "extension")
 		updates = append(updates, u)
@@ -106,7 +113,7 @@ func TestTypedHandlersReceiveEveryCoreEvent(t *testing.T) {
 	h.dispatch(appcore.Event{Kind: appcore.EventDownloadCompleted})
 	h.dispatch(appcore.Event{Kind: appcore.EventMinecraftDirChanged, Payload: "/tmp/.minecraft"})
 	h.dispatch(appcore.Event{Kind: appcore.EventSelectedVersionChanged, Payload: version})
-	h.dispatch(appcore.Event{Kind: appcore.EventUsageStatsUpdated})
+	h.dispatch(appcore.Event{Kind: appcore.EventUsageStatsUpdated, Payload: storage.UsageStats{DownloadsCompleted: 3}})
 	h.dispatch(appcore.Event{Kind: appcore.EventExtensionModsAccepted, Payload: update})
 
 	wantOrder := []string{"search", "states", "queue", "failed", "completed", "dir", "version", "usage", "extension"}

@@ -9,15 +9,16 @@ import "testing"
 // Adapters may centralize these strings, but they must never rename them.
 func TestButtonStatusContract(t *testing.T) {
 	want := map[string]string{
-		"new":               BtnStatusNew,
-		"installed":         BtnStatusInstalled,
-		"update":            BtnStatusUpdate,
-		"conflict":          BtnStatusConflict,
-		"incompatible":      BtnStatusIncompatible,
-		"metadataLoading":   BtnStatusMetadataLoading,
-		"metadataFailed":    BtnStatusMetadataFailed,
-		"noSelectedVersion": BtnStatusNoSelectedVersion,
-		"invalidRequest":    BtnStatusInvalidRequest,
+		"new":                BtnStatusNew,
+		"installed":          BtnStatusInstalled,
+		"update":             BtnStatusUpdate,
+		"conflict":           BtnStatusConflict,
+		"incompatible":       BtnStatusIncompatible,
+		"metadataLoading":    BtnStatusMetadataLoading,
+		"metadataFailed":     BtnStatusMetadataFailed,
+		"missingDownloadUrl": BtnStatusMissingDownloadURL,
+		"noSelectedVersion":  BtnStatusNoSelectedVersion,
+		"invalidRequest":     BtnStatusInvalidRequest,
 	}
 	for expected, got := range want {
 		if got != expected {

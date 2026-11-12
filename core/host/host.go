@@ -1,9 +1,6 @@
 // SPDX-FileCopyrightText: 2026 link-fgfgui
 // SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
 
-// Package host owns the UI-independent runtime: the core service, the HTTP
-// server and the typed event fan-out. GUI and TUI adapters only configure it
-// and register handlers; neither reimplements lifecycle or event plumbing.
 package host
 
 import (
@@ -313,7 +310,7 @@ func (h *Host) StartupStatus() appstructs.StartupStatus {
 
 	status := appstructs.StartupStatus{Ready: core != nil && startupErr == nil}
 	if startupErr != nil {
-		status.Stage = "unknown"
+		status.Stage = appstructs.StartupStageUnknown
 		status.Error = startupErr.Error()
 		var typed *appcore.StartupError
 		if errors.As(startupErr, &typed) {

@@ -389,7 +389,11 @@ func TestSaveThemePersistsAndNormalizes(t *testing.T) {
 	})
 
 	app := newTestApp(t, &configs.Config{})
-	if got := app.SaveTheme("2"); got != "system" {
+	got, err := app.SaveTheme("2")
+	if err != nil {
+		t.Fatalf("SaveTheme(2) error = %v", err)
+	}
+	if got != "system" {
 		t.Fatalf("SaveTheme(2) = %q, want system", got)
 	}
 
@@ -418,7 +422,11 @@ func TestSaveLanguagePersistsAndNormalizes(t *testing.T) {
 	})
 
 	app := newTestApp(t, &configs.Config{})
-	if got := app.SaveLanguage("zh-CN"); got != "zh" {
+	got, err := app.SaveLanguage("zh-CN")
+	if err != nil {
+		t.Fatalf("SaveLanguage(zh-CN) error = %v", err)
+	}
+	if got != "zh" {
 		t.Fatalf("SaveLanguage(zh-CN) = %q, want zh", got)
 	}
 	if got := app.service().GetPreferences().Language; got != "zh" {
@@ -545,17 +553,17 @@ func TestUnpinMod(t *testing.T) {
 	}
 
 	app := newTestApp(t, &configs.Config{})
-	if !app.UnpinMod("Modrinth", "Sodium", "1.21.1", "Fabric") {
-		t.Fatal("UnpinMod returned false for existing pin")
+	if removed, err := app.UnpinMod("Modrinth", "Sodium", "1.21.1", "Fabric"); err != nil || !removed {
+		t.Fatalf("UnpinMod existing pin = %v, %v", removed, err)
 	}
 	if _, ok := storage.GetPinnedMod("modrinth", "sodium", "1.21.1", "fabric"); ok {
 		t.Fatal("pin still exists after unpin")
 	}
-	if app.UnpinMod("modrinth", "sodium", "1.21.1", "fabric") {
-		t.Fatal("UnpinMod returned true for missing pin")
+	if removed, err := app.UnpinMod("modrinth", "sodium", "1.21.1", "fabric"); err != nil || removed {
+		t.Fatalf("UnpinMod missing pin = %v, %v", removed, err)
 	}
-	if app.UnpinMod("", "sodium", "1.21.1", "fabric") {
-		t.Fatal("UnpinMod returned true for empty platform")
+	if removed, err := app.UnpinMod("", "sodium", "1.21.1", "fabric"); err != nil || removed {
+		t.Fatalf("UnpinMod empty platform = %v, %v", removed, err)
 	}
 }
 

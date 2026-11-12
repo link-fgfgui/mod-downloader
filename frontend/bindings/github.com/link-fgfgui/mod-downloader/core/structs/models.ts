@@ -204,8 +204,11 @@ export interface ModDownloadRequest {
  */
 export interface ModDownloadResult {
     "queued": boolean;
+    "accepted"?: boolean;
+    "pinned"?: boolean;
     "skipped": boolean;
     "reason": string;
+    "error"?: string;
     "fileName": string;
     "versionId": string;
 

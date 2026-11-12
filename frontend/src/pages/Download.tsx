@@ -61,6 +61,8 @@ function resultStateIcon(state: ModDownloadButtonState | undefined, busy: boolea
       return <Loader2 className="size-4 animate-spin" />;
     case DownloadStatus.MetadataFailed:
       return <AlertCircle className="size-4" />;
+    case DownloadStatus.MissingDownloadUrl:
+      return <X className="size-4" />;
     case DownloadStatus.NoSelectedVersion:
     case DownloadStatus.InvalidRequest:
       return <Ban className="size-4" />;
@@ -85,6 +87,8 @@ const statusLabelKey = (status: string | undefined) => {
       return "download.status.metadataLoading";
     case DownloadStatus.MetadataFailed:
       return "download.status.metadataFailed";
+    case DownloadStatus.MissingDownloadUrl:
+      return "download.status.missingDownloadUrl";
     default:
       return "download.status.download";
   }
@@ -439,7 +443,13 @@ export function DownloadPage() {
                       <Button
                         type="button"
                         size="icon-sm"
-                        variant={state?.status === DownloadStatus.Conflict || state?.status === DownloadStatus.Incompatible ? "destructive" : "outline"}
+                        variant={
+                          state?.status === DownloadStatus.Conflict ||
+                          state?.status === DownloadStatus.Incompatible ||
+                          state?.status === DownloadStatus.MissingDownloadUrl
+                            ? "destructive"
+                            : "outline"
+                        }
                         className="shrink-0"
                         disabled={!state || Boolean(state.disabled) || busy}
                         aria-label={t(statusLabelKey(state?.status))}

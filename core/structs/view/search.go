@@ -12,6 +12,9 @@ type SearchModsUpdate struct {
 	Results   []models.ModProject `json:"results"`
 	Loading   bool                `json:"loading"`
 	Append    bool                `json:"append"`
+	// Error is set on the final page when one or more providers failed. The
+	// partial results (if any) remain usable.
+	Error string `json:"error,omitempty"`
 }
 
 // DownloadQueueState is the aggregate download queue snapshot rendered by the

@@ -24,6 +24,7 @@ import {
 import { ModVersionList, type DependencyBreakDetail } from "@/components/ModVersionList";
 import { api } from "@/services/app";
 import { hasMajorVersionChange, isVersionDowngrade } from "@/utils/versionCompare";
+import { DownloadErrorKeys } from "@/lib/downloadStatus";
 import { useMinecraftStore } from "@/stores/minecraft";
 import type {
   DependencyPreflightResult,
@@ -43,6 +44,8 @@ interface ManageVersionDialogProps {
   onQueued: () => void;
   onError: (error: unknown) => void;
   onNotify: (key: string, color?: "success" | "error") => void;
+  /** Raw message sink for core-provided text such as a CurseForge page URL. */
+  onNotifyMessage: (message: string, color?: "success" | "error") => void;
 }
 
 const onlineProjectFromGroup = (group: LocalModGroup): ModProject => group.onlineProject;
@@ -55,6 +58,7 @@ export function ManageVersionDialog({
   onQueued,
   onError,
   onNotify,
+  onNotifyMessage,
 }: ManageVersionDialogProps) {
   const { t } = useTranslation();
   const minecraftVersion = useMinecraftStore((state) => state.minecraftVersion);
@@ -146,7 +150,12 @@ export function ManageVersionDialog({
         versionId: version.id,
       });
       if (result?.skipped) {
-        onNotify("download.errors.generic", "error");
+        const errorKey = DownloadErrorKeys[result.reason];
+        if (errorKey) {
+          onNotify(`download.errors.${errorKey}`, "error");
+        } else {
+          onNotifyMessage(result.reason || t("download.errors.generic"), "error");
+        }
         return;
       }
       onQueued();

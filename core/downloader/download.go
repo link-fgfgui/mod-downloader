@@ -458,7 +458,7 @@ func buildDownloadJob(req appstructs.ModDownloadRequest, curseForgeAPIKey string
 	}
 	version.DownloadURL = providers.EffectiveDownloadURL(version)
 	if strings.TrimSpace(version.DownloadURL) == "" {
-		return downloadJob{}, appstructs.ModDownloadResult{Skipped: true, Reason: "missing download url"}, false
+		return downloadJob{}, appstructs.ModDownloadResult{Skipped: true, Reason: missingDownloadURLReason(req, version)}, false
 	}
 	if visited == nil {
 		visited = make(map[string]bool)
@@ -486,6 +486,32 @@ func buildDownloadJob(req appstructs.ModDownloadRequest, curseForgeAPIKey string
 			FileName:  version.FileName,
 			VersionID: version.ID,
 		}, true
+}
+
+// missingDownloadURLReason returns the stable missing-URL code, or the official
+// CurseForge file page when enough identifying data is available. The page is
+// not a CDN URL; it redirects to the CDN in a browser.
+func missingDownloadURLReason(req appstructs.ModDownloadRequest, version models.ModVersion) string {
+	const missing = "missing download url"
+	platform := firstNonEmpty(version.Platform, req.Result.Platform)
+	if !strings.EqualFold(strings.TrimSpace(platform), "curseforge") {
+		return missing
+	}
+	slug := strings.TrimSpace(req.Result.Slug)
+	if slug == "" {
+		if project, ok := providers.GetProjectByKey(req.ProjectID); ok {
+			slug = strings.TrimSpace(project.Slug)
+		}
+	}
+	projectID := firstNonEmpty(version.ProjectID, req.Result.ProjectID)
+	if projectID == "" {
+		_, projectID = providers.SplitProjectReference(req.ProjectID)
+	}
+	fileID := firstNonEmpty(version.ID, version.VersionID)
+	if pageURL := providers.CurseForgeDownloadPageURL(slug, projectID, fileID); pageURL != "" {
+		return pageURL
+	}
+	return missing
 }
 
 // GetDownloadQueueState returns the current queue snapshot.

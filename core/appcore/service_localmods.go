@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/link-fgfgui/mod-downloader/core/configs"
 	"github.com/link-fgfgui/mod-downloader/core/global"
 	"github.com/link-fgfgui/mod-downloader/core/logging"
 	"github.com/link-fgfgui/mod-downloader/core/minecraft"
@@ -46,9 +47,9 @@ func (s *Service) SetMinecraftDir(dir string) string {
 		}
 		return ""
 	}
-	if s.config != nil {
-		s.config.Preferences.MinecraftDir = dir
-	}
+	s.mutateConfig(func(cfg *configs.Config) {
+		cfg.Preferences.MinecraftDir = dir
+	})
 	s.emit(EventMinecraftDirChanged, simplified)
 	s.emit(EventSelectedVersionChanged, global.GetSelectedVersion())
 	return simplified
@@ -70,14 +71,14 @@ func (s *Service) ValidateMinecraftDir() bool {
 }
 
 // GetVersions returns the discovered instances, loading them on first access.
+// A cold load establishes the default selection; subsequent reads never change
+// it.
 func (s *Service) GetVersions() []structs.VersionInfo {
 	mcDir := global.GetMinecraftDir()
 	if versions, ok := global.GetVersionsForDir(mcDir); ok {
-		// Cache population always goes through LoadVersionsFromDisk, which
-		// selects the default instance; a read must not mutate selection.
 		return versions
 	}
-	return s.LoadVersionsFromDisk(mcDir)
+	return s.loadVersionsFromDisk(mcDir, true)
 }
 
 // GetSelectedVersion returns the currently selected instance.
@@ -127,15 +128,29 @@ func (s *Service) SelectVersion(versionKey string) (structs.VersionInfo, error) 
 }
 
 // LocalMods returns the mods of the given instance, or of the selected one
-// when versionKey is empty.
+// when versionKey is empty. It never changes the global selection.
 func (s *Service) LocalMods(versionKey string) ([]structs.ModInfo, error) {
-	if strings.TrimSpace(versionKey) != "" {
-		if _, err := s.SelectVersion(versionKey); err != nil {
-			return nil, err
-		}
+	version, err := s.localModsForVersion(versionKey)
+	if err != nil {
+		return nil, err
 	}
-	selected := s.RefreshSelectedVersionMods()
-	return selected.Mods, nil
+	return version.Mods, nil
+}
+
+// localModsForVersion refreshes one instance projection without changing the
+// process-wide selection. An empty key resolves to the selected instance.
+func (s *Service) localModsForVersion(versionKey string) (structs.VersionInfo, error) {
+	versionKey = strings.TrimSpace(versionKey)
+	selected := global.GetSelectedVersion()
+	if versionKey == "" || versionKey == selected.ID || versionKey == selected.Name {
+		return s.RefreshSelectedVersionMods(), nil
+	}
+	version, ok := global.GetVersionByKey(versionKey)
+	if !ok {
+		return structs.VersionInfo{}, fmt.Errorf("version not found: %s", versionKey)
+	}
+	refreshed := s.refreshVersionMods(version, global.GetMinecraftDir())
+	return refreshed, nil
 }
 
 // LocalModsInDir scans an arbitrary mods directory for the given version and
@@ -519,6 +534,10 @@ func pathInsideDir(path string, dir string) bool {
 // LoadVersionsFromDisk discovers instances in mcDir, refreshes the version
 // cache and starts the hardlink index scan.
 func (s *Service) LoadVersionsFromDisk(mcDir string) []structs.VersionInfo {
+	return s.loadVersionsFromDisk(mcDir, true)
+}
+
+func (s *Service) loadVersionsFromDisk(mcDir string, selectDefault bool) []structs.VersionInfo {
 	if strings.TrimSpace(mcDir) == "" {
 		global.SetVersionsForDir(mcDir, nil)
 		return nil
@@ -529,7 +548,9 @@ func (s *Service) LoadVersionsFromDisk(mcDir string) []structs.VersionInfo {
 		infos[i] = resetConnectorVersion(infos[i])
 	}
 	global.SetVersionsForDir(mcDir, infos)
-	ensureSelectedVersion(infos)
+	if selectDefault {
+		ensureSelectedVersion(infos)
+	}
 	generation := global.HardlinkIndexGeneration()
 	go ScanAllModDirsForHardlinkIndex(mcDir, infos, generation)
 	return infos

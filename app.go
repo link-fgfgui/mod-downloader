@@ -112,51 +112,47 @@ func (a *App) ListMatchingProjectVersions(result models.ModProject, minecraftVer
 }
 
 func (a *App) LookupProjectBySlug(platform, slug, mcVersion, modLoader string) (models.ModProject, error) {
-	project, ok := a.service().LookupProjectBySlug(platform, slug, mcVersion, modLoader)
-	if !ok {
-		return models.ModProject{}, fmt.Errorf("project not found: %s/%s", platform, slug)
-	}
-	return project, nil
+	return a.service().LookupProjectBySlugWithError(platform, slug, mcVersion, modLoader)
 }
 
-func (a *App) GetPinnedModVersion(platform string, modID string, minecraftVersion string, modLoader string) storage.PinnedMod {
-	return a.service().GetPinnedModVersion(platform, modID, minecraftVersion, modLoader)
+func (a *App) GetPinnedModVersion(platform string, modID string, minecraftVersion string, modLoader string) (storage.PinnedMod, error) {
+	return a.service().GetPinnedModVersionWithError(platform, modID, minecraftVersion, modLoader)
 }
 
-func (a *App) PinModVersion(req appstructs.ModVersionPinRequest) storage.PinnedMod {
-	return a.service().PinModVersion(req)
+func (a *App) PinModVersion(req appstructs.ModVersionPinRequest) (storage.PinnedMod, error) {
+	return a.service().PinModVersionWithError(req)
 }
 
 func (a *App) ListPinnedMods() []storage.PinnedMod {
 	return a.service().ListPinnedMods()
 }
 
-func (a *App) UnpinMod(platform, modID, mcVersion, modLoader string) bool {
-	return a.service().UnpinMod(platform, modID, mcVersion, modLoader)
+func (a *App) UnpinMod(platform, modID, mcVersion, modLoader string) (bool, error) {
+	return a.service().UnpinModWithError(platform, modID, mcVersion, modLoader)
 }
 
 func (a *App) ListFavoriteLists() []storage.FavoriteList {
 	return a.service().ListFavoriteLists()
 }
 
-func (a *App) CreateFavoriteList(name, minecraftVersion, modLoader string) storage.FavoriteList {
-	return a.service().CreateFavoriteListForScope(name, minecraftVersion, modLoader)
+func (a *App) CreateFavoriteListForScope(name, minecraftVersion, modLoader string) (storage.FavoriteList, error) {
+	return a.service().CreateFavoriteListForScopeWithError(name, minecraftVersion, modLoader)
 }
 
-func (a *App) RenameFavoriteList(id, name string) storage.FavoriteList {
-	return a.service().RenameFavoriteList(id, name)
+func (a *App) RenameFavoriteList(id, name string) (storage.FavoriteList, error) {
+	return a.service().RenameFavoriteListWithError(id, name)
 }
 
-func (a *App) DeleteFavoriteList(id string) bool {
-	return a.service().DeleteFavoriteList(id)
+func (a *App) DeleteFavoriteList(id string) (bool, error) {
+	return a.service().DeleteFavoriteListWithError(id)
 }
 
-func (a *App) UpdateFavoriteListMetadata(list storage.FavoriteList) storage.FavoriteList {
-	return a.service().UpdateFavoriteListMetadata(list)
+func (a *App) UpdateFavoriteListMetadata(list storage.FavoriteList) (storage.FavoriteList, error) {
+	return a.service().UpdateFavoriteListMetadataWithError(list)
 }
 
-func (a *App) ReorderFavoriteLists(ids []string) bool {
-	return a.service().ReorderFavoriteLists(ids)
+func (a *App) ReorderFavoriteLists(ids []string) error {
+	return a.service().ReorderFavoriteListsWithError(ids)
 }
 
 // ListFavoriteOverview returns the scope-filtered, core-ordered favorites
@@ -170,8 +166,8 @@ func (a *App) ListFavoriteContentsForScope(listID string, minecraftVersion strin
 	return a.service().ListFavoriteContentsForScope(listID, minecraftVersion, modLoader)
 }
 
-func (a *App) AddFavoriteMod(mod storage.FavoriteMod) storage.FavoriteMod {
-	return a.service().AddFavoriteMod(mod)
+func (a *App) AddFavoriteMod(mod storage.FavoriteMod) (storage.FavoriteMod, error) {
+	return a.service().AddFavoriteModWithError(mod)
 }
 
 func (a *App) AddFavoriteModsToLists(req appcore.FavoriteBulkAddRequest) appcore.FavoriteBulkOperationResult {
@@ -190,15 +186,15 @@ func (a *App) ApplyFavoriteListCrossVersionCopy(req appcore.FavoriteCrossVersion
 	return a.service().ApplyFavoriteListCrossVersionCopy(req)
 }
 
-func (a *App) AddFavoriteListReference(parentListID, childListID string) storage.FavoriteListRef {
-	return a.service().AddFavoriteListReference(parentListID, childListID)
+func (a *App) AddFavoriteListReference(parentListID, childListID string) (storage.FavoriteListRef, error) {
+	return a.service().AddFavoriteListReferenceWithError(parentListID, childListID)
 }
 
-func (a *App) RemoveFavoriteMod(listID, platform, modID, mcVersion, modLoader string) bool {
-	return a.service().RemoveFavoriteMod(listID, platform, modID, mcVersion, modLoader)
+func (a *App) RemoveFavoriteMod(listID, platform, modID, mcVersion, modLoader string) (bool, error) {
+	return a.service().RemoveFavoriteModWithError(listID, platform, modID, mcVersion, modLoader)
 }
 
-func (a *App) ExportFavoriteListPackwizZip(listID, minecraftVersion, modLoader, locale string) ExportFavoritePackwizResult {
+func (a *App) ExportFavoriteListPackwizZipForScope(listID, minecraftVersion, modLoader, locale string) (ExportFavoritePackwizResult, error) {
 	dialogText := localizedDialogText(locale)
 	path, err := a.app.Dialog.SaveFileWithOptions(&application.SaveFileDialogOptions{
 		Title:                dialogText.exportPackwizTitle,
@@ -212,10 +208,10 @@ func (a *App) ExportFavoriteListPackwizZip(listID, minecraftVersion, modLoader, 
 	}).PromptForSingleSelection()
 	if err != nil {
 		logging.Error("choose packwiz export path failed", "listID", listID, "error", err)
-		panic("export packwiz failed: " + err.Error())
+		return ExportFavoritePackwizResult{}, fmt.Errorf("choose packwiz export path: %w", err)
 	}
 	if strings.TrimSpace(path) == "" {
-		return ExportFavoritePackwizResult{Canceled: true}
+		return ExportFavoritePackwizResult{Canceled: true}, nil
 	}
 	if filepath.Ext(path) == "" {
 		path += ".zip"
@@ -223,9 +219,9 @@ func (a *App) ExportFavoriteListPackwizZip(listID, minecraftVersion, modLoader, 
 	result, err := a.service().ExportFavoriteListPackwizZipForScope(listID, path, minecraftVersion, modLoader)
 	if err != nil {
 		logging.Error("export favorite packwiz zip failed", "listID", listID, "path", path, "error", err)
-		panic("export packwiz failed: " + err.Error())
+		return ExportFavoritePackwizResult{}, fmt.Errorf("export favorite list: %w", err)
 	}
-	return ExportFavoritePackwizResult{Path: result.Path}
+	return ExportFavoritePackwizResult{Path: result.Path}, nil
 }
 
 func (a *App) GetMinecraftReleaseVersions() []string {
@@ -237,14 +233,17 @@ func (a *App) GetSettings() appview.SettingsView {
 	return a.service().GetSettings()
 }
 
-// SaveTheme updates the theme preference and persists it immediately. Returns the updated theme string.
-// Invalid values fall back to dark.
-func (a *App) SaveTheme(theme string) string {
-	return a.service().SaveTheme(theme)
+// SaveTheme updates the theme preference and persists it immediately. It
+// returns the normalized theme and a persistence error. Invalid values fall
+// back to dark.
+func (a *App) SaveTheme(theme string) (string, error) {
+	return a.service().SaveThemeWithError(theme)
 }
 
-func (a *App) SaveLanguage(language string) string {
-	return a.service().SaveLanguage(language)
+// SaveLanguage updates the language preference and persists it immediately. It
+// returns the normalized language and a persistence error.
+func (a *App) SaveLanguage(language string) (string, error) {
+	return a.service().SaveLanguageWithError(language)
 }
 
 func (a *App) SaveAnimationSettings(req appstructs.SaveAnimationSettingsRequest) appview.SettingsView {
@@ -391,7 +390,7 @@ func (a *App) dialogWindow() application.Window {
 	return a.app.Window.Current()
 }
 
-func (a *App) ChooseCacheDir(locale string) (appview.SettingsView, error) {
+func (a *App) ChooseCacheDir(locale string) (CacheDirSelectionResult, error) {
 	dir, err := a.app.Dialog.OpenFileWithOptions(&application.OpenFileDialogOptions{
 		Title:                localizedDialogText(locale).chooseCacheDir,
 		Directory:            a.GetSettings().CacheDir,
@@ -402,12 +401,13 @@ func (a *App) ChooseCacheDir(locale string) (appview.SettingsView, error) {
 	}).PromptForSingleSelection()
 	if err != nil {
 		logging.Error("choose cache dir failed", "error", err)
-		return a.GetSettings(), fmt.Errorf("open folder picker: %w", err)
+		return CacheDirSelectionResult{}, fmt.Errorf("open folder picker: %w", err)
 	}
 	if strings.TrimSpace(dir) == "" {
-		return a.GetSettings(), nil
+		return CacheDirSelectionResult{Settings: a.GetSettings(), Canceled: true}, nil
 	}
-	return a.SaveCacheDirPreference(dir), nil
+	view := a.SaveCacheDirPreference(dir)
+	return CacheDirSelectionResult{Settings: view, Error: view.SaveError}, nil
 }
 
 func (a *App) GetMinecraftDir() string {

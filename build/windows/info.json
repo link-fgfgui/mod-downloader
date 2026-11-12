@@ -5,11 +5,11 @@
 	"info": {
 		"0409": {
 			"ProductVersion": "0.1.0",
-			"CompanyName": "My Company",
-			"FileDescription": "A mod-downloader-gui-v3 application",
-			"LegalCopyright": "© 2026, My Company",
-			"ProductName": "My Product",
-			"Comments": "This is a comment"
+			"CompanyName": "link-fgfgui",
+			"FileDescription": "Minecraft mod downloader and instance manager",
+			"LegalCopyright": "(c) 2026, link-fgfgui",
+			"ProductName": "Mod Downloader",
+			"Comments": "Minecraft mod downloader and instance manager"
 		}
 	}
 }

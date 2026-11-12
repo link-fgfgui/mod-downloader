@@ -142,6 +142,12 @@ export interface SearchModsUpdate {
     "results": models$0.ModProject[] | null;
     "loading": boolean;
     "append": boolean;
+
+    /**
+     * Error is set on the final page when one or more providers failed. The
+     * partial results (if any) remain usable.
+     */
+    "error"?: string;
 }
 
 /**

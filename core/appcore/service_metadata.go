@@ -43,10 +43,12 @@ func applyResolvedModMetadata(mods []structs.ModInfo, missingFiles map[string]ui
 			continue
 		}
 		if project, ok := projects[sha1]; ok {
-			enrichedMod := modbridge.ApplyPlatformMetadataToModInfo(updated[i], project, versions[sha1])
-			if modInfoDisplayMetadataChanged(updated[i], enrichedMod) {
-				updated[i] = enrichedMod
-				changed = true
+			if providers.VersionDownloadAvailable(versions[sha1]) {
+				enrichedMod := modbridge.ApplyPlatformMetadataToModInfo(updated[i], project, versions[sha1])
+				if modInfoDisplayMetadataChanged(updated[i], enrichedMod) {
+					updated[i] = enrichedMod
+					changed = true
+				}
 			}
 		}
 		if updated[i].OnlineMetadataLoading {
@@ -76,6 +78,12 @@ func enrichModMetadata(mods []structs.ModInfo) ([]structs.ModInfo, map[string]ui
 			continue
 		}
 		project, version, ok := modbridge.PlatformMetadataForSHA1(sha1)
+		if ok && !providers.VersionDownloadAvailable(version) {
+			// A known online version without a usable download URL is a permanent
+			// metadata failure in strict mode. Leave the local metadata untouched
+			// and do not retry the lookup on every scan.
+			continue
+		}
 		if ok && hasProjectDisplayMetadata(project) {
 			enriched[i] = modbridge.ApplyPlatformMetadataToModInfo(enriched[i], project, version)
 		} else {

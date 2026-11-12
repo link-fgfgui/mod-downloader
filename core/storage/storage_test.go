@@ -82,6 +82,28 @@ func TestOpenAtCreatesParentDirectoryOnClose(t *testing.T) {
 	}
 }
 
+func TestOpenAtPreservesStateWhenSwitchingBack(t *testing.T) {
+	pathA := filepath.Join(t.TempDir(), "a", metadataCacheFileName)
+	pathB := filepath.Join(t.TempDir(), "b", metadataCacheFileName)
+	t.Cleanup(Close)
+
+	if err := OpenAt(pathA); err != nil {
+		t.Fatal(err)
+	}
+	if err := UpsertModProject(models.ModProject{Platform: "Modrinth", ProjectID: "sodium", Title: "Sodium"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := OpenAt(pathB); err != nil {
+		t.Fatal(err)
+	}
+	if err := OpenAt(pathA); err != nil {
+		t.Fatal(err)
+	}
+	if project, ok := GetModProject("Modrinth", "sodium"); !ok || project.Title != "Sodium" {
+		t.Fatalf("project after A -> B -> A = %#v, %v", project, ok)
+	}
+}
+
 func TestUsageStatsAccumulateAndPersist(t *testing.T) {
 	path := openTestDB(t)
 
@@ -127,7 +149,7 @@ func TestUsageStatsAccumulateAndPersist(t *testing.T) {
 		t.Fatalf("stats after reopen = %#v, want %#v", got, want)
 	}
 	var unknown int
-	if err := userDB.db.QueryRow(`SELECT COUNT(*) FROM usage_stats WHERE key = 'unknown'`).Scan(&unknown); err != nil || unknown != 0 {
+	if err := userDBPtr.Load().db.QueryRow(`SELECT COUNT(*) FROM usage_stats WHERE key = 'unknown'`).Scan(&unknown); err != nil || unknown != 0 {
 		t.Fatalf("unknown usage stat rows = %d, %v", unknown, err)
 	}
 }
@@ -572,7 +594,7 @@ func TestSQLiteSchemaV3DiscardsExistingFavorites(t *testing.T) {
 		t.Fatalf("usage stats were not preserved = %#v", stats)
 	}
 	var version int
-	if err := userDB.db.QueryRow(`SELECT version FROM schema_migrations WHERE version = 3`).Scan(&version); err != nil || version != 3 {
+	if err := userDBPtr.Load().db.QueryRow(`SELECT version FROM schema_migrations WHERE version = 3`).Scan(&version); err != nil || version != 3 {
 		t.Fatalf("schema version 3 = %d, %v", version, err)
 	}
 }
@@ -774,7 +796,7 @@ func TestFavoriteModUsesParentListScope(t *testing.T) {
 	if err != nil || !ok || saved.MinecraftVersion != "1.21.1" || saved.ModLoader != "fabric" {
 		t.Fatalf("canonicalized favorite = %#v, %v, %v", saved, ok, err)
 	}
-	_, err = userDB.db.Exec(
+	_, err = userDBPtr.Load().db.Exec(
 		`INSERT INTO favorite_mods(id, list_id, platform, mod_id, minecraft_version, mod_loader, created_at, updated_at)
 		 VALUES ('invalid-scope', ?, 'modrinth', 'lithium', '1.20.1', 'forge', 1, 1)`,
 		list.ID,

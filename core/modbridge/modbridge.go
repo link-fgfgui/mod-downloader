@@ -33,15 +33,16 @@ import (
 
 // Button status constants shared by downloader and modbridge.
 const (
-	BtnStatusNew               = "new"          // No same modId in instance -> standard download
-	BtnStatusInstalled         = "installed"    // Installed and same sha1 as latest -> disabled
-	BtnStatusUpdate            = "update"       // Same modId same project but not latest -> update
-	BtnStatusConflict          = "conflict"     // Same modId but not from this project's versions -> switch source
-	BtnStatusIncompatible      = "incompatible" // Requested version declares an incompatible installed project
-	BtnStatusMetadataLoading   = "metadataLoading"
-	BtnStatusMetadataFailed    = "metadataFailed"
-	BtnStatusNoSelectedVersion = "noSelectedVersion" // Adapter-side disabled state when no instance is selected
-	BtnStatusInvalidRequest    = "invalidRequest"    // Adapter-side disabled state for an invalid search request
+	BtnStatusNew                = "new"          // No same modId in instance -> standard download
+	BtnStatusInstalled          = "installed"    // Installed and same sha1 as latest -> disabled
+	BtnStatusUpdate             = "update"       // Same modId same project but not latest -> update
+	BtnStatusConflict           = "conflict"     // Same modId but not from this project's versions -> switch source
+	BtnStatusIncompatible       = "incompatible" // Requested version declares an incompatible installed project
+	BtnStatusMetadataLoading    = "metadataLoading"
+	BtnStatusMetadataFailed     = "metadataFailed"
+	BtnStatusMissingDownloadURL = "missingDownloadUrl" // Strict mode: no usable download URL; disabled, not retryable
+	BtnStatusNoSelectedVersion  = "noSelectedVersion"  // Adapter-side disabled state when no instance is selected
+	BtnStatusInvalidRequest     = "invalidRequest"     // Adapter-side disabled state for an invalid search request
 )
 
 const (
@@ -228,7 +229,7 @@ func ResolveVersions(req appstructs.ModDownloadRequest) []models.ModVersion {
 	}
 
 	versions := providers.ListMatchingProjectVersions(req.Result, req.MinecraftVersion, req.ModLoader)
-	return preferredVersions(versions)
+	return preferredVersions(providers.PreferDownloadableVersions(versions))
 }
 
 // FindVersionByID returns a version by its platform version ID from a list of versions.
@@ -577,6 +578,7 @@ func DownloadStates(req appstructs.DownloadStatesRequest, onBackfillComplete fun
 		for i := range req.Results {
 			states[i] = defaultDownloadButtonState(req.Results[i])
 		}
+		markUnavailableDownloadStates(states, req.Results, req.MinecraftVersion, req.ModLoader)
 		return states
 	}
 
@@ -598,6 +600,7 @@ func DownloadStates(req appstructs.DownloadStatesRequest, onBackfillComplete fun
 		for i := range req.Results {
 			states[i] = defaultDownloadButtonState(req.Results[i])
 		}
+		markUnavailableDownloadStates(states, req.Results, req.MinecraftVersion, req.ModLoader)
 		return states
 	}
 
@@ -612,6 +615,9 @@ func DownloadStates(req appstructs.DownloadStatesRequest, onBackfillComplete fun
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
+			if markUnavailableDownloadState(&states[idx], result, req.MinecraftVersion, req.ModLoader) {
+				return
+			}
 			downloadReq := appstructs.ModDownloadRequest{
 				ProjectID:        states[idx].Key,
 				Result:           result,
@@ -679,6 +685,9 @@ func VersionModIDs(version models.ModVersion, modLoader string) []string {
 	}
 
 	downloadURL := providers.EffectiveDownloadURL(version)
+	if strings.TrimSpace(downloadURL) == "" {
+		return nil
+	}
 	modIDs, err := cachedRemoteModIDs(downloadURL, modLoader)
 	if err != nil {
 		logging.Warn("remote jar parse failed for version mod IDs", "downloadURL", downloadURL, "error", err)
@@ -778,7 +787,10 @@ func remoteModIDBackfillSuppressed(downloadURL, modLoader string) bool {
 func remoteMetadataButtonStatus(version models.ModVersion, modLoader string) string {
 	downloadURL := providers.EffectiveDownloadURL(version)
 	if strings.TrimSpace(downloadURL) == "" {
-		return BtnStatusMetadataFailed
+		// No remote JAR can be parsed, so retrying metadata would loop forever.
+		// Return the ordinary state; DownloadStates replaces it with the strict
+		// missing-URL state when applicable, and queueing reports the URL.
+		return BtnStatusNew
 	}
 	key := remoteModIDCacheKey(downloadURL, modLoader)
 	remoteModIDCache.Lock()
@@ -852,7 +864,11 @@ func markBackfill(version models.ModVersion, modLoader string) {
 	if strings.TrimSpace(version.ID) == "" {
 		return
 	}
-	if remoteModIDBackfillSuppressed(version.DownloadURL, modLoader) {
+	downloadURL := providers.EffectiveDownloadURL(version)
+	if strings.TrimSpace(downloadURL) == "" {
+		return
+	}
+	if remoteModIDBackfillSuppressed(downloadURL, modLoader) {
 		return
 	}
 	backfillMu.Lock()
@@ -1068,6 +1084,36 @@ func defaultDownloadButtonState(result models.ModProject) appview.ModDownloadBut
 	return appview.ModDownloadButtonState{Key: providers.ProjectReferenceFromSearchResult(result), Status: BtnStatusNew, Icon: "mdi-download", Color: "primary"}
 }
 
+// markUnavailableDownloadStates parallelizes the strict-mode availability guard
+// because each check may resolve project versions over the network on a cache
+// miss. States without a project key are left untouched.
+func markUnavailableDownloadStates(states []appview.ModDownloadButtonState, results []models.ModProject, minecraftVersion, modLoader string) {
+	var wg sync.WaitGroup
+	for i := range results {
+		if states[i].Key == "" {
+			continue
+		}
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			markUnavailableDownloadState(&states[idx], results[idx], minecraftVersion, modLoader)
+		}(i)
+	}
+	wg.Wait()
+}
+
+// markUnavailableDownloadState exposes strict mode as a unique, terminal
+// button state. The row stays visible and index-aligned with the search results
+// so a late state refresh cannot reorder or remove entries; the adapter renders
+// a disabled X and never retries metadata or queues a download.
+func markUnavailableDownloadState(state *appview.ModDownloadButtonState, result models.ModProject, minecraftVersion, modLoader string) bool {
+	if providers.ProjectHasDownloadableVersion(result, minecraftVersion, modLoader) {
+		return false
+	}
+	applyButtonStatus(state, BtnStatusMissingDownloadURL)
+	return true
+}
+
 func applyButtonStatus(state *appview.ModDownloadButtonState, status string) {
 	state.Status = status
 	switch status {
@@ -1089,6 +1135,10 @@ func applyButtonStatus(state *appview.ModDownloadButtonState, status string) {
 		state.Color = "surface-variant"
 	case BtnStatusMetadataFailed:
 		state.Icon = "mdi-refresh"
+		state.Color = "surface-variant"
+	case BtnStatusMissingDownloadURL:
+		state.Disabled = true
+		state.Icon = "mdi-close"
 		state.Color = "surface-variant"
 	default:
 		state.Icon = "mdi-download"

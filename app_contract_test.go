@@ -4,7 +4,12 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"reflect"
+	"sort"
+	"strings"
 	"testing"
 
 	"github.com/link-fgfgui/mod-downloader/core/appcore"
@@ -14,13 +19,13 @@ var expectedAppMethods = []string{
 	"GetStartupStatus", "Quit",
 	"SearchMods", "ListMatchingProjectVersions", "LookupProjectBySlug",
 	"GetPinnedModVersion", "PinModVersion", "ListPinnedMods", "UnpinMod",
-	"ListFavoriteLists", "CreateFavoriteList", "RenameFavoriteList", "DeleteFavoriteList",
+	"ListFavoriteLists", "CreateFavoriteListForScope", "RenameFavoriteList", "DeleteFavoriteList",
 	"UpdateFavoriteListMetadata", "ReorderFavoriteLists",
 	"ListFavoriteOverview", "ListFavoriteContentsForScope",
 	"AddFavoriteMod", "AddFavoriteModsToLists", "CopyFavoriteListToList",
 	"PreviewFavoriteListCrossVersionCopy", "ApplyFavoriteListCrossVersionCopy",
 	"AddFavoriteListReference",
-	"RemoveFavoriteMod", "ExportFavoriteListPackwizZip",
+	"RemoveFavoriteMod", "ExportFavoriteListPackwizZipForScope",
 	"GetMinecraftReleaseVersions", "GetSettings", "ChooseCacheDir",
 	"SaveTheme", "SaveLanguage", "SaveAnimationSettings", "SaveSimpleModeSettings",
 	"SaveUnusedDependencyCleanupSettings", "SaveMCIMSettings", "SaveJIJDetectionSettings",
@@ -61,6 +66,26 @@ func TestAppBindingContract(t *testing.T) {
 	}
 	for name := range expected {
 		t.Errorf("missing App method %q", name)
+	}
+}
+
+// appBindingSignatureHash pins the full method surface (names plus parameter
+// and result types). Update the constant only for an intentional breaking
+// change to the binding contract; additive methods also change the hash.
+const appBindingSignatureHash = "f0bd29565c3140bf9307650d7fe0d511e25ef010892310c9c6c4335445dbc4f2"
+
+func TestAppBindingSignatureContract(t *testing.T) {
+	typeOfApp := reflect.TypeOf((*App)(nil))
+	signatures := make([]string, 0, typeOfApp.NumMethod())
+	for i := 0; i < typeOfApp.NumMethod(); i++ {
+		method := typeOfApp.Method(i)
+		signatures = append(signatures, fmt.Sprintf("%s%s", method.Name, method.Type))
+	}
+	sort.Strings(signatures)
+	hash := sha256.Sum256([]byte(strings.Join(signatures, "\n")))
+	got := hex.EncodeToString(hash[:])
+	if got != appBindingSignatureHash {
+		t.Fatalf("App binding signature hash = %q, want %q\nsignatures:\n%s", got, appBindingSignatureHash, strings.Join(signatures, "\n"))
 	}
 }
 

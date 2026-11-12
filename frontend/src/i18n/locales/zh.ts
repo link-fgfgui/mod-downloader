@@ -1,7 +1,4 @@
 const messages = {
-    welcome: "欢迎来到 Wails 桌面应用",
-    about: "关于我们",
-    changeLang: "切换语言",
     startup: {
       title: "核心服务启动失败",
       description: "应用暂时无法加载数据。请检查配置文件、缓存目录或日志后重新打开应用。",
@@ -13,6 +10,12 @@ const messages = {
       extensionWarning: "扩展 HTTP 服务启动失败：{message}",
       retry: "重试",
       quit: "退出应用",
+    },
+    errorBoundary: {
+      title: "界面出现异常",
+      description: "界面因意外错误而中断。请重新加载应用继续使用；如果问题仍然存在，请检查日志。",
+      details: "错误详情",
+      reload: "重新加载应用",
     },
     nav: {
       home: "首页",
@@ -438,6 +441,7 @@ const messages = {
         download: "下载",
         metadataLoading: "正在获取版本信息",
         metadataFailed: "版本信息获取失败，点击重试",
+        missingDownloadUrl: "缺少下载链接，当前构建不可下载",
       },
     },
     versions: {
@@ -469,8 +473,6 @@ const messages = {
       clearSearch: "清空搜索",
       useCustom: "使用“{value}”",
     },
-    aboutDescription:
-      "这是一个基于 Wails + Vue3 + Vuetify + Router + i18n 的高配置桌面端模板。",
 };
 
 export default messages;

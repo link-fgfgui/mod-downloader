@@ -113,6 +113,56 @@ describe("settings store", () => {
     expect(useSettingsStore.getState().draftModrinthKey).toBe("");
   });
 
+  it("treats a canceled cache-dir selection as no change", async () => {
+    useSettingsStore.setState({ settings: { ...view, cacheDir: "/old" } });
+    vi.mocked(api.ChooseCacheDir).mockResolvedValue({ settings: view, canceled: true });
+    await expect(useSettingsStore.getState().chooseCacheDir()).resolves.toBe(false);
+    const state = useSettingsStore.getState();
+    expect(state.settings).toEqual(view);
+    expect(state.error).toBe("");
+  });
+
+  it("surfaces a failed cache-dir switch", async () => {
+    useSettingsStore.setState({ settings: { ...view, cacheDir: "/old" } });
+    vi.mocked(api.ChooseCacheDir).mockResolvedValue({
+      settings: { ...view, cacheDir: "/old" },
+      canceled: false,
+      error: "permission denied",
+    });
+    await expect(useSettingsStore.getState().chooseCacheDir()).resolves.toBe(false);
+    expect(useSettingsStore.getState().error).toBe("permission denied");
+  });
+
+  it("rejects a failed cache-dir reset", async () => {
+    vi.mocked(api.SaveCacheDirPreference).mockResolvedValue({ ...view, saveError: "disk full" });
+    await expect(useSettingsStore.getState().resetCacheDir()).rejects.toThrow("disk full");
+    expect(useSettingsStore.getState().error).toBe("disk full");
+  });
+
+  it("rejects a failed settings save and keeps the save error visible", async () => {
+    vi.mocked(api.SaveMultiSelectSettings).mockResolvedValue({ ...view, saveError: "disk full" });
+    useSettingsStore.setState({ settings: view, draftRequireCtrlForMultiSelect: true });
+    await expect(useSettingsStore.getState().saveMultiSelectSettings()).rejects.toThrow("disk full");
+    expect(useSettingsStore.getState().settings?.saveError).toBe("disk full");
+  });
+
+  it("rejects a failed theme save and reloads the persisted settings", async () => {
+    vi.mocked(api.SaveTheme).mockRejectedValue(new Error("disk full"));
+    vi.mocked(api.GetSettings).mockResolvedValue({ ...view, theme: "dark", saveError: "disk full" });
+    useSettingsStore.setState({ settings: { ...view, theme: "dark" }, draftTheme: "light" });
+    await expect(useSettingsStore.getState().saveTheme()).rejects.toThrow("disk full");
+    const state = useSettingsStore.getState();
+    expect(state.settings?.saveError).toBe("disk full");
+    expect(state.draftTheme).toBe("dark");
+  });
+
+  it("rejects an autosave that returns SaveError", async () => {
+    vi.mocked(api.SaveAnimationSettings).mockResolvedValue({ ...view, saveError: "disk full" });
+    vi.mocked(api.GetSettings).mockResolvedValue({ ...view, saveError: "disk full" });
+    useSettingsStore.setState({ settings: view, draftAnimationDurationMultiplier: 2 });
+    await expect(useSettingsStore.getState().saveAnimationSettings()).rejects.toThrow("disk full");
+  });
+
   it("persists the multi-select preference and mirrors the saved view", async () => {
     vi.mocked(api.SaveMultiSelectSettings).mockResolvedValue({ ...view, requireCtrlForMultiSelect: true });
     useSettingsStore.setState({ settings: view, draftRequireCtrlForMultiSelect: true });

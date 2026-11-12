@@ -86,9 +86,15 @@ const (
 )
 
 // New returns a Service with the given options; Startup must be called before
-// the service is used.
+// the service is used. A process may run only one active Service at a time;
+// Startup rejects a second concurrent service instead of sharing process-wide
+// providers, storage and logging.
 func New(options Options) *Service {
-	return &Service{config: options.Config, options: options}
+	service := &Service{options: options}
+	if options.Config != nil {
+		service.storeConfig(options.Config)
+	}
+	return service
 }
 
 // UserAgent returns the HTTP user agent advertised with provider requests.
@@ -97,7 +103,9 @@ func (s *Service) UserAgent() string {
 }
 
 // Startup initializes providers, storage, logging and background tasks.
-// Calling it on an already started service is a no-op.
+// Calling it on an already started service is a no-op. A failed startup tears
+// down partially initialized resources and returns a *StartupError whose Stage
+// is one of the core/structs.StartupStage* constants.
 func (s *Service) Startup(ctx context.Context) error {
 	s.lifecycleMu.Lock()
 	defer s.lifecycleMu.Unlock()
@@ -130,42 +138,44 @@ func (s *Service) Startup(ctx context.Context) error {
 
 func (s *Service) startup() error {
 	providers.StartBackgroundTasks()
-	if s.config != nil {
-		s.configureLoggingConfig(s.config.Logging)
+	if cfg := s.configPtr.Load(); cfg != nil {
+		s.configureLoggingConfig(cfg.Logging)
 	} else if !s.options.Runtime.NoConfigFile {
 		if bootstrapLogging, err := configs.LoadLogging(); err == nil {
 			s.configureLoggingConfig(bootstrapLogging)
 		}
 	}
-	if s.config == nil {
+	if s.configPtr.Load() == nil {
 		cfg, err := s.loadConfig()
 		if err != nil {
 			logging.Error("load config failed", "error", err)
-			return &StartupError{Stage: "config", Err: err}
+			return &StartupError{Stage: appstructs.StartupStageConfig, Err: err}
 		}
-		s.config = cfg
+		s.storeConfig(cfg)
 	}
 	s.applyConfigOverrides()
 	s.configureLogging()
 	s.applyRuntimeConfig()
-	if minecraftDir := minecraft.ExpandPathWithEnv(s.config.Preferences.MinecraftDir); strings.TrimSpace(minecraftDir) != "" {
-		s.config.Preferences.MinecraftDir = minecraftDir
+	if minecraftDir := minecraft.ExpandPathWithEnv(s.configSnapshot().Preferences.MinecraftDir); strings.TrimSpace(minecraftDir) != "" {
+		s.mutateConfig(func(cfg *configs.Config) {
+			cfg.Preferences.MinecraftDir = minecraftDir
+		})
 		global.SetMinecraftDir(minecraftDir)
 	}
 
 	cachePath, err := s.cachePath()
 	if err != nil {
 		logging.Error("resolve database cache path failed", "error", err)
-		return &StartupError{Stage: "storage", Err: fmt.Errorf("resolve cache path: %w", err)}
+		return &StartupError{Stage: appstructs.StartupStageStorage, Err: fmt.Errorf("resolve cache path: %w", err)}
 	}
 	if err := storage.OpenAt(cachePath); err != nil {
 		logging.Error("open database failed", "path", cachePath, "error", err)
-		return &StartupError{Stage: "storage", Err: fmt.Errorf("open storage %s: %w", cachePath, err)}
+		return &StartupError{Stage: appstructs.StartupStageStorage, Err: fmt.Errorf("open storage %s: %w", cachePath, err)}
 	}
 
 	if s.options.LoadMinecraftReleases {
 		if err := loadMinecraftReleaseVersions(); err != nil {
-			return &StartupError{Stage: "releases", Err: err}
+			return &StartupError{Stage: appstructs.StartupStageReleases, Err: err}
 		}
 	}
 	// The queue may still be closed from a previous service in the same
@@ -250,12 +260,10 @@ func (s *Service) Close() {
 	s.lifecycleState = serviceStateIdle
 }
 
-// Config returns the live configuration, allocating an empty one if needed.
+// Config returns an immutable snapshot of the current configuration. Callers
+// may read it freely; mutating it does not change the service.
 func (s *Service) Config() *configs.Config {
-	if s.config == nil {
-		s.config = &configs.Config{}
-	}
-	return s.config
+	return s.configSnapshot()
 }
 
 // GetMinecraftReleaseVersions returns the cached Minecraft release versions.
@@ -264,18 +272,17 @@ func (s *Service) GetMinecraftReleaseVersions() []string {
 }
 
 func (s *Service) applyConfigOverrides() {
-	if s.config == nil {
-		s.config = &configs.Config{}
-	}
-	if s.options.ConfigOverrides.HasMinecraftDir {
-		s.config.Preferences.MinecraftDir = s.options.ConfigOverrides.MinecraftDir
-	}
-	if s.options.ConfigOverrides.HasCurseForgeAPIKey {
-		s.config.Keys.CurseForgeAPIKey = s.options.ConfigOverrides.CurseForgeAPIKey
-	}
-	if s.options.ConfigOverrides.HasModrinthAPIKey {
-		s.config.Keys.ModrinthAPIKey = s.options.ConfigOverrides.ModrinthAPIKey
-	}
+	s.mutateConfig(func(cfg *configs.Config) {
+		if s.options.ConfigOverrides.HasMinecraftDir {
+			cfg.Preferences.MinecraftDir = s.options.ConfigOverrides.MinecraftDir
+		}
+		if s.options.ConfigOverrides.HasCurseForgeAPIKey {
+			cfg.Keys.CurseForgeAPIKey = s.options.ConfigOverrides.CurseForgeAPIKey
+		}
+		if s.options.ConfigOverrides.HasModrinthAPIKey {
+			cfg.Keys.ModrinthAPIKey = s.options.ConfigOverrides.ModrinthAPIKey
+		}
+	})
 }
 
 func (s *Service) loadConfig() (*configs.Config, error) {
@@ -286,10 +293,16 @@ func (s *Service) loadConfig() (*configs.Config, error) {
 }
 
 func (s *Service) cachePath() (string, error) {
+	return s.cachePathForDir(s.configSnapshot().Runtime.CacheDir)
+}
+
+// cachePathForDir resolves the metadata cache path for a prospective cache
+// directory without mutating the live config.
+func (s *Service) cachePathForDir(cacheDir string) (string, error) {
 	if path := s.resolveRuntimePath(s.options.Runtime.CachePath); path != "" {
 		return path, nil
 	}
-	cacheDir := firstNonEmpty(s.options.Runtime.CacheDir, s.Config().Runtime.CacheDir)
+	cacheDir = firstNonEmpty(s.options.Runtime.CacheDir, cacheDir)
 	if cacheDir != "" {
 		return filepath.Join(s.resolveRuntimePath(cacheDir), storage.CacheFileName), nil
 	}
@@ -361,17 +374,18 @@ func firstNonEmpty(values ...string) string {
 }
 
 func (s *Service) effectiveCurseForgeAPIKey() string {
-	if s == nil || s.config == nil {
+	if s == nil {
 		return configs.EffectiveCurseForgeAPIKey("")
 	}
-	return configs.EffectiveCurseForgeAPIKey(s.config.Keys.CurseForgeAPIKey)
+	return configs.EffectiveCurseForgeAPIKey(s.configSnapshot().Keys.CurseForgeAPIKey)
 }
 
 func (s *Service) configureProviderClients() {
-	limiter := newRequestRateLimiter(s.Config().API.RequestsPerSecondValue())
+	cfg := s.configSnapshot()
+	limiter := newRequestRateLimiter(cfg.API.RequestsPerSecondValue())
 	limitedTransport := rateLimitedTransport{limiter: limiter, base: networking.NewTransport()}
-	useMCIM := s.Config().Preferences.MCIMEnabledValue()
-	curseForgeAPIKey := s.effectiveCurseForgeAPIKey()
+	useMCIM := cfg.Preferences.MCIMEnabledValue()
+	curseForgeAPIKey := configs.EffectiveCurseForgeAPIKey(cfg.Keys.CurseForgeAPIKey)
 	if curseForgeAPIKey != "" || useMCIM {
 		apiBaseURL := ""
 		if useMCIM {
@@ -395,7 +409,7 @@ func (s *Service) configureProviderClients() {
 }
 
 func (s *Service) configureLogging() {
-	s.configureLoggingConfig(s.Config().Logging)
+	s.configureLoggingConfig(s.configSnapshot().Logging)
 }
 
 func (s *Service) configureLoggingConfig(config configs.LoggingConfig) {
@@ -684,13 +698,9 @@ func (s *Service) stop(saveConfig bool) {
 	// running jobs still touch all three while finishing.
 	downloader.Shutdown()
 	if saveConfig {
-		if s.config == nil {
-			s.config = &configs.Config{}
-		}
-		s.config.Preferences.MinecraftDir = global.GetMinecraftDir()
-		if err := configs.Save(s.config); err != nil {
-			logging.Error("save config failed", "error", err)
-		}
+		_, _ = s.updateConfig("save config failed", true, func(cfg *configs.Config) {
+			cfg.Preferences.MinecraftDir = global.GetMinecraftDir()
+		})
 	}
 	providers.StopBackgroundTasks()
 	storage.Close()

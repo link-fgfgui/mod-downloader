@@ -12,6 +12,7 @@ export const DownloadStatus = {
   Incompatible: "incompatible",
   MetadataLoading: "metadataLoading",
   MetadataFailed: "metadataFailed",
+  MissingDownloadUrl: "missingDownloadUrl",
   NoSelectedVersion: "noSelectedVersion",
   InvalidRequest: "invalidRequest",
 } as const;

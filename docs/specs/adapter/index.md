@@ -2,7 +2,7 @@
 
 This directory registers contracts for the Wails adapter layer (`main.go`,
 `app.go`, `app_events.go` at the repository root). Core domain rules live in
-`docs/specs/core/`.
+`core/docs/specs/`.
 
 | Topic | File | Summary |
 | --- | --- | --- |

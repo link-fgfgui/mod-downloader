@@ -30,22 +30,32 @@ func UpsertPinnedMod(p PinnedMod) error {
 
 // GetPinnedMod returns the pinned version for a mod in one scope.
 func GetPinnedMod(platform, modID, minecraftVersion, modLoader string) (PinnedMod, bool) {
+	pin, found, _ := GetPinnedModWithError(platform, modID, minecraftVersion, modLoader)
+	return pin, found
+}
+
+// GetPinnedModWithError reads a pin and preserves storage failures.
+func GetPinnedModWithError(platform, modID, minecraftVersion, modLoader string) (PinnedMod, bool, error) {
 	d, err := readyUserDB()
 	if err != nil {
-		return PinnedMod{}, false
+		return PinnedMod{}, false, err
 	}
 	key := makePinnedModKey(platform, modID, minecraftVersion, modLoader)
 	if key.Platform == "" || key.ModID == "" || key.MinecraftVersion == "" || key.ModLoader == "" {
-		return PinnedMod{}, false
+		return PinnedMod{}, false, nil
 	}
 
 	p, found, err := d.getPinnedMod(key.Platform, key.ModID, key.MinecraftVersion, key.ModLoader)
-	if err != nil || !found {
+	if err != nil {
+		logging.Debug("pinned mod read failed", "platform", key.Platform, "modID", key.ModID, "minecraftVersion", key.MinecraftVersion, "modLoader", key.ModLoader, "error", err)
+		return PinnedMod{}, false, err
+	}
+	if !found {
 		logging.Debug("pinned mod miss", "platform", key.Platform, "modID", key.ModID, "minecraftVersion", key.MinecraftVersion, "modLoader", key.ModLoader)
-		return PinnedMod{}, false
+		return PinnedMod{}, false, nil
 	}
 	logging.Debug("pinned mod hit", "platform", key.Platform, "modID", key.ModID, "versionID", p.VersionID, "minecraftVersion", key.MinecraftVersion, "modLoader", key.ModLoader)
-	return p, true
+	return p, true, nil
 }
 
 // DeletePinnedMod removes the pin for a mod in one scope.

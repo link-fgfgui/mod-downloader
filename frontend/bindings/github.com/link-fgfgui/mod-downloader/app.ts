@@ -69,7 +69,7 @@ export function CheckDependencyFulfillment(req: structs$0.DependencyPreflightReq
     return $Call.ByID(1495726836, req);
 }
 
-export function ChooseCacheDir(locale: string): $CancellablePromise<view$0.SettingsView> {
+export function ChooseCacheDir(locale: string): $CancellablePromise<$models.CacheDirSelectionResult> {
     return $Call.ByID(1602493177, locale);
 }
 
@@ -85,8 +85,8 @@ export function CopyFavoriteListToList(req: appcore$0.FavoriteListCopyRequest): 
     return $Call.ByID(4016724269, req);
 }
 
-export function CreateFavoriteList(name: string, minecraftVersion: string, modLoader: string): $CancellablePromise<storage$0.FavoriteList> {
-    return $Call.ByID(91835881, name, minecraftVersion, modLoader);
+export function CreateFavoriteListForScope(name: string, minecraftVersion: string, modLoader: string): $CancellablePromise<storage$0.FavoriteList> {
+    return $Call.ByID(3490398952, name, minecraftVersion, modLoader);
 }
 
 export function DeleteFavoriteList(id: string): $CancellablePromise<boolean> {
@@ -97,8 +97,8 @@ export function DismissOptionalDependencyReminder(id: string): $CancellablePromi
     return $Call.ByID(2208119680, id);
 }
 
-export function ExportFavoriteListPackwizZip(listID: string, minecraftVersion: string, modLoader: string, locale: string): $CancellablePromise<$models.ExportFavoritePackwizResult> {
-    return $Call.ByID(387069411, listID, minecraftVersion, modLoader, locale);
+export function ExportFavoriteListPackwizZipForScope(listID: string, minecraftVersion: string, modLoader: string, locale: string): $CancellablePromise<$models.ExportFavoritePackwizResult> {
+    return $Call.ByID(2282674018, listID, minecraftVersion, modLoader, locale);
 }
 
 export function GetDownloadQueueState(): $CancellablePromise<view$0.DownloadQueueState> {
@@ -245,7 +245,7 @@ export function RenameFavoriteList(id: string, name: string): $CancellablePromis
     return $Call.ByID(229132587, id, name);
 }
 
-export function ReorderFavoriteLists(ids: string[] | null): $CancellablePromise<boolean> {
+export function ReorderFavoriteLists(ids: string[] | null): $CancellablePromise<void> {
     return $Call.ByID(2324610133, ids);
 }
 
@@ -281,6 +281,10 @@ export function SaveJIJDetectionSettings(req: structs$0.SaveJIJDetectionSettings
     return $Call.ByID(2533299945, req);
 }
 
+/**
+ * SaveLanguage updates the language preference and persists it immediately. It
+ * returns the normalized language and a persistence error.
+ */
 export function SaveLanguage(language: string): $CancellablePromise<string> {
     return $Call.ByID(3495151482, language);
 }
@@ -306,8 +310,9 @@ export function SaveSimpleModeSettings(req: structs$0.SaveSimpleModeSettingsRequ
 }
 
 /**
- * SaveTheme updates the theme preference and persists it immediately. Returns the updated theme string.
- * Invalid values fall back to dark.
+ * SaveTheme updates the theme preference and persists it immediately. It
+ * returns the normalized theme and a persistence error. Invalid values fall
+ * back to dark.
  */
 export function SaveTheme(theme: string): $CancellablePromise<string> {
     return $Call.ByID(2006138805, theme);

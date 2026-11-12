@@ -29,7 +29,7 @@ func TestHealthEndpoint(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("health status = %d, want %d", rec.Code, http.StatusOK)
 	}
-	if body := rec.Body.String(); !strings.Contains(body, `"ok"`) {
+	if body := rec.Body.String(); !strings.Contains(body, `"ok"`) || !strings.Contains(body, `"apiVersion":1`) {
 		t.Fatalf("health body = %q", body)
 	}
 }
@@ -101,6 +101,7 @@ func TestRootForwardsDecodedPayloads(t *testing.T) {
 func TestRootRejectsWhenReceiverUnavailable(t *testing.T) {
 	s := New("")
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("[]"))
+	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	s.handler().ServeHTTP(rec, req)
 	if rec.Code != http.StatusServiceUnavailable {
@@ -113,6 +114,7 @@ func TestRootRejectsMismatchedResultCount(t *testing.T) {
 		return nil
 	}})
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`[{"p":"mr","slug":"sodium","file":""}]`))
+	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	s.handler().ServeHTTP(rec, req)
 	if rec.Code != http.StatusInternalServerError {
@@ -191,6 +193,129 @@ func TestRootAcceptsEmptyArray(t *testing.T) {
 	body, _ := io.ReadAll(rec.Body)
 	if strings.TrimSpace(string(body)) != "[]" {
 		t.Fatalf("empty array body = %q", string(body))
+	}
+}
+
+func TestProjectsEndpointAcceptsCanonicalPathAndSetsVersion(t *testing.T) {
+	var called bool
+	s := New("", Options{Accept: func(payloads []appstructs.ExtensionProjectPayload) []appstructs.ModDownloadResult {
+		called = true
+		return make([]appstructs.ModDownloadResult, len(payloads))
+	}})
+	req := httptest.NewRequest(http.MethodPost, ProjectsPath, strings.NewReader(`[{"p":"mr","slug":"sodium"}]`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", "chrome-extension://abcdefghijklmnop")
+	rec := httptest.NewRecorder()
+	s.handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if !called {
+		t.Fatal("accept handler was not called")
+	}
+	if got := rec.Header().Get("X-Mod-Downloader-API-Version"); got != "1" {
+		t.Fatalf("api version header = %q, want 1", got)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "chrome-extension://abcdefghijklmnop" {
+		t.Fatalf("allow-origin header = %q", got)
+	}
+}
+
+func TestProjectsEndpointRejectsForeignOrigin(t *testing.T) {
+	s := New("", Options{Accept: func(payloads []appstructs.ExtensionProjectPayload) []appstructs.ModDownloadResult {
+		return make([]appstructs.ModDownloadResult, len(payloads))
+	}})
+	req := httptest.NewRequest(http.MethodPost, ProjectsPath, strings.NewReader("[]"))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", "https://example.com")
+	rec := httptest.NewRecorder()
+	s.handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+	}
+}
+
+func TestProjectsEndpointAllowsExtensionPreflight(t *testing.T) {
+	s := New("")
+	req := httptest.NewRequest(http.MethodOptions, ProjectsPath, nil)
+	req.Header.Set("Origin", "moz-extension://abcdefghijklmnop")
+	rec := httptest.NewRecorder()
+	s.handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNoContent)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Methods"); !strings.Contains(got, "POST") {
+		t.Fatalf("allow-methods header = %q", got)
+	}
+}
+
+func TestProjectsEndpointRequiresJSONContentType(t *testing.T) {
+	s := New("", Options{Accept: func(payloads []appstructs.ExtensionProjectPayload) []appstructs.ModDownloadResult {
+		return make([]appstructs.ModDownloadResult, len(payloads))
+	}})
+	req := httptest.NewRequest(http.MethodPost, ProjectsPath, strings.NewReader("[]"))
+	req.Header.Set("Content-Type", "text/plain")
+	rec := httptest.NewRecorder()
+	s.handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnsupportedMediaType {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnsupportedMediaType)
+	}
+}
+
+func TestProjectsEndpointRejectsTooManyPayloads(t *testing.T) {
+	called := false
+	s := New("", Options{Accept: func(payloads []appstructs.ExtensionProjectPayload) []appstructs.ModDownloadResult {
+		called = true
+		return make([]appstructs.ModDownloadResult, len(payloads))
+	}})
+	payloads := make([]appstructs.ExtensionProjectPayload, maxExtensionPayloads+1)
+	for i := range payloads {
+		payloads[i] = appstructs.ExtensionProjectPayload{PlatformCode: "mr", Slug: "sodium"}
+	}
+	body, err := json.Marshal(payloads)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, ProjectsPath, bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	s.handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusRequestEntityTooLarge)
+	}
+	if called {
+		t.Fatal("accept handler called for oversized payload list")
+	}
+}
+
+func TestProjectsEndpointRejectsOversizedBody(t *testing.T) {
+	s := New("", Options{Accept: func(payloads []appstructs.ExtensionProjectPayload) []appstructs.ModDownloadResult {
+		return make([]appstructs.ModDownloadResult, len(payloads))
+	}})
+	req := httptest.NewRequest(http.MethodPost, ProjectsPath, bytes.NewReader(make([]byte, maxBodyBytes+1)))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	s.handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusRequestEntityTooLarge)
+	}
+}
+
+func TestUnknownPathReturnsNotFound(t *testing.T) {
+	s := New("")
+	req := httptest.NewRequest(http.MethodPost, "/v2/extension/projects", strings.NewReader("[]"))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	s.handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
 	}
 }
 

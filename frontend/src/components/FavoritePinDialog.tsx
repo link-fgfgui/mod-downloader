@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ModVersionList } from "@/components/ModVersionList";
@@ -53,6 +54,9 @@ export function FavoritePinDialog({ open, item, onOpenChange }: FavoritePinDialo
         setVersions(matched ?? []);
         setPinnedVersionId(pin?.versionId || "");
       })
+      .catch((error) => {
+        if (!cancelled) toast.error(error instanceof Error ? error.message : String(error));
+      })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
@@ -73,6 +77,8 @@ export function FavoritePinDialog({ open, item, onOpenChange }: FavoritePinDialo
         modLoader,
       });
       setPinnedVersionId(pin?.versionId || "");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
     } finally {
       setBusyVersionId("");
     }

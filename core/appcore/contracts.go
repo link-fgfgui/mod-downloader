@@ -7,6 +7,7 @@ import (
 	"context"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 
 	"github.com/link-fgfgui/mod-downloader/core/configs"
 	"github.com/link-fgfgui/mod-downloader/core/models"
@@ -35,18 +36,29 @@ const (
 // Event constants are the internal kinds; Name maps them to the kebab-case
 // wire names in EventName*.
 const (
-	// EventSearchModsUpdated carries a streamed search page.
+	// EventSearchModsUpdated carries a streamed search page as a
+	// view.SearchModsUpdate.
 	EventSearchModsUpdated EventKind = "searchModsUpdated"
 	// EventExtensionModsAccepted carries projects accepted from the browser
-	// extension as a view.SearchModsUpdate payload.
-	EventExtensionModsAccepted  EventKind = "extensionModsAccepted"
-	EventDownloadStatesUpdated  EventKind = "downloadStatesUpdated"
-	EventDownloadQueueUpdated   EventKind = "downloadQueueUpdated"
-	EventDownloadFailed         EventKind = "downloadFailed"
-	EventDownloadCompleted      EventKind = "downloadCompleted"
-	EventMinecraftDirChanged    EventKind = "minecraftDirChanged"
+	// extension as a view.SearchModsUpdate.
+	EventExtensionModsAccepted EventKind = "extensionModsAccepted"
+	// EventDownloadStatesUpdated carries no payload. It signals that asynchronous
+	// metadata backfill finished and adapters should re-read download states.
+	EventDownloadStatesUpdated EventKind = "downloadStatesUpdated"
+	// EventDownloadQueueUpdated carries a view.DownloadQueueState snapshot.
+	EventDownloadQueueUpdated EventKind = "downloadQueueUpdated"
+	// EventDownloadFailed carries a structs.DownloadFailedEvent for one queue
+	// entry that failed permanently.
+	EventDownloadFailed EventKind = "downloadFailed"
+	// EventDownloadCompleted carries no payload and reports that one queue entry
+	// completed.
+	EventDownloadCompleted EventKind = "downloadCompleted"
+	// EventMinecraftDirChanged carries the simplified Minecraft directory string.
+	EventMinecraftDirChanged EventKind = "minecraftDirChanged"
+	// EventSelectedVersionChanged carries the selected minecraft/structs.VersionInfo.
 	EventSelectedVersionChanged EventKind = "selectedVersionChanged"
-	EventUsageStatsUpdated      EventKind = "usageStatsUpdated"
+	// EventUsageStatsUpdated carries the current storage.UsageStats snapshot.
+	EventUsageStatsUpdated EventKind = "usageStatsUpdated"
 )
 
 // Event is one typed core notification delivered to adapters.
@@ -228,7 +240,8 @@ type InstallToDirRequest struct {
 // shared runtime.
 type Service struct {
 	ctx                context.Context
-	config             *configs.Config
+	configPtr          atomic.Pointer[configs.Config]
+	configWriteMu      sync.Mutex
 	options            Options
 	modsWatchMu        sync.Mutex
 	modsWatchRestartMu sync.Mutex

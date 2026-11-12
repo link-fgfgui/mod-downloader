@@ -126,11 +126,14 @@ export function ManagePage() {
     return () => observer.disconnect();
   }, [viewMode, i18n.language]);
 
-  const notify = (key: string, color: "success" | "warning" | "error" = "success", params: Record<string, unknown> = {}) => {
-    const message = t(key, params);
+  const notifyMessage = (message: string, color: "success" | "warning" | "error" = "success") => {
     if (color === "error") toast.error(message);
     else if (color === "warning") toast.warning(message);
     else toast.success(message);
+  };
+
+  const notify = (key: string, color: "success" | "warning" | "error" = "success", params: Record<string, unknown> = {}) => {
+    notifyMessage(t(key, params), color);
   };
 
   const handleError = (error: unknown) => {
@@ -539,6 +542,7 @@ export function ManagePage() {
         onQueued={() => setReplacementQueued(true)}
         onError={handleError}
         onNotify={notify}
+        onNotifyMessage={notifyMessage}
       />
 
       <AddToFavoriteDialog

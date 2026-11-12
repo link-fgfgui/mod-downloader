@@ -7,6 +7,7 @@ export {
 };
 
 export type {
+    CacheDirSelectionResult,
     DirectorySelectionResult,
     ExportFavoritePackwizResult
 } from "./models.js";

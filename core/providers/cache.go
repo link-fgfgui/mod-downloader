@@ -1,8 +1,6 @@
 // SPDX-FileCopyrightText: 2026 link-fgfgui
 // SPDX-License-Identifier: LGPL-3.0-or-later WITH LGPL-3.0-linking-exception
 
-// Package providers integrates the Modrinth and CurseForge APIs behind a
-// single provider interface and persists their metadata to the cache.
 package providers
 
 import (

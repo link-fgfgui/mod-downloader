@@ -453,6 +453,14 @@ func TestSimpleModeReturnsOrdinaryDownloadStates(t *testing.T) {
 		t.Fatalf("state count = %d, want 1", len(states))
 	}
 	state := states[0]
+	if providers.CurseForgeDownloadURL("12345678", "example.jar") == "" {
+		// Strict mode reports a terminal missing-URL state but keeps the row so
+		// results and states stay index-aligned.
+		if state.Key != "modrinth:sodium" || state.Status != BtnStatusMissingDownloadURL || !state.Disabled || state.Icon != "mdi-close" || state.Color != "surface-variant" {
+			t.Fatalf("simple mode strict state = %#v, want missing-URL state", state)
+		}
+		return
+	}
 	if state.Key != "modrinth:sodium" || state.Status != BtnStatusNew || state.Disabled || state.Icon != "mdi-download" || state.Color != "primary" {
 		t.Fatalf("simple mode state = %#v, want ordinary download state", state)
 	}
@@ -784,6 +792,13 @@ func TestRemoteMetadataButtonStatusUsesCurseForgeCDNFallback(t *testing.T) {
 		ID:       "12345678",
 		FileName: "example.jar",
 	}
+	if providers.CurseForgeDownloadURL(version.ID, version.FileName) == "" {
+		// Strict build: no JAR can be fetched, so retrying metadata would loop.
+		if got := remoteMetadataButtonStatus(version, "forge"); got != BtnStatusNew {
+			t.Fatalf("strict metadata status = %q, want %q", got, BtnStatusNew)
+		}
+		return
+	}
 	if got := remoteMetadataButtonStatus(version, "forge"); got != BtnStatusMetadataLoading {
 		t.Fatalf("fallback metadata status = %q, want %q", got, BtnStatusMetadataLoading)
 	}
@@ -803,7 +818,7 @@ func TestMarkBackfillDeduplicatesByVersionID(t *testing.T) {
 	resetBackfillState()
 	t.Cleanup(resetBackfillState)
 
-	version := models.ModVersion{ID: "v-dedup"}
+	version := models.ModVersion{ID: "v-dedup", DownloadURL: "https://cdn.example.test/dedup.jar"}
 	markBackfill(version, "fabric")
 	markBackfill(version, "fabric")
 	markBackfill(version, "forge")
@@ -821,6 +836,16 @@ func TestMarkBackfillDeduplicatesByVersionID(t *testing.T) {
 	pending = drainPendingBackfills()
 	if len(pending) != 1 {
 		t.Fatalf("drainPendingBackfills() after re-mark returned %d entries, want 1", len(pending))
+	}
+}
+
+func TestMarkBackfillSkipsVersionWithoutDownloadURL(t *testing.T) {
+	resetBackfillState()
+	t.Cleanup(resetBackfillState)
+
+	markBackfill(models.ModVersion{ID: "v-no-url"}, "fabric")
+	if pending := drainPendingBackfills(); len(pending) != 0 {
+		t.Fatalf("drainPendingBackfills() returned %d entries, want 0 without download URL", len(pending))
 	}
 }
 

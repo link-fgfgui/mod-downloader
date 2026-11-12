@@ -43,8 +43,11 @@ type ModDownloadRequest struct {
 // rejected, and identifies the created queue entry.
 type ModDownloadResult struct {
 	Queued    bool   `json:"queued"`
+	Accepted  bool   `json:"accepted,omitempty"`
+	Pinned    bool   `json:"pinned,omitempty"`
 	Skipped   bool   `json:"skipped"`
 	Reason    string `json:"reason"`
+	Error     string `json:"error,omitempty"`
 	FileName  string `json:"fileName"`
 	VersionID string `json:"versionId"`
 	// QueueID identifies the queue entry created by this request so callers can

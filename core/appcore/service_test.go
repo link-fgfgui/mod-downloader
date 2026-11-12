@@ -1269,7 +1269,9 @@ func TestDefaultCurseForgeAPIKeyFallback(t *testing.T) {
 	}
 
 	// Explicit user key wins over compiled default.
-	svc.config.Keys.CurseForgeAPIKey = "user-override-key"
+	svc.mutateConfig(func(cfg *configs.Config) {
+		cfg.Keys.CurseForgeAPIKey = "user-override-key"
+	})
 	svc.configureProviderClients()
 	sv = svc.GetSettings()
 	if sv.CurseForgeKeyMask != MaskKey("user-override-key") {
@@ -1383,7 +1385,9 @@ func TestSettingsViewExposesRequireCtrlForMultiSelect(t *testing.T) {
 	if svc.GetSettings().RequireCtrlForMultiSelect {
 		t.Fatal("RequireCtrlForMultiSelect = true by default, want false")
 	}
-	svc.config.Preferences.RequireCtrlForMultiSelect = true
+	svc.mutateConfig(func(cfg *configs.Config) {
+		cfg.Preferences.RequireCtrlForMultiSelect = true
+	})
 	if !svc.GetSettings().RequireCtrlForMultiSelect {
 		t.Fatal("RequireCtrlForMultiSelect = false after enabling in config")
 	}

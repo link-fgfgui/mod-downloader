@@ -155,7 +155,7 @@ wails3 task build:server
 The server listens on `http://127.0.0.1:9245` by default; override with
 `MOD_DOWNLOADER_SERVER_PORT`. It is subject to the global single-instance guard
 (`127.0.0.1:18801`); close any running GUI/TUI instance first or it exits with
-`instance.ErrAlreadyRunning` (see `docs/specs/core/single-instance.md`). It serves
+`instance.ErrAlreadyRunning` (see `core/docs/specs/single-instance.md`). It serves
 the embedded production frontend with real Go bindings, so Playwright exercises
 the real backend.
 
@@ -208,35 +208,43 @@ old repository, now inlined here).
 
 ## 6. Documentation mechanism
 
-Documentation uses a lightweight, tool-free Markdown mechanism (no scripts, state
-machines, or JSONL manifests) under `docs/specs/`. **The only source of truth for
-specifications is this repository's `docs/specs/`**; the old repository is
-archived (`../archived-legacy-mod-downloader.tar.gz`) and is historical reference
-only. Reuse an existing file instead of creating a new one.
+Documentation uses two complementary sources of truth:
+
+- The public Go API of `core/` is documented with Go doc comments in the core
+  module. Package docs live in a package comment (preferably `doc.go`);
+  exported identifiers carry their own contract comment. Read them with
+  `go doc github.com/link-fgfgui/mod-downloader/core/...`.
+- Behavioral specifications, constraints and anti-patterns use a lightweight,
+  tool-free Markdown mechanism: core rules live under `core/docs/specs/`, and
+  adapter/frontend rules live under `docs/specs/`. The old repository is
+  archived (`../archived-legacy-mod-downloader.tar.gz`) and is historical
+  reference only. Reuse an existing file instead of creating a new one.
 
 All project documentation is written in English.
 
 ### 6.1 Directory structure
 
 ```text
+core/docs/specs/   core domain rules (storage, downloads, networking, compatibility, …)
 docs/specs/
-  core/       core domain rules (storage, downloads, networking, compatibility, …)
   adapter/    Wails adapter (binding surface, events, native dialogs, server mode)
   frontend/   React UI (state lifecycle, animation, i18n, theme)
 ```
 
 - Each subdirectory has an `index.md` listing every topic file. Create it when
   the first file lands.
-- `core` exists physically only in this repository: **core-level specifications
-  live in this repository's `docs/specs/core/`**. The TUI repository must link
-  here rather than copy them.
+- `core` exists physically only in this repository: **core-level behavioral
+  specifications live in `core/docs/specs/`**, while the public Go API is
+  documented in `core/` itself. The TUI repository must link there for specs and
+  import the core module for godoc; it must not copy either.
 
 ### 6.2 Read before changing
 
 Before modifying an existing layer or module, find the relevant specification in
-`docs/specs/` and confirm the plan does not violate a recorded contract or repeat
-a recorded anti-pattern. If the topic is not documented, add it using the
-triggers in 6.3 before changing code.
+`core/docs/specs/` for core or `docs/specs/` for adapter/frontend, and read the
+affected package docs with `go doc`. Confirm the plan does not violate a
+recorded contract or repeat a recorded anti-pattern. If the topic is not
+documented, add it using the triggers in 6.3 before changing code.
 
 ### 6.3 When to record
 
@@ -247,14 +255,20 @@ Record immediately when any of the following occurs:
    problem, root cause, forbidden pattern (Don't), and correct approach (Instead).
 2. **Architecture or contract boundary changes**: new modules, cross-layer
    payload changes, SQLite schema changes, `App` binding or core event changes.
-   Update the relevant spec or create `docs/specs/<layer>/<topic>.md` and register
-   it in `index.md`.
+   Update the relevant package doc comment and, when a decision or anti-pattern
+   changed, the relevant spec. Core specs are created under
+   `core/docs/specs/`; adapter/frontend specs use `docs/specs/<layer>/<topic>.md`.
+   Register every new file in the matching `index.md`.
 3. **Identified anti-patterns**: circular dependencies, duplicate
    implementations (especially those violating section 2), or three sources of
    duplicated state. Append to the relevant layer spec.
 4. **Key design decisions**: non-trivial choices (complex dependency resolution,
    download chunk calculation, grouping/compatibility consolidation). Record the
    constraints and trade-offs.
+5. **Core API changes**: update the `doc.go` package comment or the exported
+   symbol comment in `core/` and verify it with `go doc`. Do not add
+   API-reference Markdown for the core module; keep only behavioral decisions
+   and anti-patterns under `core/docs/specs/`.
 
 ### 6.4 One-minute pre-commit checklist
 
@@ -268,8 +282,8 @@ Before finishing a task or committing:
 - [ ] **When core public APIs or events change, verify the sibling repository**:
       `cd ../mod-downloader-cli && go build ./... && go vet ./... && go test ./...`
 - [ ] Did this work fix a subtle bug or produce an architectural insight? If yes,
-      update/create the relevant spec in `docs/specs/`, and commit the doc change
-      in the same batch as the code change.
+      update/create the relevant spec under `core/docs/specs/` or `docs/specs/`,
+      and commit the doc change in the same batch as the code change.
 - [ ] Grep for revived "second implementations", for example:
       `rg -n "MinFileConcurrency|MinConcurrentDownloads|MaxTargetDownloadRateMiB" --glob '!core/**'`
       must return 0 hits in adapters and the frontend (boundary rules live in one
