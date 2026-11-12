@@ -128,7 +128,7 @@ const messages = {
       hardwareAcceleration: {
         label: "硬件加速（Linux）",
         enabled: "启用 WebView 硬件加速",
-        hint: "强制 WebView 使用 GPU 渲染；修改后需重启应用生效。若出现黑屏或画面异常请关闭",
+        hint: "允许 WebView 使用 GPU 渲染；修改后需重启应用生效。若出现黑屏或画面异常请关闭",
         saved: "硬件加速设置已保存，重启应用后生效",
       },
       multiSelect: {

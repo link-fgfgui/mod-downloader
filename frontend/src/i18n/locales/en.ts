@@ -123,7 +123,7 @@ const messages = {
       hardwareAcceleration: {
         label: "Hardware acceleration (Linux)",
         enabled: "Enable WebView hardware acceleration",
-        hint: "Force GPU rendering for the webview; restart the app to apply. Disable this if the window goes black or renders incorrectly",
+        hint: "Use GPU rendering for the webview; restart the app to apply. Disable this if the window goes black or renders incorrectly",
         saved: "Hardware acceleration setting saved; restart the app to apply",
       },
       multiSelect: {
