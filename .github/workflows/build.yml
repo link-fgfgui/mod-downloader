@@ -95,6 +95,16 @@ jobs:
           go test ./...
           go test -race ./...
 
+      # The GUI root module embeds frontend/dist (`//go:embed all:frontend/dist`),
+      # so the frontend must be built before the root module is vetted/tested.
+      - name: Frontend quality gate (lint + test + build)
+        working-directory: mod-downloader-gui-v3/frontend
+        run: |
+          npm ci
+          npm run lint
+          npm run test
+          npm run build
+
       - name: Test GUI root module (vet + test)
         working-directory: mod-downloader-gui-v3
         run: |
@@ -107,14 +117,6 @@ jobs:
           go build ./...
           go vet ./...
           go test ./...
-
-      - name: Frontend quality gate (lint + test + build)
-        working-directory: mod-downloader-gui-v3/frontend
-        run: |
-          npm ci
-          npm run lint
-          npm run test
-          npm run build
 
       - name: Build headless server binary
         working-directory: mod-downloader-gui-v3
